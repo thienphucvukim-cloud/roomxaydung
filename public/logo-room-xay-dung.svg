@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2200 780" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">ROOM Xây Dựng</title>
+  <desc id="logoDesc">Logo thương hiệu ROOM Xây Dựng theo phong cách chữ khối cam trên nền đen</desc>
+
+  <defs>
+    <linearGradient id="brandOrange" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff8c2a"/>
+      <stop offset="25%" stop-color="#ff731a"/>
+      <stop offset="55%" stop-color="#ff5b00"/>
+      <stop offset="100%" stop-color="#ff7d1a"/>
+    </linearGradient>
+    <filter id="brandShadow" x="-15%" y="-15%" width="130%" height="170%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#ff5a00" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <rect width="2200" height="780" fill="#000000"/>
+
+  <g filter="url(#brandShadow)">
+    <path d="M220 210 L470 0 L720 210 Z" fill="url(#brandOrange)"/>
+    <path d="M340 165 h830 l120 -30 h440 c82 0 154 39 193 101 c-18 -8 -38 -12 -59 -12 h-302 c-5 0 -10 1 -15 2 l-155 20 c-33 4 -66 6 -99 6 H340 Z" fill="url(#brandOrange)" opacity="0.98"/>
+    <path d="M1700 260 c-44 -50 -108 -83 -181 -83 c-126 0 -214 85 -252 154 c40 -16 83 -24 128 -24 c81 0 152 26 216 79 l89 -126 Z" fill="url(#brandOrange)" opacity="0.95"/>
+
+    <text
+      x="90"
+      y="585"
+      font-size="470"
+      font-family="Impact, 'Arial Black', sans-serif"
+      font-weight="900"
+      fill="url(#brandOrange)"
+      letter-spacing="-20"
+      transform="skewX(-10)"
+      textLength="1710"
+      lengthAdjust="spacingAndGlyphs"
+    >XAYDUNG</text>
+  </g>
+</svg>
