@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, FileText, LogOut, Menu, Search, UserRound, X } from "lucide-react";
+import { Bell, ChevronDown, FileText, LogOut, Menu, MessageCircle, Search, UserRound, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
@@ -70,8 +70,10 @@ export function ExploreHeader() {
         <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-11 w-full rounded-full border-0 bg-[#f1f5fa] pl-11 pr-4 text-[14px] text-[#173b67] outline-none placeholder:text-[#66788c]" placeholder="Tìm bài viết, nhà thầu, kinh nghiệm..."/>
       </form>
 
+      <Link href="/chat" title="Tin nhắn" aria-label="Tin nhắn" className={"relative ml-auto hidden size-10 place-items-center rounded-full transition md:grid 2xl:ml-0 " + (pathname === "/chat" ? "bg-[#e8f6fc] text-[#168ac0]" : "text-[#314b6d] hover:bg-[#f1f5fa]")}><MessageCircle size={21}/></Link>
+
       <Popover>
-        <PopoverTrigger asChild><button className="relative ml-auto hidden size-10 place-items-center rounded-full text-[#314b6d] transition hover:bg-[#f1f5fa] md:grid 2xl:ml-0" aria-label="Hoạt động"><Bell size={21}/>{activities.length > 0 && <span className="absolute right-1 top-1 size-2 rounded-full bg-[#229ed9] ring-2 ring-white"/>}</button></PopoverTrigger>
+        <PopoverTrigger asChild><button className="relative hidden size-10 place-items-center rounded-full text-[#314b6d] transition hover:bg-[#f1f5fa] md:grid" aria-label="Hoạt động"><Bell size={21}/>{activities.length > 0 && <span className="absolute right-1 top-1 size-2 rounded-full bg-[#229ed9] ring-2 ring-white"/>}</button></PopoverTrigger>
         <PopoverContent align="end" sideOffset={10} className="z-[100] w-[min(360px,calc(100vw-1.5rem))] rounded-2xl border-[#e3eaf2] bg-white p-3 shadow-xl">
           <div className="flex items-center justify-between px-2 pb-2"><h2 className="font-bold text-[#0b2e59]">Hoạt động gần đây</h2><Link href="/tai-khoan" className="text-xs font-bold text-[#229ed9]">Xem tài khoản</Link></div>
           <div className="max-h-80 space-y-1 overflow-y-auto">

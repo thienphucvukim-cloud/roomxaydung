@@ -77,6 +77,9 @@ importers:
       tailwind-merge:
         specifier: 3.6.0
         version: 3.6.0
+      tinode-sdk:
+        specifier: 0.25.3
+        version: 0.25.3
       vaul:
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -4437,6 +4440,9 @@ packages:
     resolution: {integrity: sha512-tPbLXTI6ohPASb/1YViL428oEHu6/qv1OxqYnfaonVCFHqx4+wCd95pHrQWsL5X4pl90CTyW9piSAsS2L0VoMw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  tinode-sdk@0.25.3:
+    resolution: {integrity: sha512-5pf6dYU1d5aIkU2t1a7VebLWFZlVLI3vIIoQIm4LbQ9LL1PMaTOlTFHAezQHBQ8UZ6yW1nj4Y3IuLqp5hSfK6w==}
 
   tiny-inflate@1.0.3:
     resolution: {integrity: sha512-pkY1fj1cKHb2seWDy0B16HeWyczlJA9/WW3u3c4z/NiWDsO3DOU5D7nhTLE9CF0yXv/QZFY7sEJmj24dK+Rrqw==}
@@ -8811,6 +8817,8 @@ snapshots:
       acorn: 8.16.0
       commander: 2.20.3
       source-map-support: 0.5.21
+
+  tinode-sdk@0.25.3: {}
 
   tiny-inflate@1.0.3: {}
 
