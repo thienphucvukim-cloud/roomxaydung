@@ -44,3 +44,13 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+# Local preview logs and visual review artifacts
+/.local-*.log
+/*-review.jpg
+/*-review.png
+/current-page*.jpg
+/current-page*.png
+/served-*.jpg
+/served-*.png
+/expert-new-page*.png
+/.chrome-review-*/
