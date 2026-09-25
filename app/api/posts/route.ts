@@ -65,9 +65,9 @@ export async function POST(request: Request) {
 
     const db = getDb();
     const effectiveUserId = userId ?? "private-member";
-    if (body.category === "Bản vẽ cộng đồng") {
-      const [profile] = await db.select({ accountType: memberProfiles.accountType }).from(memberProfiles).where(eq(memberProfiles.userId, effectiveUserId)).limit(1);
-      if (profile?.accountType !== "engineer" && profile?.accountType !== "architect") return Response.json({ error: "Bạn cần chuyển sang tài khoản Kỹ sư hoặc Kiến trúc sư trước khi đăng bản vẽ." }, { status: 403 });
+    const [profile] = await db.select({ accountType: memberProfiles.accountType }).from(memberProfiles).where(eq(memberProfiles.userId, effectiveUserId)).limit(1);
+    if (body.category === "Bản vẽ cộng đồng" && profile?.accountType !== "engineer" && profile?.accountType !== "architect") {
+      return Response.json({ error: "Bạn cần chuyển sang tài khoản Kỹ sư hoặc Kiến trúc sư trước khi đăng bản vẽ." }, { status: 403 });
     }
 
     const validAttachment = (attachment: AttachmentInput, maxSize: number) =>
@@ -82,6 +82,19 @@ export async function POST(request: Request) {
     const attachments = (body.attachments ?? []).slice(0, 10).filter((attachment) => validAttachment(attachment, 25 * 1024 * 1024));
     const paidFiles = (body.paidFiles ?? []).slice(0, 5).filter((attachment) => validAttachment(attachment, 100 * 1024 * 1024));
     if (body.category === "Bản vẽ cộng đồng" && (!attachments.length || !paidFiles.length)) return Response.json({ error: "Cần tải ít nhất một ảnh đại diện và một file bản vẽ để bán." }, { status: 400 });
+
+    await db.insert(memberProfiles).values({
+      userId: effectiveUserId,
+      displayName: authorName,
+      email: email ?? null,
+    }).onConflictDoUpdate({
+      target: memberProfiles.userId,
+      set: {
+        displayName: authorName,
+        email: email ?? null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
 
     const [post] = await db.insert(posts).values({
       userId: effectiveUserId,

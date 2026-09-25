@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BarChart3, BookOpen, CheckCircle2,
-  CircleDollarSign, Clock3, FileText, Heart, Home, Image as ImageIcon,
+  CircleDollarSign, FileText, Heart, Home, Image as ImageIcon,
   MapPin, MessageCircle, Search, Send, Smile, TrendingUp,
   Users, X
 } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +22,34 @@ type Comment = { id: number | string; authorName: string; content: string; creat
 const demoPosts: Post[] = [];
 
 const stages = ["Chuẩn bị xây", "Thiết kế", "Chi phí thực tế", "Đang thi công", "Hoàn thiện"];
+
+const tipookExperts = [
+  ["/avatars/expert-khanh-linh.png", "KTS. Khánh Linh", "Thiết kế nhà phố", "virtual-architect-001", true],
+  ["/avatars/expert-trong-hieu.png", "KS. Nguyễn Trọng Hiếu", "Kết cấu & thi công", "virtual-engineer-001", true],
+  ["/avatars/expert-vu-mai.png", "Vũ Mai", "Dự toán công trình", "virtual-engineer-003", true],
+  ["/avatars/user-minh-anh.png", "KTS. Trần Minh Khoa", "Kiến trúc dân dụng", "virtual-architect-002", false],
+  ["/avatars/user-hoang-nam.png", "KS. Trần Văn Hùng", "Hệ thống kỹ thuật", "virtual-engineer-002", false],
+  ["/avatars/user-thu-ha.png", "KTS. Lê Hoài An", "Thiết kế nội thất", "virtual-architect-003", false],
+  ["/avatars/user-nguyen-van-a.png", "KS. Phạm Minh Tâm", "Giám sát thi công", "virtual-engineer-004", false],
+  ["/avatars/user-thu-ha.png", "KTS. Võ Thanh Trúc", "Thiết kế cảnh quan", "virtual-architect-005", false],
+] as const;
+
+const sortedTipookExperts = [...tipookExperts].sort((a, b) => Number(b[4]) - Number(a[4]));
+
+const tipookMembers = [
+  ["Nguyễn Minh Anh", "TP. Hồ Chí Minh", "virtual-member-001", true],
+  ["Trần Quốc Bảo", "Hà Nội", "virtual-member-002", true],
+  ["Lê Hoàng Nam", "Đà Nẵng", "virtual-member-003", true],
+  ["Phạm Thu Hà", "Bình Dương", "virtual-member-004", true],
+  ["Võ Gia Huy", "Đồng Nai", "virtual-member-005", false],
+  ["Đặng Ngọc Lan", "Cần Thơ", "virtual-member-006", false],
+  ["Bùi Thanh Tùng", "Hải Phòng", "virtual-member-007", false],
+  ["Đỗ Khánh Linh", "Khánh Hòa", "virtual-member-008", false],
+  ["Nguyễn Đức Anh", "TP. Hồ Chí Minh", "virtual-member-009", false],
+  ["Trần Mai Phương", "Hà Nội", "virtual-member-010", false],
+] as const;
+
+const sortedTipookMembers = [...tipookMembers].sort((a, b) => Number(b[3]) - Number(a[3]));
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return bytes + " B";
@@ -79,10 +106,63 @@ function HashtagText({ text, onSelect }: { text: string; onSelect: (hashtag: str
   return <>{text.split(/(#[\p{L}\p{N}_]+)/gu).map((part, index) => part.startsWith("#") ? <button type="button" key={part + index} onClick={() => onSelect(part.slice(1))} className="font-semibold text-[#168ac0] hover:underline">{part}</button> : part)}</>;
 }
 
+function FeedPostText({ post, onHashtag }: { post: Post; onHashtag: (hashtag: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const content = post.content.trim();
+  const isLong = content.length > 320 || content.split(/\r?\n/).length > 5;
+
+  return (
+    <div className="px-4 pb-3 text-left sm:px-5">
+      <h2 className="mt-2 text-[17px] font-bold leading-snug tracking-[-.015em] text-[#182230]">{post.title}</h2>
+      {post.feeling && <p className="mt-1.5 text-sm font-semibold text-[#168ac0]">cảm thấy {post.feeling}</p>}
+      {!post.background && content && <>
+        <p className={`mt-2 whitespace-pre-wrap text-[15px] leading-6 text-[#344054] ${!expanded && isLong ? "line-clamp-5" : ""}`}>
+          <HashtagText text={content} onSelect={onHashtag}/>
+        </p>
+        {isLong && <button type="button" onClick={() => setExpanded((current) => !current)} className="mt-1 text-[15px] font-bold text-[#344054] hover:underline">{expanded ? "Thu gọn" : "Xem thêm"}</button>}
+      </>}
+    </div>
+  );
+}
+
+function FeedPostMedia({ attachments }: { attachments?: PostAttachment[] }) {
+  const [preview, setPreview] = useState<PostAttachment | null>(null);
+  const images = attachments?.filter((attachment) => attachment.type.startsWith("image/")) ?? [];
+  const files = attachments?.filter((attachment) => !attachment.type.startsWith("image/")) ?? [];
+  const visibleImages = images.slice(0, 4);
+  const count = images.length;
+  const gridClass = count === 2
+    ? "grid-cols-2 h-[260px] sm:h-[420px]"
+    : count >= 3
+      ? "grid-cols-2 grid-rows-2 h-[360px] sm:h-[520px]"
+      : "grid-cols-1";
+
+  return <>
+    {count > 0 && <div className={`mt-1 grid gap-1 overflow-hidden border-y border-[#edf0f3] bg-[#e9edf1] ${gridClass}`}>
+      {visibleImages.map((attachment, index) => {
+        const spansRows = count === 3 && index === 0;
+        return <button type="button" key={attachment.key} onClick={() => setPreview(attachment)} className={`relative min-h-0 overflow-hidden bg-[#e9edf1] text-left ${spansRows ? "row-span-2" : ""}`} aria-label={`Xem ảnh ${attachment.name}`}>
+          <img src={attachment.url} alt={attachment.name} className={count === 1 ? "max-h-[620px] w-full object-contain" : "h-full w-full object-cover transition duration-200 hover:scale-[1.015]"}/>
+          {index === 3 && count > 4 && <span className="absolute inset-0 grid place-items-center bg-black/55 text-3xl font-bold text-white">+{count - 4}</span>}
+        </button>;
+      })}
+    </div>}
+    {files.length > 0 && <div className="px-4 sm:px-5"><AttachmentList attachments={files}/></div>}
+    <Dialog open={!!preview} onOpenChange={(open) => !open && setPreview(null)}>
+      <DialogContent className="max-h-[94dvh] max-w-[min(96vw,1100px)] overflow-hidden border-0 bg-black/95 p-2 text-white sm:rounded-2xl">
+        <DialogTitle className="sr-only">{preview?.name ?? "Xem ảnh bài viết"}</DialogTitle>
+        {preview && <img src={preview.url} alt={preview.name} className="mx-auto max-h-[90dvh] max-w-full object-contain"/>}
+      </DialogContent>
+    </Dialog>
+  </>;
+}
+
 export default function CommunityClient() {
   const [posts, setPosts] = useState<Post[]>(demoPosts);
   const [active, setActive] = useState("Tất cả");
   const [query, setQuery] = useState("");
+  const [showAllExperts, setShowAllExperts] = useState(false);
+  const [showAllMembers, setShowAllMembers] = useState(false);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -95,10 +175,6 @@ export default function CommunityClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
-  const [selected, setSelected] = useState<Post | null>(null);
-  const [thread, setThread] = useState<Comment[]>([]);
-  const [commentText, setCommentText] = useState("");
-  const [commentSaving, setCommentSaving] = useState(false);
   const [inlineThreads, setInlineThreads] = useState<Record<number, Comment[]>>({});
   const [inlineOpen, setInlineOpen] = useState<Record<number, boolean>>({});
   const [inlineDrafts, setInlineDrafts] = useState<Record<number, string>>({});
@@ -209,23 +285,12 @@ export default function CommunityClient() {
   ).sort((a, b) => sortNewest ? b.createdAt.localeCompare(a.createdAt) : b.likes - a.likes), [posts, active, query, sortNewest]);
   const hashtags = useMemo(() => Array.from(new Set(content.match(/#[\p{L}\p{N}_]+/gu) ?? [])), [content]);
 
-  const openPost = async (post: Post) => {
-    setSelected(post);
-    setCommentText("");
-    try {
-        const response = await fetch(`/api/comments?postId=${post.id}`);
-        const data = await response.json() as { comments?: Comment[] };
-        setThread(response.ok ? data.comments ?? [] : []);
-    } catch { setThread([]); }
-  };
-
   const likePost = async (post: Post) => {
     const key = String(post.id);
     const next = !liked[key];
     const delta = next ? 1 : -1;
     setLiked((current) => ({ ...current, [key]: next }));
     setPosts((current) => current.map((item) => item.id === post.id ? { ...item, likes: Math.max(item.likes + delta, 0) } : item));
-    setSelected((current) => current?.id === post.id ? { ...current, likes: Math.max(current.likes + delta, 0) } : current);
     try {
       const response = await fetch("/api/likes", { method: next ? "POST" : "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: post.id }) });
       if (!response.ok) throw new Error();
@@ -282,35 +347,12 @@ export default function CommunityClient() {
       setInlineDrafts((current) => ({ ...current, [post.id]: "" }));
       setInlineImages((current) => ({ ...current, [post.id]: undefined }));
       setPosts((current) => current.map((item) => item.id === post.id ? { ...item, comments: item.comments + 1 } : item));
-      setSelected((current) => current?.id === post.id ? { ...current, comments: current.comments + 1 } : current);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Chưa thể gửi bình luận.");
     } finally {
       setInlineBusy((current) => ({ ...current, [post.id]: false }));
     }
   };
-  const sendComment = async () => {
-    const contentValue = commentText.trim();
-    if (!selected || !contentValue) return;
-    setCommentSaving(true);
-    try {
-      let comment: Comment;
-      if (typeof selected.id === "number") {
-        const response = await fetch("/api/comments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ postId: selected.id, content: contentValue }) });
-        const data = await response.json() as { error?: string; comment?: Comment };
-        if (!response.ok) throw new Error(data.error);
-        if (!data.comment) throw new Error("Phản hồi bình luận không hợp lệ.");
-        comment = data.comment;
-      } else {
-        comment = { id: `local-${Date.now()}`, authorName: "Phúc Thiện", content: contentValue, createdAt: "Vừa xong" };
-      }
-      setThread((current) => [...current, comment]);
-      setPosts((current) => current.map((item) => item.id === selected.id ? { ...item, comments: item.comments + 1 } : item));
-      setSelected((current) => current ? { ...current, comments: current.comments + 1 } : current);
-      setCommentText("");
-    } finally { setCommentSaving(false); }
-  };
-
   const openComposer = (mode?: "file" | "cost" | "poll") => {
     if (mode === "cost") setCategory("Chi phí thực tế");
     if (mode === "poll" && !pollQuestion) setPollQuestion("Bạn muốn hỏi ý kiến cộng đồng về điều gì?");
@@ -366,8 +408,9 @@ export default function CommunityClient() {
           <div className="space-y-4">
             {visible.map((post, index) => <article key={post.id} className="social-card overflow-hidden transition hover:border-[#c9e8f5]">
               <header className="flex items-start gap-3 px-4 pb-2 pt-4 sm:px-5 sm:pt-5"><img src={post.avatar ?? "/avatars/user-nguyen-van-a.png"} alt={post.authorName} className="size-11 shrink-0 rounded-full object-cover"/><div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 text-[15px] font-bold text-[#182230]">{post.authorName}{index===1 && <CheckCircle2 size={15} className="fill-[#229ed9] text-white"/>}</p><p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[#667085]">{formatRelativeTime(post.createdAt)}{post.location && <><span>·</span><MapPin size={12}/>{post.location}</>}<span>·</span><span>Công khai</span></p></div><span className="shrink-0 rounded-full bg-[#eef9fd] px-2.5 py-1 text-[11px] font-bold text-[#147aa8]">{post.category}</span></header>
-              <div className="px-4 pb-3 text-left sm:px-5"><button type="button" onClick={() => openPost(post)} className="block w-full text-left"><h2 className="mt-2 text-[17px] font-bold leading-snug tracking-[-.015em] text-[#182230] transition hover:text-[#168ac0]">{post.title}</h2></button>{post.feeling && <p className="mt-1.5 text-sm font-semibold text-[#168ac0]">cảm thấy {post.feeling}</p>}<p className="mt-2 whitespace-pre-wrap text-[15px] leading-6 text-[#344054]"><HashtagText text={post.content} onSelect={(hashtag) => { setActive("Tất cả"); setQuery(hashtag); window.scrollTo({ top: 0, behavior: "smooth" }); }}/></p></div>
-              <div className="px-4 sm:px-5"><PostExtras post={post}/><AttachmentList attachments={post.attachments}/></div>
+              <FeedPostText post={post} onHashtag={(hashtag) => { setActive("Tất cả"); setQuery(hashtag); window.scrollTo({ top: 0, behavior: "smooth" }); }}/>
+              <div className="px-4 sm:px-5"><PostExtras post={post}/></div>
+              <FeedPostMedia attachments={post.attachments}/>
               <div className="mx-2 mt-3 grid grid-cols-4 items-center border-b border-[#e4e7ec] pb-2 text-center text-xs text-[#667085] sm:mx-3"><button onClick={() => likePost(post)} className="hover:underline">{post.likes} lượt hữu ích</button><button onClick={() => toggleInlineComments(post)} className="hover:underline">{post.comments} bình luận</button><span>{post.shares ?? 0} lượt chia sẻ</span><span aria-hidden="true" /></div>
               <div className="mx-2 grid grid-cols-4 gap-1 py-1.5 sm:mx-3">
                 <button onClick={() => likePost(post)} className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold hover:bg-[#f2f4f7] ${liked[String(post.id)] ? "text-[#168ac0]" : "text-[#475467]"}`}><Heart size={18} className={liked[String(post.id)] ? "fill-current" : ""}/><span className="hidden sm:inline">Hữu ích</span></button>
@@ -392,8 +435,15 @@ export default function CommunityClient() {
         <aside className="sticky top-[84px] hidden max-h-[calc(100dvh-96px)] xl:block">
           <div className="sidebar-scroll max-h-[calc(100dvh-96px)] space-y-4 overflow-y-auto overscroll-contain pr-2">
             <section id="chuyen-gia" className="social-card overflow-hidden scroll-mt-24">
-              <div className="flex items-center justify-between border-b border-[#edf0f3] px-4 py-3.5"><div><h2 className="text-base font-extrabold text-[#182230]">Chuyên gia đang hoạt động</h2><p className="mt-0.5 text-xs text-[#667085]">Hỏi đúng người, đúng chuyên môn</p></div><Link href="/hoi-chuyen-gia" className="text-xs font-bold text-[#168ac0]">Xem thêm</Link></div>
-              <div className="p-2">{[["/avatars/expert-khanh-linh.png","KTS. Khánh Linh","Thiết kế nhà phố","virtual-architect-001"],["/avatars/expert-trong-hieu.png","KS. Trọng Hiếu","Kết cấu & thi công","virtual-engineer-001"],["/avatars/expert-vu-mai.png","Vũ Mai","Dự toán công trình","virtual-engineer-003"]].map(([avatar,name,job,recipientUserId]) => <div key={name} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-[#f8fafb]"><span className="relative"><img src={avatar} alt={name} className="size-10 rounded-full object-cover"/><i className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-white bg-emerald-500"/></span><span className="min-w-0 flex-1"><b className="block truncate text-sm text-[#182230]">{name}</b><small className="block truncate text-xs text-[#667085]">{job}</small></span><RequestActionButton requestType="expert-question" targetType="expert" targetId={name} label="Hỏi" title={"Hỏi " + name} description={"Chuyên môn: " + job} recipientUserId={recipientUserId} allowFile className="rounded-full bg-[#e8f6fc] px-3 py-1.5 text-xs font-bold text-[#168ac0]"/></div>)}</div>
+              <div className="border-b border-[#edf0f3] px-4 py-3.5"><h2 className="text-base font-extrabold text-[#182230]">Hỏi chuyên gia</h2><p className="mt-0.5 text-xs text-[#667085]">Chuyên gia online được ưu tiên hiển thị</p></div>
+              <div className="p-2">{sortedTipookExperts.slice(0, showAllExperts ? sortedTipookExperts.length : 3).map(([avatar,name,job,recipientUserId,online]) => <div key={recipientUserId} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-[#f8fafb]"><span className="relative shrink-0"><img src={avatar} alt={name} className="size-10 rounded-full object-cover"/><i className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-white ${online ? "bg-emerald-500" : "bg-[#b7c0cb]"}`}/></span><span className="min-w-0 flex-1"><b className="block truncate text-sm text-[#182230]">{name}</b><small className="block truncate text-xs text-[#667085]">{job} <span aria-hidden="true">·</span> <span className={online ? "font-medium text-emerald-600" : "text-[#98a2b3]"}>{online ? "Đang online" : "Đang offline"}</span></small></span><RequestActionButton requestType="expert-question" targetType="expert" targetId={name} label="Hỏi" title={"Hỏi " + name} description={"Chuyên môn: " + job} recipientUserId={recipientUserId} allowFile className="rounded-full bg-[#e8f6fc] px-3 py-1.5 text-xs font-bold text-[#168ac0]"/></div>)}</div>
+              <div className="border-t border-[#edf0f3] p-2"><button type="button" onClick={() => setShowAllExperts((current) => !current)} className="flex w-full items-center justify-center rounded-xl py-2 text-sm font-bold text-[#168ac0] hover:bg-[#eef9fd]">{showAllExperts ? "Thu gọn" : "Xem thêm"}</button></div>
+            </section>
+
+            <section className="social-card overflow-hidden">
+              <div className="border-b border-[#edf0f3] px-4 py-3.5"><h2 className="text-base font-extrabold text-[#182230]">Thành viên Tipook</h2><p className="mt-0.5 text-xs text-[#667085]">Thành viên online được ưu tiên hiển thị</p></div>
+              <div className="p-2">{sortedTipookMembers.slice(0, showAllMembers ? sortedTipookMembers.length : 4).map(([name,location,userId,online]) => <div key={userId} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-[#f8fafb]"><Link href={`/nguoi-dung/${userId}`} className="flex min-w-0 flex-1 items-center gap-3"><span className="relative shrink-0"><img src="/avatars/user-nguyen-van-a.png" alt={name} className="size-10 rounded-full object-cover"/><i className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-white ${online ? "bg-emerald-500" : "bg-[#b7c0cb]"}`}/></span><span className="min-w-0 flex-1"><b className="block truncate text-sm text-[#182230]">{name}</b><small className="block truncate text-xs text-[#667085]">{location} <span aria-hidden="true">·</span> <span className={online ? "font-medium text-emerald-600" : "text-[#98a2b3]"}>{online ? "Đang online" : "Đang offline"}</span></small></span></Link><Link href={`/chat?user=${encodeURIComponent(userId)}`} aria-label={`Nhắn tin cho ${name}`} title={`Nhắn tin cho ${name}`} className="grid size-9 shrink-0 place-items-center rounded-full bg-[#e8f6fc] text-[#168ac0] transition hover:bg-[#d6f0fa]"><MessageCircle size={17}/></Link></div>)}</div>
+              <div className="border-t border-[#edf0f3] p-2"><button type="button" onClick={() => setShowAllMembers((current) => !current)} className="flex w-full items-center justify-center rounded-xl py-2 text-sm font-bold text-[#168ac0] hover:bg-[#eef9fd]">{showAllMembers ? "Thu gọn" : "Xem thêm"}</button></div>
             </section>
 
             <section className="social-card p-4"><div className="flex items-center justify-between"><h2 className="text-base font-extrabold text-[#182230]">Nhóm gợi ý</h2><Link href="/tai-khoan" className="text-xs font-bold text-[#168ac0]">Xem tất cả</Link></div><div className="mt-3 flex items-center gap-3"><img src="/mau-nha-pho-xanh.png" alt="Xây nhà Bình Dương" className="size-12 shrink-0 rounded-xl object-cover"/><div className="min-w-0 flex-1"><b className="block truncate text-sm text-[#182230]">Xây nhà Bình Dương</b><p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#667085]"><Users size={12}/>2,8K thành viên</p></div><ToggleActionButton actionType="join" targetType="group" targetId="xay-nha-binh-duong" label="Tham gia" activeLabel="Đã tham gia" icon="follow" className="rounded-lg bg-[#229ed9] px-3 py-2 text-xs font-bold text-white"/></div></section>
@@ -401,44 +451,6 @@ export default function CommunityClient() {
             </div>
         </aside>
       </main>
-      <Sheet open={!!selected} onOpenChange={(value) => !value && setSelected(null)}>
-        <SheetContent side="right" className="w-full overflow-y-auto border-l-[#e3eaf2] bg-[#f4f7fb] p-0 sm:max-w-[620px]">
-          {selected && <>
-            <div className="bg-white px-5 pb-5 pt-6 sm:px-7">
-              <SheetHeader className="text-left">
-                <div className="mb-2 flex items-center gap-3"><img src={selected.avatar ?? "/avatars/user-nguyen-van-a.png"} alt={selected.authorName} className="size-11 rounded-full object-cover"/><div><p className="font-bold">{selected.authorName}</p><p className="flex items-center gap-1.5 text-sm text-[#3f5064]"><Clock3 size={13}/>{formatRelativeTime(selected.createdAt)}{selected.location && <> · <MapPin size={13}/>{selected.location}</>}</p></div></div>
-                <span className="w-fit rounded-full bg-[#eef9fd] px-3 py-1 text-xs font-bold text-[#147aa8]">{selected.category}</span>
-                <SheetTitle className="pt-2 text-2xl font-extrabold leading-tight tracking-[-.03em] text-[#0b2e59] sm:text-3xl">{selected.title}</SheetTitle>
-                <SheetDescription className="pt-2 text-base leading-7 text-[#3f5064]">{selected.content}</SheetDescription>
-              </SheetHeader>
-              <PostExtras post={selected}/>
-              <AttachmentList attachments={selected.attachments} />
-              <div className="mt-5 flex items-center gap-2 border-t border-[#edf1f6] pt-4">
-                <button onClick={() => likePost(selected)} className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold ${liked[String(selected.id)] ? "bg-[#eef9fd] text-[#168ac0]" : "bg-[#f7f9fc] text-[#3f5064]"}`}><Heart size={18} className={liked[String(selected.id)] ? "fill-current" : ""}/>{selected.likes} hữu ích</button>
-                <ToggleActionButton actionType="save" targetType="post" targetId={String(selected.id)} label="Lưu bài" activeLabel="Đã lưu" icon="bookmark" className="ml-auto flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#3f5064] hover:bg-[#f7f9fc]"/>
-                <ShareActionButton title={selected.title} className="ml-auto flex size-10 items-center justify-center rounded-xl bg-[#f7f9fc] text-[#3f5064] [&>span]:sr-only"/>
-              </div>
-            </div>
-
-            <div className="px-5 py-6 sm:px-7">
-              <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-extrabold">{selected.comments} bình luận</h3><span className="text-sm font-medium text-[#3f5064]">Cũ nhất trước</span></div>
-              <div className="space-y-3">
-                {thread.map((comment, index) => <div key={comment.id} className="rounded-2xl border border-[#e4ebf3] bg-white p-4">
-                  <div className="flex items-center gap-2"><span className={`grid size-9 place-items-center rounded-full text-sm font-extrabold ${index % 2 ? "bg-[#e8edfa] text-[#5368a6]" : "bg-[#d9f1fb] text-[#229ed9]"}`}>{comment.authorName.charAt(0)}</span><div><b className="block text-sm">{comment.authorName}</b><small className="text-[#3f5064]">{comment.createdAt.includes("T") ? "Vừa gần đây" : comment.createdAt}</small></div></div>
-                  <p className="mt-3 text-[15px] leading-6 text-[#3f5064]">{comment.content}</p>
-                  <button onClick={() => setCommentText("@" + comment.authorName + " ")} className="mt-3 text-xs font-bold text-[#3f5064] hover:text-[#229ed9]">Trả lời</button>
-                </div>)}
-                {!thread.length && <div className="rounded-2xl border border-dashed border-[#dce5ef] bg-white/70 p-7 text-center"><MessageCircle className="mx-auto text-[#3f5064]"/><p className="mt-2 font-bold">Chưa có bình luận</p><p className="mt-1 text-sm text-[#3f5064]">Hãy là người đầu tiên chia sẻ kinh nghiệm.</p></div>}
-              </div>
-              <div className="sticky bottom-0 mt-5 rounded-2xl border border-[#d5e8f1] bg-white p-3 shadow-[0_-8px_24px_rgba(23,49,38,.08)]">
-                <Textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} className="min-h-24 resize-none border-0 p-2 text-base shadow-none focus-visible:ring-0" placeholder="Chia sẻ kinh nghiệm hoặc đặt câu hỏi..." maxLength={600}/>
-                <div className="mt-2 flex items-center justify-between border-t border-[#edf1f6] pt-3"><span className="text-xs text-[#3f5064]">{commentText.length}/600</span><Button disabled={commentSaving || !commentText.trim()} onClick={sendComment} className="h-10 rounded-xl bg-[#229ed9] px-4 font-bold hover:bg-[#168ac0]"><Send size={16}/>{commentSaving ? "Đang gửi..." : "Bình luận"}</Button></div>
-              </div>
-            </div>
-          </>}
-        </SheetContent>
-      </Sheet>
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton={false} className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-[520px] flex-col gap-0 overflow-hidden rounded-2xl border-0 bg-white p-0 shadow-[0_18px_60px_rgba(0,0,0,.28)]">
           <DialogHeader className="relative shrink-0 border-b border-[#e4e6eb] px-14 py-[18px] text-center sm:text-center">

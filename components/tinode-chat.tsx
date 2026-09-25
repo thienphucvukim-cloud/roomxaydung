@@ -18,7 +18,7 @@ function errorText(error: unknown) {
   return "Không thể kết nối trò chuyện.";
 }
 
-export function TinodeChat() {
+export function TinodeChat({ initialRecipient = "" }: { initialRecipient?: string }) {
   const tinodeRef = useRef<any>(null);
   const meRef = useRef<any>(null);
   const topicRef = useRef<any>(null);
@@ -35,7 +35,7 @@ export function TinodeChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [newTopic, setNewTopic] = useState("");
+  const [newTopic, setNewTopic] = useState(initialRecipient);
   const [currentUser, setCurrentUser] = useState("");
 
   const refreshContacts = () => {
