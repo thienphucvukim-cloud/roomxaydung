@@ -7,11 +7,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 
 type Post = { id: number; title: string; content: string; category: string; createdAt: string };
 const resources = [
-  { title: "Mẫu nhà đẹp", copy: "Thư viện mẫu nhà phố, nhà vườn và thiết kế hiện đại.", href: "/mau-nha-dep", type: "Danh mục" },
+  { title: "Mẫu nhà đẹp", copy: "Thư viện mẫu nhà phố, nhà vườn và thiết kế hiện đại.", href: "/kho-mau-nha-dep-tipook", type: "Danh mục" },
   { title: "Mặt bằng công năng", copy: "Mặt bằng tham khảo theo chiều ngang, số tầng và nhu cầu.", href: "/mat-bang-cong-nang", type: "Danh mục" },
-  { title: "Kho bản vẽ", copy: "Bản vẽ CAD, hồ sơ thi công và tài liệu xây dựng.", href: "/file-ban-ve", type: "Danh mục" },
+  { title: "Kho bản vẽ", copy: "Bản vẽ CAD, hồ sơ thi công và tài liệu xây dựng.", href: "/file-ban-ve-nha-dep-tipook", type: "Danh mục" },
   { title: "Hỏi chuyên gia", copy: "Gửi câu hỏi về kiến trúc, kết cấu, dự toán và thi công.", href: "/hoi-chuyen-gia", type: "Dịch vụ" },
-  { title: "Tính vật tư xây dựng", copy: "Tính khối lượng bê tông, xây tường, trát, lát gạch và sơn nước.", href: "/tinh-vat-tu", type: "Tiện ích" },
+  { title: "Tính vật tư xây dựng", copy: "Tính khối lượng bê tông, xây tường, trát, lát gạch và sơn nước.", href: "/tinh-vat-tu-tipook", type: "Tiện ích" },
   { title: "Cẩm nang xây nhà", copy: "Kiến thức chuẩn bị ngân sách, hợp đồng và nghiệm thu.", href: "/cam-nang", type: "Nội dung" },
 ];
 

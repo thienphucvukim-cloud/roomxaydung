@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LegacyContractorsPage() {
-  redirect("/file-ban-ve");
+  redirect("/file-ban-ve-nha-dep-tipook");
 }

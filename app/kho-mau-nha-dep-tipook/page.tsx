@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Maximize2 } from "lucide-react";
 import { ProjectGallery } from "@/components/project-gallery";
 import { EditorialContent } from "@/components/editorial-content";
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
   description: "Tham khảo mẫu nhà phố, nhà vườn và nhà hiện đại theo kích thước đất. Nhận tư vấn trực tiếp từ kiến trúc sư.",
 };
 
-const models = [
+const modelItems = [
   { tags: "nha-pho|mat-tien-5m|3-tang|nhieu-cay", title: "Nhà phố 3 tầng xanh mát", meta: "5 × 20m · 4 phòng ngủ", style: "Hiện đại nhiệt đới", image: "/mau-nha-pho-xanh.png" },
   { tags: "nha-pho|3-tang", title: "Nhà phố lệch tầng thoáng sáng", meta: "4,5 × 18m · 3 phòng ngủ", style: "Hiện đại tối giản", image: "/community-house.png" },
   { tags: "nha-pho|mat-tien-5m|3-tang", title: "Nhà 3 tầng có sân trước", meta: "5 × 16m · 4 phòng ngủ", style: "Ấm áp, gần gũi", image: "/mau-nha-pho-xanh.png" },
@@ -20,10 +21,24 @@ const models = [
   { tags: "nha-pho|co-gara", title: "Nhà phố kết hợp kinh doanh", meta: "6 × 18m · 3 phòng ngủ", style: "Linh hoạt công năng", image: "/community-house.png" },
 ];
 
+const modelAuthors = [
+  ["virtual-architect-001", "KTS. Nguyễn Khánh Linh"],
+  ["virtual-architect-002", "KTS. Trần Minh Khoa"],
+  ["virtual-architect-003", "KTS. Lê Hoài An"],
+  ["virtual-architect-004", "KTS. Phạm Đức Long"],
+  ["virtual-architect-005", "KTS. Võ Thanh Trúc"],
+  ["virtual-architect-006", "KTS. Đặng Quang Vinh"],
+] as const;
+
+const models = modelItems.map((model, index) => {
+  const [authorId, authorName] = modelAuthors[index];
+  return { ...model, authorId, authorName };
+});
+
 export default function BeautifulHouseModels() {
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-[#0b2e59]">
-      <main className="mx-auto max-w-[1320px] px-4 py-7 lg:px-8 lg:py-10">
+      <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
         <CommunityGallery />
         <div className="mt-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div><p className="text-sm font-extrabold uppercase tracking-[.13em] text-[#229ed9]">Thư viện tham khảo</p><h1 className="mt-2 text-3xl font-extrabold tracking-[-.04em] sm:text-4xl">Mẫu nhà đẹp, dễ ứng dụng</h1><p className="mt-3 max-w-2xl text-base leading-7 text-[#3f5064]">Khám phá ý tưởng theo đúng kích thước đất và nhu cầu gia đình. Mỗi mẫu đều có thể trao đổi với kiến trúc sư để điều chỉnh thành thiết kế riêng.</p></div>
@@ -31,7 +46,7 @@ export default function BeautifulHouseModels() {
         <section className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {models.map((model,index)=><article key={model.title} data-model-search={`${model.title} ${model.meta} ${model.style} ${model.tags}`} className="group overflow-hidden rounded-[22px] border border-[#e3eaf2] bg-white shadow-[0_5px_20px_rgba(24,49,39,.045)]">
             <div className="relative aspect-[4/3] overflow-hidden"><img src={model.image} alt={model.title} className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.03] ${index%2 ? "object-center" : ""}`}/><span className="absolute left-3 top-3 rounded-lg bg-white/90 px-2.5 py-1.5 text-xs font-bold text-[#0b2e59] backdrop-blur">{model.style}</span><ToggleActionButton actionType="save" targetType="house-model" targetId={model.title} label="Lưu mẫu" activeLabel="Đã lưu" icon="heart" className="absolute right-3 top-3 z-20 grid size-9 place-items-center rounded-full bg-white/90 text-[#3f5064] backdrop-blur [&>span]:sr-only"/><ProjectGallery model={model} trigger="overlay"/></div>
-            <div className="p-5"><h2 className="text-lg font-extrabold tracking-[-.02em]">{model.title}</h2><p className="mt-2 flex items-center gap-2 text-sm font-medium text-[#3f5064]"><Maximize2 size={15}/>{model.meta}</p><ModelCardActions title={model.title} meta={model.meta} image={model.image} recipientUserId={`virtual-architect-${String((index % 15) + 1).padStart(3, "0")}`}/></div>
+            <div className="p-5"><h2 className="text-lg font-extrabold tracking-[-.02em]">{model.title}</h2><p className="mt-2 flex items-center gap-2 text-sm font-medium text-[#3f5064]"><Maximize2 size={15}/>{model.meta}</p><p className="mt-2 text-sm text-[#66778a]">Đăng bởi <Link href={`/nguoi-dung/${model.authorId}`} className="font-semibold text-[#0b2e59] hover:text-[#229ed9] hover:underline">{model.authorName}</Link></p><ModelCardActions title={model.title} meta={model.meta} image={model.image} recipientUserId={model.authorId}/></div>
           </article>)}
         </section>
                 <EditorialContent

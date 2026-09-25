@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     if (!requestType || !targetType || !targetId || !subject || !content || !channels.length) return Response.json({ error: "Vui lòng nhập đầy đủ nội dung và chọn ít nhất một kênh." }, { status: 400 });
 
     const recipientUserId = await resolveRecipient(targetType, targetId, requestedRecipient);
-    const routedRequest = requestType === "expert-question" || requestType === "drawing-purchase";
+    const routedRequest = requestType === "expert-question" || requestType === "drawing-purchase" || requestType === "drawing-file-request";
     if (routedRequest && !recipientUserId) return Response.json({ error: "Chưa xác định được người đăng để nhận tin nhắn." }, { status: 400 });
 
     const member = await currentMember();

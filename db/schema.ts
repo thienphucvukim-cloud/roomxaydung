@@ -40,6 +40,7 @@ export const postAttachments = sqliteTable("post_attachments", {
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull(),
+  accessType: text("access_type").notNull().default("public"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [index("idx_post_attachments_post_id").on(table.postId)]);
 export const userActions = sqliteTable("user_actions", {
@@ -117,3 +118,36 @@ export const deliveryProfiles = sqliteTable("delivery_profiles", {
   internalChatId: text("internal_chat_id"),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
+export const paymentOrders = sqliteTable("payment_orders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  orderCode: integer("order_code").notNull().unique(),
+  buyerUserId: text("buyer_user_id").notNull(),
+  buyerName: text("buyer_name").notNull(),
+  buyerEmail: text("buyer_email"),
+  sellerUserId: text("seller_user_id").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  productTitle: text("product_title").notNull(),
+  amount: integer("amount").notNull(),
+  provider: text("provider").notNull().default("payos"),
+  paymentLinkId: text("payment_link_id"),
+  checkoutUrl: text("checkout_url"),
+  status: text("status").notNull().default("pending"),
+  transactionReference: text("transaction_reference"),
+  paidAt: text("paid_at"),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("idx_payment_orders_buyer").on(table.buyerUserId, table.createdAt),
+  index("idx_payment_orders_seller").on(table.sellerUserId, table.createdAt),
+  index("idx_payment_orders_status").on(table.status, table.createdAt),
+]);
+export const memberProfiles = sqliteTable("member_profiles", {
+  userId: text("user_id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  email: text("email"),
+  accountType: text("account_type").notNull().default("user"),
+  profession: text("profession"),
+  upgradedAt: text("upgraded_at"),
+  updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [index("idx_member_profiles_type").on(table.accountType)]);

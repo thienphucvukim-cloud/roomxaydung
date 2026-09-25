@@ -10,13 +10,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 const nav = [
   ["Bảng tin", "/", Home],
-  ["Kho bản vẽ", "/file-ban-ve", FileText],
-  ["Tính vật tư", "/tinh-vat-tu", Calculator],
+  ["Kho bản vẽ", "/file-ban-ve-nha-dep-tipook", FileText],
+  ["Tính vật tư", "/tinh-vat-tu-tipook", Calculator],
 ] as const;
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
-  if (href === "/mau-nha-dep") return ["/mau-nha-dep", "/mat-bang-cong-nang", "/file-ban-ve"].some((item) => pathname.startsWith(item));
+  if (href === "/kho-mau-nha-dep-tipook") return ["/kho-mau-nha-dep-tipook", "/mat-bang-cong-nang", "/file-ban-ve-nha-dep-tipook"].some((item) => pathname.startsWith(item));
   return pathname.startsWith(href);
 }
 
@@ -26,7 +26,7 @@ export function ExploreHeader() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSearchExpanded, setMobileSearchExpanded] = useState(false);
-  const samplesActive = ["/mau-nha-dep", "/mat-bang-cong-nang"].some((item) => pathname.startsWith(item));
+  const samplesActive = ["/kho-mau-nha-dep-tipook", "/mat-bang-cong-nang"].some((item) => pathname.startsWith(item));
   const utilitiesActive = pathname.startsWith("/tinh-khoi-luong-thep");
 
   const search = (event: FormEvent) => {
@@ -55,7 +55,7 @@ export function ExploreHeader() {
           const active=isActive(pathname,href);
           return <Link key={href} href={href} title={label} aria-current={active?"page":undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg transition after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t-full ${active?"text-[#168ac0] after:bg-[#229ed9]":"text-[#52677f] after:scale-x-0 hover:bg-[#f5f8fb] hover:text-[#168ac0]"}`}><Icon size={23} strokeWidth={active?2.4:1.9}/><span className="max-w-full truncate text-[11px] font-semibold leading-none">{label}</span></Link>;
         })}
-        <Link href="/mau-nha-dep" title="Kho mẫu" aria-current={samplesActive?"page":undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg transition after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t-full ${samplesActive?"text-[#168ac0] after:bg-[#229ed9]":"text-[#52677f] after:scale-x-0 hover:bg-[#f5f8fb] hover:text-[#168ac0]"}`}><Images size={23} strokeWidth={samplesActive?2.4:1.9}/><span className="max-w-full truncate text-[11px] font-semibold leading-none">Kho mẫu</span></Link>
+        <Link href="/kho-mau-nha-dep-tipook" title="Kho mẫu" aria-current={samplesActive?"page":undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg transition after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t-full ${samplesActive?"text-[#168ac0] after:bg-[#229ed9]":"text-[#52677f] after:scale-x-0 hover:bg-[#f5f8fb] hover:text-[#168ac0]"}`}><Images size={23} strokeWidth={samplesActive?2.4:1.9}/><span className="max-w-full truncate text-[11px] font-semibold leading-none">Kho mẫu</span></Link>
 {nav.slice(1).map(([label,href,Icon]) => {
           const active=isActive(pathname,href);
           return <Link key={href} href={href} title={label} aria-current={active?"page":undefined} className={`relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg transition after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t-full ${active?"text-[#168ac0] after:bg-[#229ed9]":"text-[#52677f] after:scale-x-0 hover:bg-[#f5f8fb] hover:text-[#168ac0]"}`}><Icon size={23} strokeWidth={active?2.4:1.9}/><span className="max-w-full truncate text-[11px] font-semibold leading-none">{label}</span></Link>;
@@ -80,7 +80,7 @@ export function ExploreHeader() {
         </Popover>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild><button className="social-icon-button grid lg:hidden" aria-label="Mở menu"><Menu size={21}/></button></SheetTrigger>
-          <SheetContent side="right" className="w-[min(360px,90vw)] bg-[#f6f8fa] p-0"><SheetHeader className="border-b bg-white p-5 text-left"><SheetTitle>Khám phá Tipook</SheetTitle></SheetHeader><nav className="grid grid-cols-2 gap-2 p-4">{nav.slice(0,1).map(([label,href,Icon])=><Link key={href} href={href} onClick={()=>setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${isActive(pathname,href)?"border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]":"border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Icon size={19}/></span>{label}</Link>)}<Link href="/mau-nha-dep" onClick={()=>setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${samplesActive?"border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]":"border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Images size={19}/></span>Kho mẫu</Link>{nav.slice(1).map(([label,href,Icon])=><Link key={href} href={href} onClick={()=>setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${isActive(pathname,href)?"border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]":"border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Icon size={19}/></span>{label}</Link>)}<div className="col-span-2 rounded-2xl border border-[#e1e7ee] bg-white p-3.5"><div className="flex items-center gap-2 text-sm font-bold text-[#344054]"><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Wrench size={19}/></span>Tiện ích</div><Link href="/tinh-khoi-luong-thep" onClick={()=>setMenuOpen(false)} className={`mt-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${pathname.startsWith("/tinh-khoi-luong-thep")?"bg-[#e8f6fc] text-[#168ac0]":"bg-[#f6f8fa] text-[#344054]"}`}><Sigma size={18}/>Thống kê cốt thép</Link></div></nav>
+          <SheetContent side="right" className="w-[min(360px,90vw)] bg-[#f6f8fa] p-0"><SheetHeader className="border-b bg-white p-5 text-left"><SheetTitle>Khám phá Tipook</SheetTitle></SheetHeader><nav className="grid grid-cols-2 gap-2 p-4">{nav.slice(0,1).map(([label,href,Icon])=><Link key={href} href={href} onClick={()=>setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${isActive(pathname,href)?"border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]":"border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Icon size={19}/></span>{label}</Link>)}<Link href="/kho-mau-nha-dep-tipook" onClick={()=>setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${samplesActive?"border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]":"border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Images size={19}/></span>Kho mẫu</Link>{nav.slice(1).map(([label,href,Icon])=><Link key={href} href={href} onClick={()=>setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${isActive(pathname,href)?"border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]":"border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Icon size={19}/></span>{label}</Link>)}<div className="col-span-2 rounded-2xl border border-[#e1e7ee] bg-white p-3.5"><div className="flex items-center gap-2 text-sm font-bold text-[#344054]"><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Wrench size={19}/></span>Tiện ích</div><Link href="/tinh-khoi-luong-thep" onClick={()=>setMenuOpen(false)} className={`mt-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold ${pathname.startsWith("/tinh-khoi-luong-thep")?"bg-[#e8f6fc] text-[#168ac0]":"bg-[#f6f8fa] text-[#344054]"}`}><Sigma size={18}/>Thống kê cốt thép</Link></div></nav>
         </SheetContent>
         </Sheet>
       </div>

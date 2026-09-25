@@ -59,3 +59,4 @@ next-env.d.ts
 # Local third-party/source packages; deployable web assets live in public/tools.
 /DeltaTIP/
 /rebar-vector-v21/
+*.tsbuildinfo

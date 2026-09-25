@@ -6,7 +6,7 @@ import { Home, Images, MessageCircle, Plus, UserRound } from "lucide-react";
 
 const left = [
   ["Bảng tin", "/", Home],
-  ["Kho mẫu", "/mau-nha-dep", Images],
+  ["Kho mẫu", "/kho-mau-nha-dep-tipook", Images],
 ] as const;
 const right = [
   ["Tin nhắn", "/chat", MessageCircle],

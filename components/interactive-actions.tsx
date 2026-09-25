@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { Bookmark, Check, CircleHelp, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, X } from "lucide-react";
+import { Bookmark, Check, CircleHelp, FileDown, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -101,12 +101,12 @@ export function RequestActionButton({
   description?: string;
   className?: string;
   allowFile?: boolean;
-  iconOnly?: "comment" | "expert";
+  iconOnly?: "comment" | "expert" | "file";
   onSuccess?: () => void;
   recipientUserId?: string;
 }) {
   const fieldId = useId();
-  const routedDelivery = requestType === "expert-question" || requestType === "drawing-purchase";
+  const routedDelivery = requestType === "expert-question" || requestType === "drawing-purchase" || requestType === "drawing-file-request";
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState(title);
   const [content, setContent] = useState("");
@@ -164,7 +164,7 @@ export function RequestActionButton({
   };
 
   return <>
-    <button type="button" onClick={() => setOpen(true)} className={className} aria-label={label} title={label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <CircleHelp size={19}/> : label}</button>
+    <button type="button" onClick={() => setOpen(true)} className={`group/request relative ${className}`} aria-label={label} title={iconOnly ? undefined : label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <CircleHelp size={19}/> : iconOnly === "file" ? <FileDown size={19}/> : label}{iconOnly && <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-[#182230] px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg group-hover/request:block group-focus-visible/request:block">{label}</span>}</button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent showCloseButton={false} className="w-[calc(100vw-1.5rem)] max-w-[520px] gap-0 overflow-hidden rounded-2xl border-0 bg-white p-0 shadow-2xl">
         <DialogHeader className="relative border-b border-[#e4e6eb] px-14 py-5 text-center sm:text-center">

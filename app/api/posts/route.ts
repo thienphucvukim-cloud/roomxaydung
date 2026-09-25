@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
 import { headers } from "next/headers";
 import { getDb } from "../../../db";
-import { postAttachments, posts, userActions } from "../../../db/schema";
+import { memberProfiles, postAttachments, posts, userActions } from "../../../db/schema";
 
 type AttachmentInput = {
   key?: string;
@@ -38,6 +38,7 @@ export async function GET() {
     }
     const byPost = new Map<number, ReturnType<typeof publicAttachment>[]>();
     for (const attachment of attachmentRows) {
+      if (attachment.accessType !== "public") continue;
       const current = byPost.get(attachment.postId) ?? [];
       current.push(publicAttachment(attachment));
       byPost.set(attachment.postId, current);
@@ -56,13 +57,20 @@ export async function POST(request: Request) {
     const email = h.get("oai-authenticated-user-email");
     const encodedName = h.get("oai-authenticated-user-full-name");
     const authorName = encodedName && h.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8" ? decodeURIComponent(encodedName) : email?.split("@")[0] ?? "Thành viên mới";
-    const body = await request.json() as { title?: string; content?: string; category?: string; location?: string; audience?: string; feeling?: string; background?: string; mentions?: string[]; pollQuestion?: string; pollOptions?: string[]; attachments?: AttachmentInput[] };
+    const body = await request.json() as { title?: string; content?: string; category?: string; location?: string; audience?: string; feeling?: string; background?: string; mentions?: string[]; pollQuestion?: string; pollOptions?: string[]; attachments?: AttachmentInput[]; paidFiles?: AttachmentInput[] };
     const title = body.title?.trim() ?? "";
     const content = body.content?.trim() ?? "";
     if (!title || !content) return Response.json({ error: "Vui lòng nhập tiêu đề và nội dung." }, { status: 400 });
     if (title.length > 120 || content.length > 1200) return Response.json({ error: "Nội dung vượt quá độ dài cho phép." }, { status: 400 });
 
-    const attachments = (body.attachments ?? []).slice(0, 10).filter((attachment) =>
+    const db = getDb();
+    const effectiveUserId = userId ?? "private-member";
+    if (body.category === "Bản vẽ cộng đồng") {
+      const [profile] = await db.select({ accountType: memberProfiles.accountType }).from(memberProfiles).where(eq(memberProfiles.userId, effectiveUserId)).limit(1);
+      if (profile?.accountType !== "engineer" && profile?.accountType !== "architect") return Response.json({ error: "Bạn cần chuyển sang tài khoản Kỹ sư hoặc Kiến trúc sư trước khi đăng bản vẽ." }, { status: 403 });
+    }
+
+    const validAttachment = (attachment: AttachmentInput, maxSize: number) =>
       typeof attachment.key === "string" &&
       /^[0-9a-f-]{36}$/i.test(attachment.key) &&
       typeof attachment.name === "string" &&
@@ -70,12 +78,13 @@ export async function POST(request: Request) {
       attachment.name.length <= 255 &&
       typeof attachment.size === "number" &&
       attachment.size > 0 &&
-      attachment.size <= 25 * 1024 * 1024
-    );
+      attachment.size <= maxSize;
+    const attachments = (body.attachments ?? []).slice(0, 10).filter((attachment) => validAttachment(attachment, 25 * 1024 * 1024));
+    const paidFiles = (body.paidFiles ?? []).slice(0, 5).filter((attachment) => validAttachment(attachment, 100 * 1024 * 1024));
+    if (body.category === "Bản vẽ cộng đồng" && (!attachments.length || !paidFiles.length)) return Response.json({ error: "Cần tải ít nhất một ảnh đại diện và một file bản vẽ để bán." }, { status: 400 });
 
-    const db = getDb();
     const [post] = await db.insert(posts).values({
-      userId: userId ?? "private-member",
+      userId: effectiveUserId,
       authorName,
       category: body.category || "Chuẩn bị xây",
       title,
@@ -90,15 +99,13 @@ export async function POST(request: Request) {
     }).returning();
 
     let savedAttachments: ReturnType<typeof publicAttachment>[] = [];
-    if (attachments.length) {
-      const inserted = await db.insert(postAttachments).values(attachments.map((attachment) => ({
-        postId: post.id,
-        objectKey: attachment.key as string,
-        fileName: attachment.name as string,
-        mimeType: attachment.type?.slice(0, 120) || "application/octet-stream",
-        size: attachment.size as number,
-      }))).returning();
-      savedAttachments = inserted.map(publicAttachment);
+    const attachmentValues = [
+      ...attachments.map((attachment) => ({ postId: post.id, objectKey: attachment.key as string, fileName: attachment.name as string, mimeType: attachment.type?.slice(0, 120) || "application/octet-stream", size: attachment.size as number, accessType: "public" })),
+      ...paidFiles.map((attachment) => ({ postId: post.id, objectKey: attachment.key as string, fileName: attachment.name as string, mimeType: attachment.type?.slice(0, 120) || "application/octet-stream", size: attachment.size as number, accessType: "private" })),
+    ];
+    if (attachmentValues.length) {
+      const inserted = await db.insert(postAttachments).values(attachmentValues).returning();
+      savedAttachments = inserted.filter((attachment) => attachment.accessType === "public").map(publicAttachment);
     }
 
     return Response.json({ post: { ...post, attachments: savedAttachments } }, { status: 201 });
