@@ -125,6 +125,14 @@ button { cursor: pointer; }
 
 .social-icon-button:active { transform: scale(.95); }
 
+@media (max-width: 1023px) {
+  .social-icon-button {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+}
+
 .mobile-dock-link {
   display: flex;
   min-width: 0;
@@ -141,7 +149,7 @@ button { cursor: pointer; }
 
 @media (max-width: 1023px) {
   body {
-    padding-top: 68px;
+    padding-top: 60px;
     padding-bottom: calc(66px + env(safe-area-inset-bottom));
   }
   .social-header {
