@@ -58,15 +58,21 @@ export async function POST(request: Request) {
     const encodedName = h.get("oai-authenticated-user-full-name");
     const authorName = encodedName && h.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8" ? decodeURIComponent(encodedName) : email?.split("@")[0] ?? "Thành viên mới";
     const body = await request.json() as { title?: string; content?: string; category?: string; location?: string; audience?: string; feeling?: string; background?: string; mentions?: string[]; pollQuestion?: string; pollOptions?: string[]; attachments?: AttachmentInput[]; paidFiles?: AttachmentInput[] };
-    const title = body.title?.trim() ?? "";
+    const category = body.category?.trim() || "Chuẩn bị xây";
+    const enteredTitle = body.title?.trim() ?? "";
     const content = body.content?.trim() ?? "";
-    if (!title || !content) return Response.json({ error: "Vui lòng nhập tiêu đề và nội dung." }, { status: 400 });
-    if (title.length > 120 || content.length > 1200) return Response.json({ error: "Nội dung vượt quá độ dài cho phép." }, { status: 400 });
+    const fallbackTitle = category === "Bản vẽ cộng đồng"
+      ? "Bản vẽ mới"
+      : category === "Bộ sưu tập ảnh"
+        ? "Bộ sưu tập mẫu nhà"
+        : "Bài viết mới";
+    const title = enteredTitle || content.slice(0, 80) || fallbackTitle;
+    if (enteredTitle.length > 120 || content.length > 1200) return Response.json({ error: "Nội dung vượt quá độ dài cho phép." }, { status: 400 });
 
     const db = getDb();
     const effectiveUserId = userId ?? "private-member";
     const [profile] = await db.select({ accountType: memberProfiles.accountType }).from(memberProfiles).where(eq(memberProfiles.userId, effectiveUserId)).limit(1);
-    if (body.category === "Bản vẽ cộng đồng" && profile?.accountType !== "engineer" && profile?.accountType !== "architect") {
+    if (category === "Bản vẽ cộng đồng" && profile?.accountType !== "engineer" && profile?.accountType !== "architect") {
       return Response.json({ error: "Bạn cần chuyển sang tài khoản Kỹ sư hoặc Kiến trúc sư trước khi đăng bản vẽ." }, { status: 403 });
     }
 
@@ -81,7 +87,7 @@ export async function POST(request: Request) {
       attachment.size <= maxSize;
     const attachments = (body.attachments ?? []).slice(0, 10).filter((attachment) => validAttachment(attachment, 25 * 1024 * 1024));
     const paidFiles = (body.paidFiles ?? []).slice(0, 5).filter((attachment) => validAttachment(attachment, 100 * 1024 * 1024));
-    if (body.category === "Bản vẽ cộng đồng" && (!attachments.length || !paidFiles.length)) return Response.json({ error: "Cần tải ít nhất một ảnh đại diện và một file bản vẽ để bán." }, { status: 400 });
+    if (category === "Bản vẽ cộng đồng" && !paidFiles.length) return Response.json({ error: "Vui lòng chọn ít nhất một file bản vẽ." }, { status: 400 });
 
     await db.insert(memberProfiles).values({
       userId: effectiveUserId,
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
     const [post] = await db.insert(posts).values({
       userId: effectiveUserId,
       authorName,
-      category: body.category || "Chuẩn bị xây",
+      category,
       title,
       content,
       location: body.location?.trim() || null,
