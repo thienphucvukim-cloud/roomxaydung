@@ -1,7 +1,7 @@
-import { desc, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
 import { headers } from "next/headers";
 import { getDb } from "../../../db";
-import { postAttachments, posts } from "../../../db/schema";
+import { postAttachments, posts, userActions } from "../../../db/schema";
 
 type AttachmentInput = {
   key?: string;
@@ -24,11 +24,14 @@ function publicAttachment(attachment: { id?: number; objectKey: string; fileName
 export async function GET() {
   try {
     const db = getDb();
-    const rows = await db.select().from(posts).orderBy(desc(posts.createdAt), desc(posts.id)).limit(30);
+    const rows = await db.select().from(posts).where(ne(posts.category, "Thảo luận mẫu nhà")).orderBy(desc(posts.createdAt), desc(posts.id)).limit(30);
     let attachmentRows: Array<typeof postAttachments.$inferSelect> = [];
+    let shareRows: Array<{ targetId: string; value: number }> = [];
     if (rows.length) {
       try {
         attachmentRows = await db.select().from(postAttachments).where(inArray(postAttachments.postId, rows.map((post) => post.id)));
+        const ids = rows.map((post) => String(post.id));
+        shareRows = await db.select({ targetId: userActions.targetId, value: count() }).from(userActions).where(and(eq(userActions.actionType, "share"), eq(userActions.targetType, "post"), inArray(userActions.targetId, ids))).groupBy(userActions.targetId);
       } catch {
         attachmentRows = [];
       }
@@ -39,7 +42,8 @@ export async function GET() {
       current.push(publicAttachment(attachment));
       byPost.set(attachment.postId, current);
     }
-    return Response.json({ posts: rows.map((post) => ({ ...post, attachments: byPost.get(post.id) ?? [] })) });
+    const shares = new Map(shareRows.map((row) => [row.targetId, row.value]));
+    return Response.json({ posts: rows.map((post) => ({ ...post, attachments: byPost.get(post.id) ?? [], shares: shares.get(String(post.id)) ?? 0 })) });
   } catch {
     return Response.json({ posts: [] });
   }

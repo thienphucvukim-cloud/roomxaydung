@@ -21,14 +21,14 @@ if not defined NODE_EXE (
 powershell.exe -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%LOCAL_URL%' -TimeoutSec 2; exit 0 } catch { exit 1 }"
 if errorlevel 1 (
   echo Dang khoi dong website local...
-  start "ROOMXAYDUNG dev server" /min "%NODE_EXE%" "%~dp0scripts\run-framework.mjs" dev
+  start "Tipook dev server" /min "%NODE_EXE%" "%~dp0scripts\run-framework.mjs" dev
 )
 
 echo Dang cho website san sang...
 powershell.exe -NoProfile -Command "$url='%LOCAL_URL%'; for ($i=0; $i -lt 120; $i++) { try { $r=Invoke-WebRequest -UseBasicParsing -Uri $url -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Milliseconds 500 }; exit 1"
 if errorlevel 1 (
   echo Khong the khoi dong website tai %LOCAL_URL%
-  echo Hay xem cua so ROOMXAYDUNG dev server de biet loi.
+  echo Hay xem cua so Tipook dev server de biet loi.
   pause
   exit /b 1
 )

@@ -1,6 +1,6 @@
 # Tích hợp Tinode
 
-Trang chat của ROOM nằm tại `/chat` và dùng package chính thức `tinode-sdk`.
+Trang chat của Tipook nằm tại `/chat` và dùng package chính thức `tinode-sdk`.
 
 ## Chạy thử
 
@@ -24,4 +24,4 @@ Khi dùng HTTPS cho website, máy chủ Tinode cũng phải hỗ trợ WSS/TLS. 
 - Đồng bộ danh sách hội thoại, trạng thái online và chưa đọc.
 - Tải lịch sử topic và nhận tin nhắn thời gian thực.
 - Gửi tin, đánh dấu đã đọc, mở topic/UID và đăng xuất.
-- Giao diện desktop/mobile tích hợp trong ROOM.
+- Giao diện desktop/mobile tích hợp trong Tipook.

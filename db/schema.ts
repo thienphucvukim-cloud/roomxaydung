@@ -25,6 +25,7 @@ export const postComments = sqliteTable("post_comments", {
   userId: text("user_id").notNull(),
   authorName: text("author_name").notNull(),
   content: text("content").notNull(),
+  imageKey: text("image_key"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [index("idx_post_comments_post_id").on(table.postId)]);
 
@@ -65,9 +66,54 @@ export const userRequests = sqliteTable("user_requests", {
   content: text("content").notNull(),
   contact: text("contact"),
   attachmentKey: text("attachment_key"),
+  recipientUserId: text("recipient_user_id"),
+  channels: text("channels"),
+  deliveryStatus: text("delivery_status"),
   status: text("status").notNull().default("pending"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [
   index("idx_user_requests_user").on(table.userId, table.createdAt),
   index("idx_user_requests_type").on(table.requestType, table.createdAt),
 ]);
+export const virtualProfiles = sqliteTable("virtual_profiles", {
+  id: text("id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  accountType: text("account_type").notNull(),
+  profession: text("profession").notNull(),
+  specialty: text("specialty"),
+  location: text("location"),
+  bio: text("bio"),
+  avatar: text("avatar"),
+  zaloUserId: text("zalo_user_id"),
+  messengerPsid: text("messenger_psid"),
+  telegramChatId: text("telegram_chat_id"),
+  internalChatId: text("internal_chat_id"),
+  isVirtual: integer("is_virtual", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("idx_virtual_profiles_type").on(table.accountType),
+  index("idx_virtual_profiles_profession").on(table.profession),
+]);
+export const directMessages = sqliteTable("direct_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  senderUserId: text("sender_user_id").notNull(),
+  senderName: text("sender_name").notNull(),
+  recipientUserId: text("recipient_user_id").notNull(),
+  requestId: integer("request_id").references(() => userRequests.id, { onDelete: "set null" }),
+  subject: text("subject").notNull(),
+  content: text("content").notNull(),
+  attachmentKey: text("attachment_key"),
+  readAt: text("read_at"),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  index("idx_direct_messages_recipient").on(table.recipientUserId, table.createdAt),
+  index("idx_direct_messages_sender").on(table.senderUserId, table.createdAt),
+]);
+export const deliveryProfiles = sqliteTable("delivery_profiles", {
+  userId: text("user_id").primaryKey(),
+  zaloUserId: text("zalo_user_id"),
+  messengerPsid: text("messenger_psid"),
+  telegramChatId: text("telegram_chat_id"),
+  internalChatId: text("internal_chat_id"),
+  updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+});

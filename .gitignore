@@ -54,3 +54,8 @@ next-env.d.ts
 /served-*.png
 /expert-new-page*.png
 /.chrome-review-*/
+/.chrome-layout-*/
+/.layout-*.png
+# Local third-party/source packages; deployable web assets live in public/tools.
+/DeltaTIP/
+/rebar-vector-v21/

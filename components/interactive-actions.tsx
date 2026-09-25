@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { Bookmark, Check, FileText, Heart, LoaderCircle, Send, Share2, Star, Upload, UserPlus, X } from "lucide-react";
+import { Bookmark, Check, CircleHelp, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -59,7 +59,7 @@ export function ToggleActionButton({
   </button>;
 }
 
-export function ShareActionButton({ title, className = "" }: { title: string; className?: string }) {
+export function ShareActionButton({ title, className = "", targetType, targetId, onShared }: { title: string; className?: string; targetType?: string; targetId?: string; onShared?: (created: boolean) => void }) {
   const [copied, setCopied] = useState(false);
   const share = async () => {
     const data = { title, text: title, url: window.location.href };
@@ -69,6 +69,11 @@ export function ShareActionButton({ title, className = "" }: { title: string; cl
         await navigator.clipboard.writeText(window.location.href);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1800);
+      }
+      if (targetType && targetId) {
+        const response = await fetch("/api/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actionType: "share", targetType, targetId }) });
+        const result = await response.json() as { created?: boolean };
+        if (response.ok) onShared?.(Boolean(result.created));
       }
     } catch {}
   };
@@ -84,6 +89,9 @@ export function RequestActionButton({
   description,
   className = "",
   allowFile = false,
+  iconOnly,
+  onSuccess,
+  recipientUserId,
 }: {
   requestType: string;
   targetType: string;
@@ -93,8 +101,12 @@ export function RequestActionButton({
   description?: string;
   className?: string;
   allowFile?: boolean;
+  iconOnly?: "comment" | "expert";
+  onSuccess?: () => void;
+  recipientUserId?: string;
 }) {
   const fieldId = useId();
+  const routedDelivery = requestType === "expert-question" || requestType === "drawing-purchase";
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState(title);
   const [content, setContent] = useState("");
@@ -103,6 +115,7 @@ export function RequestActionButton({
   const [attachmentName, setAttachmentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [channels, setChannels] = useState(routedDelivery ? ["internal", "zalo", "messenger", "telegram"] : ["internal"]);
 
   const upload = async (file?: File) => {
     if (!file) return;
@@ -131,15 +144,18 @@ export function RequestActionButton({
       const response = await fetch("/api/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestType, targetType, targetId, subject, content, contact, attachmentKey }),
+        body: JSON.stringify({ requestType, targetType, targetId, subject, content, contact, attachmentKey, recipientUserId, channels }),
       });
-      const data = await response.json() as { error?: string };
+      const data = await response.json() as { error?: string; delivery?: Record<string, { status: string }> };
       if (!response.ok) throw new Error(data.error || "Chưa thể gửi yêu cầu.");
-      setMessage("Đã gửi thành công. Bạn có thể theo dõi trong trang tài khoản.");
+      const sent = Object.entries(data.delivery ?? {}).filter(([, result]) => result.status === "sent").map(([channel]) => channel === "internal" ? "Web nội bộ" : channel === "zalo" ? "Zalo" : channel === "messenger" ? "Messenger" : "Telegram");
+      const pending = Object.entries(data.delivery ?? {}).filter(([, result]) => result.status !== "sent").map(([channel]) => channel === "zalo" ? "Zalo" : channel === "messenger" ? "Messenger" : "Telegram");
+      setMessage(`Đã gửi: ${sent.join(", ") || "chưa có kênh"}.${pending.length ? ` Chưa cấu hình: ${pending.join(", ")}.` : ""}`);
       setContent("");
       setContact("");
       setAttachmentKey("");
       setAttachmentName("");
+      onSuccess?.();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Chưa thể gửi yêu cầu.");
     } finally {
@@ -148,7 +164,7 @@ export function RequestActionButton({
   };
 
   return <>
-    <button type="button" onClick={() => setOpen(true)} className={className}>{label}</button>
+    <button type="button" onClick={() => setOpen(true)} className={className} aria-label={label} title={label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <CircleHelp size={19}/> : label}</button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent showCloseButton={false} className="w-[calc(100vw-1.5rem)] max-w-[520px] gap-0 overflow-hidden rounded-2xl border-0 bg-white p-0 shadow-2xl">
         <DialogHeader className="relative border-b border-[#e4e6eb] px-14 py-5 text-center sm:text-center">
@@ -164,8 +180,9 @@ export function RequestActionButton({
           <label className="block text-sm font-semibold text-[#182230]" htmlFor={fieldId + "-contact"}>Thông tin liên hệ</label>
           <input id={fieldId + "-contact"} value={contact} onChange={(event) => setContact(event.target.value)} className="h-11 w-full rounded-xl border border-[#d0d5dd] px-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Email hoặc số điện thoại"/>
           {allowFile && <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#98a2b3] bg-[#f8fafc] p-3 text-sm font-semibold text-[#344054] hover:border-[#229ed9]"><Upload size={19}/><span className="min-w-0 flex-1 truncate">{attachmentName || "Đính kèm hồ sơ hoặc tài liệu"}</span><input type="file" className="hidden" onChange={(event) => upload(event.target.files?.[0])}/></label>}
+          {routedDelivery && <fieldset><legend className="mb-2 text-sm font-semibold text-[#182230]">Gửi qua các kênh</legend><div className="grid grid-cols-2 gap-2">{[["internal","Web nội bộ"],["zalo","Zalo"],["messenger","Messenger"],["telegram","Telegram"]].map(([value, name]) => <label key={value} className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#d0d5dd] px-3 py-2.5 text-sm font-medium text-[#344054]"><input type="checkbox" checked={channels.includes(value)} onChange={() => setChannels((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value])} className="size-4 accent-[#229ed9]"/>{name}</label>)}</div></fieldset>}
           {message && <p className={"rounded-lg px-3 py-2 text-sm " + (message.startsWith("Đã gửi") ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-[#147aa8]")}>{message}</p>}
-          <Button type="button" onClick={submit} disabled={busy || !content.trim()} className="h-11 w-full rounded-xl bg-[#229ed9] font-bold hover:bg-[#168ac0]">{busy ? <LoaderCircle size={18} className="animate-spin"/> : <Send size={17}/>}Gửi yêu cầu</Button>
+          <Button type="button" onClick={submit} disabled={busy || !content.trim() || !channels.length} className="h-11 w-full rounded-xl bg-[#229ed9] font-bold hover:bg-[#168ac0]">{busy ? <LoaderCircle size={18} className="animate-spin"/> : <Send size={17}/>}Gửi yêu cầu</Button>
         </div>
       </DialogContent>
     </Dialog>

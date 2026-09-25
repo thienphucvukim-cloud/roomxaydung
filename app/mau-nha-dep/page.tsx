@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { ArrowRight, BedDouble, Heart, Maximize2, MessageCircle, SlidersHorizontal } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import { ProjectGallery } from "@/components/project-gallery";
 import { EditorialContent } from "@/components/editorial-content";
-import { FilterChips, RequestActionButton, ToggleActionButton } from "@/components/interactive-actions";
+import { CommunityGallery } from "@/components/community-gallery";
+import { ModelCardActions } from "@/components/model-card-actions";
+import { RequestActionButton, ToggleActionButton } from "@/components/interactive-actions";
 
 export const metadata: Metadata = {
-  title: "Mẫu nhà đẹp hiện đại, dễ xây | ROOM XÂY DỰNG",
+  title: "Mẫu nhà đẹp hiện đại, dễ xây | Tipook",
   description: "Tham khảo mẫu nhà phố, nhà vườn và nhà hiện đại theo kích thước đất. Nhận tư vấn trực tiếp từ kiến trúc sư.",
 };
 
@@ -22,15 +24,14 @@ export default function BeautifulHouseModels() {
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-[#0b2e59]">
       <main className="mx-auto max-w-[1320px] px-4 py-7 lg:px-8 lg:py-10">
-        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+        <CommunityGallery />
+        <div className="mt-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div><p className="text-sm font-extrabold uppercase tracking-[.13em] text-[#229ed9]">Thư viện tham khảo</p><h1 className="mt-2 text-3xl font-extrabold tracking-[-.04em] sm:text-4xl">Mẫu nhà đẹp, dễ ứng dụng</h1><p className="mt-3 max-w-2xl text-base leading-7 text-[#3f5064]">Khám phá ý tưởng theo đúng kích thước đất và nhu cầu gia đình. Mỗi mẫu đều có thể trao đổi với kiến trúc sư để điều chỉnh thành thiết kế riêng.</p></div>
-          <RequestActionButton requestType="design-match" targetType="catalog" targetId="mau-nha-dep" label="Lọc mẫu phù hợp" title="Tìm mẫu nhà phù hợp" description="Gửi kích thước đất, số tầng, số phòng và phong cách mong muốn để kiến trúc sư đề xuất mẫu phù hợp." className="flex h-11 items-center justify-center gap-2 rounded-xl border border-[#dce5ef] bg-white px-4 text-sm font-bold text-[#3f5064]"/>
         </div>
-        <div className="mt-6 overflow-x-auto pb-2 scrollbar-none"><FilterChips scope="models" items={[{label:"Tất cả",value:"all"},{label:"Nhà phố",value:"nha-pho"},{label:"Nhà vườn",value:"nha-vuon"},{label:"Mặt tiền 5m",value:"mat-tien-5m"},{label:"3 tầng",value:"3-tang"},{label:"Có gara",value:"co-gara"},{label:"Nhiều cây xanh",value:"nhieu-cay"}]}/></div>
         <section className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {models.map((model,index)=><article key={model.title} data-filter-scope="models" data-filter-tags={model.tags} className="group overflow-hidden rounded-[22px] border border-[#e3eaf2] bg-white shadow-[0_5px_20px_rgba(24,49,39,.045)]">
+          {models.map((model,index)=><article key={model.title} data-model-search={`${model.title} ${model.meta} ${model.style} ${model.tags}`} className="group overflow-hidden rounded-[22px] border border-[#e3eaf2] bg-white shadow-[0_5px_20px_rgba(24,49,39,.045)]">
             <div className="relative aspect-[4/3] overflow-hidden"><img src={model.image} alt={model.title} className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.03] ${index%2 ? "object-center" : ""}`}/><span className="absolute left-3 top-3 rounded-lg bg-white/90 px-2.5 py-1.5 text-xs font-bold text-[#0b2e59] backdrop-blur">{model.style}</span><ToggleActionButton actionType="save" targetType="house-model" targetId={model.title} label="Lưu mẫu" activeLabel="Đã lưu" icon="heart" className="absolute right-3 top-3 z-20 grid size-9 place-items-center rounded-full bg-white/90 text-[#3f5064] backdrop-blur [&>span]:sr-only"/><ProjectGallery model={model} trigger="overlay"/></div>
-            <div className="p-5"><h2 className="text-lg font-extrabold tracking-[-.02em]">{model.title}</h2><p className="mt-2 flex items-center gap-2 text-sm font-medium text-[#3f5064]"><Maximize2 size={15}/>{model.meta}</p><div className="mt-5 flex items-center justify-between border-t border-[#e8eef5] pt-4"><ProjectGallery model={model}/><RequestActionButton requestType="architect-consultation" targetType="house-model" targetId={model.title} label="Nhờ KTS tư vấn" title={"Tư vấn: " + model.title} description={"Mẫu tham khảo: " + model.meta + ". Hãy mô tả khu đất và thay đổi bạn mong muốn."} className="flex items-center gap-1.5 rounded-lg bg-[#eef9fd] px-3 py-2 text-sm font-bold text-[#147aa8]"/></div></div>
+            <div className="p-5"><h2 className="text-lg font-extrabold tracking-[-.02em]">{model.title}</h2><p className="mt-2 flex items-center gap-2 text-sm font-medium text-[#3f5064]"><Maximize2 size={15}/>{model.meta}</p><ModelCardActions title={model.title} meta={model.meta} image={model.image} recipientUserId={`virtual-architect-${String((index % 15) + 1).padStart(3, "0")}`}/></div>
           </article>)}
         </section>
                 <EditorialContent

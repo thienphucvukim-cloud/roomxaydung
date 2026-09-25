@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   if (!Number.isInteger(postId)) return Response.json({ error: "Bài viết không hợp lệ." }, { status: 400 });
   try {
     const comments = await getDb().select().from(postComments).where(eq(postComments.postId, postId)).orderBy(asc(postComments.createdAt), asc(postComments.id)).limit(100);
-    return Response.json({ comments });
+    return Response.json({ comments: comments.map((comment) => ({ ...comment, imageUrl: comment.imageKey ? "/api/files?key=" + encodeURIComponent(comment.imageKey) : null })) });
   } catch {
     return Response.json({ error: "Chưa thể tải bình luận." }, { status: 500 });
   }
@@ -28,16 +28,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { postId?: number; content?: string };
+    const body = await request.json() as { postId?: number; content?: string; imageKey?: string };
     const postId = Number(body.postId);
     const content = body.content?.trim() ?? "";
-    if (!Number.isInteger(postId) || !content) return Response.json({ error: "Vui lòng nhập bình luận." }, { status: 400 });
+    const imageKey = body.imageKey?.trim() ?? "";
+    if (!Number.isInteger(postId) || (!content && !imageKey)) return Response.json({ error: "Vui lòng nhập bình luận hoặc chọn ảnh." }, { status: 400 });
+    if (imageKey && !/^[0-9a-f-]{36}$/i.test(imageKey)) return Response.json({ error: "Ảnh bình luận không hợp lệ." }, { status: 400 });
     if (content.length > 600) return Response.json({ error: "Bình luận tối đa 600 ký tự." }, { status: 400 });
     const member = await currentMember();
     const db = getDb();
-    const [comment] = await db.insert(postComments).values({ postId, content, ...member }).returning();
+    const [comment] = await db.insert(postComments).values({ postId, content, imageKey: imageKey || null, ...member }).returning();
     await db.update(posts).set({ comments: sql`${posts.comments} + 1` }).where(eq(posts.id, postId));
-    return Response.json({ comment }, { status: 201 });
+    return Response.json({ comment: { ...comment, imageUrl: comment.imageKey ? "/api/files?key=" + encodeURIComponent(comment.imageKey) : null } }, { status: 201 });
   } catch {
     return Response.json({ error: "Chưa thể gửi bình luận lúc này." }, { status: 500 });
   }

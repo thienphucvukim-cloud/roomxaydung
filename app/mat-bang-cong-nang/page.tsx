@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { ArrowRight, Bath, BedDouble, Car, CheckCircle2, MessageCircle, Ruler, SlidersHorizontal, Sun } from "lucide-react";
+import { Bath, BedDouble, Car, CheckCircle2, SlidersHorizontal, Sun } from "lucide-react";
 import { EditorialContent } from "@/components/editorial-content";
 import { DetailActionButton, FilterChips, RequestActionButton } from "@/components/interactive-actions";
 
 export const metadata: Metadata = {
-  title: "Mặt bằng công năng nhà ở theo kích thước đất | ROOM XÂY DỰNG",
+  title: "Mặt bằng công năng nhà ở theo kích thước đất | Tipook",
   description: "Tham khảo mặt bằng công năng nhà phố 4x20m, 5x20m và nhiều kích thước phổ biến. Nhận tư vấn bố trí từ kiến trúc sư.",
 };
 

@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ExploreHeader } from "@/components/explore-header";
+import { SocialDock } from "@/components/social-dock";
 
 export const metadata: Metadata = {
-  title: "ROOM XÂY DỰNG — Cộng đồng tư vấn và thiết kế nhà",
+  title: "Tipook — Cộng đồng tư vấn và thiết kế nhà",
   description: "Hỏi đáp, chia sẻ chi phí thực tế và kinh nghiệm từ những người đã và đang xây nhà.",
   icons: {
-    icon: [{ url: "/roomxaydung-browser-icon-v2.png", type: "image/png" }],
-    shortcut: "/roomxaydung-browser-icon-v2.png",
-    apple: "/roomxaydung-browser-icon-v2.png",
+    icon: [{ url: "/tipook-browser-icon.png?v=2", type: "image/png" }],
+    shortcut: "/tipook-browser-icon.png?v=2",
+    apple: "/tipook-browser-icon.png?v=2",
   },
 };
 
@@ -19,7 +20,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className="antialiased"><ExploreHeader />{children}</body>
+      <head><meta charSet="utf-8" /></head>
+      <body className="antialiased"><ExploreHeader />{children}<SocialDock /></body>
     </html>
   );
 }

@@ -36,6 +36,12 @@ export async function POST(request: Request) {
       return Response.json({ error: "Hành động không hợp lệ." }, { status: 400 });
     }
     const userId = await currentUserId();
+    const [existing] = await getDb().select({ id: userActions.id }).from(userActions).where(and(
+      eq(userActions.userId, userId),
+      eq(userActions.actionType, body.actionType),
+      eq(userActions.targetType, body.targetType),
+      eq(userActions.targetId, body.targetId),
+    )).limit(1);
     const [action] = await getDb().insert(userActions).values({
       userId,
       actionType: body.actionType,
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
       target: [userActions.userId, userActions.actionType, userActions.targetType, userActions.targetId],
       set: { payload: body.payload === undefined ? null : JSON.stringify(body.payload).slice(0, 4000), createdAt: new Date().toISOString() },
     }).returning();
-    return Response.json({ action, active: true });
+    return Response.json({ action, active: true, created: !existing });
   } catch {
     return Response.json({ error: "Chưa thể lưu hành động." }, { status: 500 });
   }
