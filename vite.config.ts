@@ -16,6 +16,8 @@ const deployToCloudflare = process.env.TIPOOK_DEPLOY_TARGET === "cloudflare";
 
 const localBindingConfig = {
   main: "vinext/server/fetch-handler",
+  // Explicit integration-test mode; never applied to Cloudflare builds.
+  ...(process.env.TIPOOK_AUTH_EMAIL_TEST === "1" ? { vars: { AUTH_EMAIL_PROVIDER: "test" } } : {}),
   compatibility_flags: ["nodejs_compat"],
   d1_databases: d1
     ? [

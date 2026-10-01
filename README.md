@@ -58,6 +58,8 @@ Các phiên khách được tách bằng cookie riêng; lưu mẫu, hồ sơ, ti
 Đăng nhập bằng email và mật khẩu ngay tại `/dang-nhap`. Chủ website có thanh
 công cụ Chỉnh sửa, Quản lý và Cài đặt ngay trên trang đang xem. Cấu hình tài
 khoản chủ website theo [docs/WEBSITE_OWNER.md](docs/WEBSITE_OWNER.md).
+Xác nhận email quản lý và khôi phục mật khẩu tại `/quen-mat-khau` cần cấu hình
+dịch vụ gửi mail theo [docs/AUTH_EMAIL.md](docs/AUTH_EMAIL.md).
 Chi tiết nạp tiền và cấu hình production nằm trong [docs/PAYMENTS.md](docs/PAYMENTS.md).
 
 ## Biến môi trường và dữ liệu

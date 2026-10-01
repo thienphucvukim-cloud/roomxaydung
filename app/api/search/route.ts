@@ -11,7 +11,7 @@ const resources = [
   { title: "Mặt bằng công năng", copy: "Mặt bằng tham khảo theo chiều ngang, số tầng và nhu cầu.", href: "/mat-bang-cong-nang", type: "Danh mục" },
   { title: "Kho bản vẽ", copy: "Bản vẽ CAD, hồ sơ thi công và tài liệu xây dựng.", href: "/file-ban-ve-nha-dep-tipook", type: "Danh mục" },
   { title: "Nội thất", copy: "Hồ sơ thiết kế nội thất, bản vẽ CAD và file 3D cho không gian sống.", href: "/noi-that", type: "Danh mục" },
-  { title: "Tư vấn", copy: "Gửi câu hỏi về kiến trúc, kết cấu, dự toán và thi công.", href: "/hoi-chuyen-gia", type: "Dịch vụ" },
+  { title: "Hỏi chuyên gia", copy: "Gửi câu hỏi về kiến trúc, kết cấu, dự toán và thi công.", href: "/hoi-chuyen-gia", type: "Dịch vụ" },
   { title: "Tính vật tư xây dựng", copy: "Tính khối lượng bê tông, xây tường, trát, lát gạch và sơn nước.", href: "/tinh-vat-tu-tipook", type: "Công cụ" },
   { title: "Cẩm nang xây nhà", copy: "Kiến thức chuẩn bị ngân sách, hợp đồng và nghiệm thu.", href: "/cam-nang", type: "Nội dung" },
 ];

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Calculator, ChevronDown, CircleHelp, FileText, Heart, Images, LogIn, LogOut, Menu, Plus, Search, ShieldCheck, Sofa, UserRound, WalletCards } from "lucide-react";
+import { Bell, Calculator, ChevronDown, CircleHelp, FileText, Heart, Images, LogIn, LogOut, Menu, Search, ShieldCheck, Sofa, UserRound, WalletCards } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ClientNavigationLink } from "@/components/client-navigation-link";
@@ -76,10 +76,6 @@ export function ExploreHeader() {
 
       <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-1.5">
         {!member?.authenticated && <ClientNavigationLink href={`/dang-nhap?return_to=${encodeURIComponent(pathname)}`} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#073b74] px-3 text-xs font-semibold text-white hover:bg-[#0b4b8d]"><LogIn size={16}/><span className="hidden sm:inline">Đăng nhập</span></ClientNavigationLink>}
-        <a href="/tai-khoan#vi-tipook" aria-label="Nạp tiền" title="Nạp tiền vào Ví Tipook" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-50 text-[#168ac0] transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#168ac0] lg:h-10 lg:w-auto lg:gap-2 lg:px-3">
-          <span className="relative"><WalletCards size={20}/><Plus size={10} strokeWidth={3} className="absolute -right-1 -top-1 rounded-full bg-sky-50"/></span>
-          <span className="hidden text-sm font-bold lg:inline">Nạp tiền</span>
-        </a>
         <button type="button" onClick={() => setMobileSearchExpanded((value) => !value)} className={`social-icon-button grid lg:hidden ${mobileSearchExpanded ? "bg-[#dff3fb] text-[#168ac0]" : ""}`} aria-label={mobileSearchExpanded ? "Đóng tìm kiếm" : "Mở tìm kiếm"}><Search size={20}/></button>
         <Popover>
           <PopoverTrigger asChild><button className="social-icon-button relative grid" aria-label={`Thông báo${unread.length ? ` (${unread.length} chưa đọc)` : ""}`}><Bell size={20}/>{unread.length > 0 && <i className="absolute right-1 top-1 size-2 rounded-full bg-[#f04438] ring-2 ring-white"/>}</button></PopoverTrigger>
@@ -98,7 +94,7 @@ export function ExploreHeader() {
         </Popover>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild><button className="social-icon-button grid lg:hidden" aria-label="Mở menu"><Menu size={21}/></button></SheetTrigger>
-          <SheetContent side="right" className="w-[min(360px,90vw)] bg-[#f6f8fa] p-0"><SheetHeader className="border-b bg-white p-5 text-left"><SheetTitle>Khám phá Tipook</SheetTitle></SheetHeader><nav className="grid grid-cols-2 gap-2 p-4">{nav.map(([label, href, Icon]) => <ClientNavigationLink key={href} href={href} onClick={() => setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${isActive(pathname, href) ? "border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]" : "border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Icon size={19}/></span>{label}</ClientNavigationLink>)}<ClientNavigationLink href="/hoi-chuyen-gia" onClick={() => setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${pathname.startsWith("/hoi-chuyen-gia") ? "border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]" : "border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><CircleHelp size={19}/></span>Tư vấn</ClientNavigationLink></nav>
+          <SheetContent side="right" className="w-[min(360px,90vw)] bg-[#f6f8fa] p-0"><SheetHeader className="border-b bg-white p-5 text-left"><SheetTitle>Khám phá Tipook</SheetTitle></SheetHeader><nav className="grid grid-cols-2 gap-2 p-4">{nav.map(([label, href, Icon]) => <ClientNavigationLink key={href} href={href} onClick={() => setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${isActive(pathname, href) ? "border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]" : "border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><Icon size={19}/></span>{label}</ClientNavigationLink>)}<ClientNavigationLink href="/hoi-chuyen-gia" onClick={() => setMenuOpen(false)} className={`flex min-h-24 flex-col justify-between rounded-2xl border p-3.5 text-sm font-bold ${pathname.startsWith("/hoi-chuyen-gia") ? "border-[#b9e2f2] bg-[#e8f6fc] text-[#168ac0]" : "border-[#e1e7ee] bg-white text-[#344054]"}`}><span className="grid size-9 place-items-center rounded-xl bg-[#eef3f7]"><CircleHelp size={19}/></span>Hỏi chuyên gia</ClientNavigationLink></nav>
           </SheetContent>
         </Sheet>
       </div>

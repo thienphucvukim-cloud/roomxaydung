@@ -4,6 +4,7 @@
 
 1. Nhấn **Đăng nhập** trên website hoặc mở `/dang-nhap`.
 2. Đăng nhập với email và mật khẩu chủ website.
+   Nhập tiếp mã 6 chữ số gửi tới email quản lý để xác nhận đăng nhập.
 3. Thanh công cụ **Website của bạn** xuất hiện phía trên giao diện.
 4. Nhấn **Chỉnh sửa**, sau đó nhấn vào chữ hoặc ảnh có viền để thay đổi.
 5. Nhấn **Áp dụng** để xem trước, rồi **Lưu website** để cập nhật cho mọi người.
@@ -41,6 +42,8 @@ Script giữ các biến môi trường khác và tạo mật khẩu ngẫu nhi�
 Khởi động lại server rồi đăng nhập. Tài khoản chủ website được tạo ở lần đăng nhập
 đầu tiên khi email và mật khẩu khởi tạo đúng. Sau đó dùng **Cài đặt → Đổi mật khẩu**.
 Thay đổi mật khẩu khởi tạo trong biến môi trường không ghi đè mật khẩu tài khoản đã tạo.
+Đăng nhập và đổi mật khẩu chủ website cần dịch vụ gửi mã email theo
+[AUTH_EMAIL.md](AUTH_EMAIL.md); mật khẩu chỉ đổi sau khi xác nhận mã.
 
 Email chủ website không được đăng ký qua form đăng ký thành viên. Các tài khoản
 thành viên được tạo tại `/dang-ky` và không có quyền sửa website.
@@ -77,7 +80,9 @@ cùng một batch D1. Nội dung chữ được hiển thị dạng văn bản, 
 Ảnh dùng đường dẫn công khai trên website hoặc URL HTTPS. Giá, công thức tính
 vật tư, số dư và quyền tài khoản được xử lý bằng nghiệp vụ riêng.
 
-Hiện chưa có gửi email xác minh hoặc khôi phục mật khẩu tự động. Đăng ký thành viên
+Tài khoản quản lý xác nhận email khi đăng nhập và đổi mật khẩu. Khi quên mật khẩu,
+khôi phục qua mã email tại `/quen-mat-khau`; chức năng này thu hồi mọi phiên cũ
+và yêu cầu đăng nhập lại. Xem [AUTH_EMAIL.md](AUTH_EMAIL.md). Đăng ký thành viên
 không xác minh quyền sở hữu email; riêng email chủ website được giữ để khởi tạo bằng
 mật khẩu bí mật phía máy chủ. Tài khoản thành viên có sẵn chỉ trở thành chủ website
 khi nhập đúng mật khẩu khởi tạo được cấu hình trên máy chủ; các phiên cũ của tài khoản
@@ -85,10 +90,12 @@ khi nhập đúng mật khẩu khởi tạo được cấu hình trên máy ch�
 
 ## Kiểm tra
 
-Khi server local đang mở:
+Khởi động server kiểm tra với chế độ outbox local theo [AUTH_EMAIL.md](AUTH_EMAIL.md):
 
 ```bash
 node scripts/check-website-auth.mjs
+node scripts/check-auth-email.mjs
+node scripts/check-password-recovery.mjs
 node scripts/check-functional-flows.mjs
 node scripts/check-facade-pagination.mjs
 ```

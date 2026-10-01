@@ -168,6 +168,7 @@ export const websiteSessions = sqliteTable("website_sessions", {
   tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id").notNull().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
   expiresAt: integer("expires_at").notNull(),
+  ownerVerified: integer("owner_verified", { mode: "boolean" }).notNull().default(false),
 }, (table) => [index("idx_website_sessions_user").on(table.userId)]);
 
 export const authRateLimits = sqliteTable("auth_rate_limits", {
@@ -183,3 +184,32 @@ export const websiteContent = sqliteTable("website_content", {
   updatedBy: text("updated_by").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const authEmailChallenges = sqliteTable("auth_email_challenges", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
+  purpose: text("purpose").notNull(),
+  browserHash: text("browser_hash").notNull(),
+  codeHash: text("code_hash").notNull(),
+  passwordVersion: text("password_version").notNull(),
+  sessionHash: text("session_hash"),
+  newPasswordHash: text("new_password_hash"),
+  redirectTo: text("redirect_to").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: integer("expires_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("idx_auth_email_challenges_user").on(table.userId, table.purpose)]);
+
+export const authEmailCooldowns = sqliteTable("auth_email_cooldowns", {
+  key: text("key").primaryKey(),
+  sentAt: integer("sent_at").notNull(),
+});
+
+export const authPasswordResetRequests = sqliteTable("auth_password_reset_requests", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  browserHash: text("browser_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, (table) => [index("idx_auth_password_reset_email").on(table.email)]);

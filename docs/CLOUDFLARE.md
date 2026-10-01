@@ -55,6 +55,8 @@ Không dùng file `dist/server/wrangler.json` sinh từ `pnpm build` local để
 Bản standalone Cloudflare dùng đăng nhập email và mật khẩu tại `/dang-nhap`.
 Áp dụng các migration `0012_website_auth.sql`, `0013_website_content.sql`, `0014_owner_account.sql` và cấu hình
 `TIPOOK_ADMIN_EMAIL`, `TIPOOK_ADMIN_PASSWORD` để khởi tạo tài khoản chủ website.
+Migration `0015_auth_email_verification.sql`, `0016_password_recovery.sql` và dịch vụ gửi mail trong
+[AUTH_EMAIL.md](AUTH_EMAIL.md) cần được cấu hình trước khi dùng xác nhận email quản lý.
 Chi tiết tại [WEBSITE_OWNER.md](WEBSITE_OWNER.md). Worker tiếp tục loại bỏ header
 `oai-authenticated-user-*` từ request công khai để ngăn giả mạo tài khoản.
 

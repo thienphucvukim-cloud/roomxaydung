@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MessageCircle, Send } from "lucide-react";
-import { RequestActionButton } from "@/components/interactive-actions";
+import { Send } from "lucide-react";
+import { ModelCardFooter } from "@/components/model-card-footer";
 
 type Comment = { id: number; authorName: string; content: string };
 
@@ -54,11 +54,7 @@ export function ModelCardActions({ title, meta, recipientUserId }: { title: stri
   };
 
   return <>
-    <div className="mt-3 flex items-center justify-between border-t border-[#e8eef5] pt-2 text-[11px] text-[#667085]"><span>{comments?.length ?? counts.comments} bình luận</span><span>{counts.expertQuestions} câu hỏi</span></div>
-    <div className="mt-1 grid grid-cols-2 border-t border-[#edf1f5] pt-1">
-      <button type="button" onClick={() => void toggle()} aria-label="Bình luận" title="Bình luận" className={`grid place-items-center rounded-lg py-2.5 hover:bg-[#f2f4f7] ${open ? "text-[#168ac0]" : "text-[#475467]"}`}><MessageCircle size={19}/></button>
-      <RequestActionButton requestType="expert-question" targetType="house-model" targetId={title} label="Tư vấn" title={"Tư vấn: " + title} description={"Mẫu tham khảo: " + meta + ". Hãy nhập câu hỏi bạn muốn chuyên gia giải đáp."} allowFile iconOnly="expert" recipientUserId={recipientUserId} onSuccess={() => void refreshCounts()} className="grid place-items-center rounded-lg py-2.5 text-[#475467] hover:bg-[#f2f4f7]"/>
-    </div>
+    <ModelCardFooter title={title} meta={meta} targetType="house-model" targetId={title} recipientUserId={recipientUserId} comments={counts.comments} expertQuestions={counts.expertQuestions} commentOpen={open} onToggleComments={() => void toggle()} onQuestionSent={() => void refreshCounts()}/>
     {open && <div className="space-y-2 border-t border-[#edf0f3] bg-[#fbfcfd] p-3">
       {comments?.map((comment) => <div key={comment.id} className="rounded-2xl bg-[#eef1f4] px-3 py-2"><b className="block text-xs text-[#182230]">{comment.authorName}</b><p className="mt-0.5 text-sm leading-5 text-[#344054]">{comment.content}</p></div>)}
       {comments === null && <p className="py-1 text-center text-xs text-[#667085]">Đang tải bình luận...</p>}

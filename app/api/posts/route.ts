@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { currentMember } from "../../../lib/member-identity";
 import { env } from "cloudflare:workers";
 import { getDb } from "../../../db";
-import { memberProfiles, postAttachments, posts } from "../../../db/schema";
+import { memberProfiles, postAttachments, posts, userRequests } from "../../../db/schema";
 import { CATALOG_PAGE_SIZE } from "../../../lib/catalog-pagination";
 import { parseVndPrice } from "../../../lib/drawing-catalog";
 
@@ -54,7 +54,14 @@ export async function GET(request: Request) {
       current.push(publicAttachment(attachment));
       byPost.set(attachment.postId, current);
     }
-    return Response.json({ posts: rows.map((post) => ({ ...post, attachments: byPost.get(post.id) ?? [] })), ...(paginated ? { total, page, pageSize: CATALOG_PAGE_SIZE } : {}) });
+    const galleryPostIds = rows.filter(post => post.category === "Bộ sưu tập ảnh").map(post => String(post.id));
+    const questionCounts = galleryPostIds.length
+      ? await db.select({ targetId: userRequests.targetId, value: count() }).from(userRequests)
+        .where(and(eq(userRequests.requestType, "expert-question"), eq(userRequests.targetType, "post"), inArray(userRequests.targetId, galleryPostIds)))
+        .groupBy(userRequests.targetId)
+      : [];
+    const questionsByPost = new Map(questionCounts.map(row => [row.targetId, row.value]));
+    return Response.json({ posts: rows.map((post) => ({ ...post, ...(post.category === "Bộ sưu tập ảnh" ? { expertQuestions: questionsByPost.get(String(post.id)) ?? 0 } : {}), attachments: byPost.get(post.id) ?? [] })), ...(paginated ? { total, page, pageSize: CATALOG_PAGE_SIZE } : {}) });
   } catch (cause) {
     console.error("Failed to load posts", cause);
     return Response.json({ error: "Chưa thể tải bài đăng. Vui lòng thử lại." }, { status: 500 });

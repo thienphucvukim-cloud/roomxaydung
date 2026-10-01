@@ -9,7 +9,7 @@ const items = [
   ["Kho bản vẽ", "/file-ban-ve-nha-dep-tipook", FileText],
   ["Nội thất", "/noi-that", Sofa],
   ["Tính vật tư", "/tinh-vat-tu-tipook", Calculator],
-  ["Tư vấn", "/hoi-chuyen-gia", CircleHelp],
+  ["Hỏi chuyên gia", "/hoi-chuyen-gia", CircleHelp],
 ] as const;
 
 export function SocialDock() {

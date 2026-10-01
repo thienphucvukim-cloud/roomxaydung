@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
+import { clearLocalOwnerCooldown, finishLocalOwnerLogin } from "./test-auth-helpers.mjs";
 
 const origin = process.env.TIPOOK_TEST_ORIGIN || "http://localhost:5173";
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname), "Functional fixtures are local only.");
@@ -11,6 +12,7 @@ const db = new DatabaseSync(`${directory}/${database}`);
 const userIds = [];
 const marker = `__tipook_check_${crypto.randomUUID()}`;
 const uploadKeys = [];
+let adminCookie;
 
 async function session() {
   const response = await fetch(origin + "/api/me");
@@ -93,9 +95,11 @@ try {
   const funded = await b.send("/api/wallet/topups", "POST", {amount:100000},201);
   const localVars = readFileSync(".dev.vars", "utf8");
   const setting = key => localVars.match(new RegExp(`^${key}[ \\t]*=[ \\t]*["']?([^\\s"']+)`, "m"))?.[1];
+  const localOwner = db.prepare("SELECT user_id FROM website_accounts WHERE email = ?").get(setting("TIPOOK_ADMIN_EMAIL"));
+  if (localOwner) clearLocalOwnerCooldown(db, localOwner.user_id);
   const ownerLogin = await fetch(origin + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: setting("TIPOOK_ADMIN_EMAIL"), password: setting("TIPOOK_ADMIN_PASSWORD") }) });
   assert.equal(ownerLogin.status, 200, "Configure the local owner with scripts/setup-owner.mjs.");
-  const adminCookie = ownerLogin.headers.get("set-cookie")?.split(";")[0];
+  adminCookie = (await finishLocalOwnerLogin(origin, db, ownerLogin)).cookie;
   assert.ok(adminCookie);
   const adminMe = await (await fetch(origin + "/api/me", { headers: { Cookie: adminCookie } })).json();
   assert.ok(adminMe.user.isAdmin, "Configure TIPOOK_ADMIN_EMAIL in .dev.vars for the local admin.");
@@ -153,6 +157,7 @@ try {
   console.log("PASS: free file checkout without topup.");
   console.log("All functional flows passed.");
 } finally {
+  if (adminCookie) await fetch(origin + "/api/auth/logout", { method: "POST", headers: { Cookie: adminCookie }, redirect: "manual" });
   for(const userId of userIds) {
     db.prepare("DELETE FROM direct_messages WHERE sender_user_id=? OR recipient_user_id=?").run(userId,userId);
     db.prepare("DELETE FROM post_comments WHERE user_id=?").run(userId);

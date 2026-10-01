@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { clearLocalOwnerCooldown, finishLocalOwnerLogin } from "./test-auth-helpers.mjs";
 
 const origin = process.env.TIPOOK_TEST_ORIGIN || "http://localhost:5173";
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname), "Fixtures must stay local.");
@@ -50,7 +51,10 @@ try {
   await send("/api/auth/login", "POST", { email: fixtureEmail, password }, undefined, 401);
   await send("/api/auth/login", "POST", { email: fixtureEmail, password: "Another-password-456" });
   console.log("PASS: registration, scrypt password storage, sessions, CSRF, safe return URLs and password change.");
-  const owner = await send("/api/auth/login", "POST", { email: adminEmail, password: adminPassword });
+  const localOwner = db.prepare("SELECT user_id FROM website_accounts WHERE email = ?").get(adminEmail);
+  if (localOwner) clearLocalOwnerCooldown(db, localOwner.user_id);
+  const ownerResponse = await fetch(origin + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) });
+  const owner = await finishLocalOwnerLogin(origin, db, ownerResponse);
   adminCookie = owner.cookie;
   assert.equal(owner.data.isAdmin, true);
   assert.equal((await send("/api/me", "GET", undefined, adminCookie)).data.user.isAdmin, true);

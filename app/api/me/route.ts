@@ -18,7 +18,7 @@ export async function GET() {
     const identity = await getAuthenticatedIdentity();
     const authenticated = Boolean(identity);
     const isAdmin = isAdminIdentity(identity);
-    return Response.json({ user: { id: userId, name, email, authenticated, isAdmin, accountType: profile?.accountType ?? "user", profession: profile?.profession ?? null }, counts: { posts: postCount.value, actions: actionCount.value, requests: requestCount.value } });
+    return Response.json({ user: { id: userId, name, email, authenticated, isAdmin, passwordAccount: identity?.source === "website", accountType: profile?.accountType ?? "user", profession: profile?.profession ?? null }, counts: { posts: postCount.value, actions: actionCount.value, requests: requestCount.value } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return Response.json({ error: "Chưa thể tải hồ sơ." }, { status: 500 });
   }

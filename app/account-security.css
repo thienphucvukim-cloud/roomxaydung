@@ -1,0 +1,12 @@
+.email-code-notice{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid #cce9e8;border-radius:12px;background:#f0faf9;color:#145467;font-size:13px;line-height:1.6;margin:0 0 20px}
+.email-code-notice svg{flex-shrink:0;margin-top:2px}
+.email-code-help{font-size:12px;color:#667085;line-height:1.7;margin:12px 0}
+.email-code-input{font-size:22px!important;font-weight:700;letter-spacing:.3em;text-align:center}
+.email-code-actions{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;margin-top:20px}
+.email-code-actions button,.password-visibility{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:#197e91;font-size:13px;font-weight:600;cursor:pointer}
+.email-code-actions button:disabled{color:#98a2b3;cursor:default}
+.password-change .auth-error{font-size:13px;padding:12px;border-radius:10px;background:#fff1f3;color:#c01048;margin:12px 0}
+.password-change .admin-alert.success{padding:12px;border-radius:10px;background:#ecfdf3;color:#027a48;font-size:13px}
+.in-account .email-code-input{max-width:100%}
+.password-visibility{justify-self:start;padding:3px 0}
+.email-code-actions button:focus-visible,.password-visibility:focus-visible{outline:2px solid #229ed9;outline-offset:4px}

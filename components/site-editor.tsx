@@ -42,7 +42,7 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
   const content = { ...saved };
   for (const [key, value] of Object.entries(drafts)) { if (value === null) delete content[key]; else content[key] = value; }
   const count = Object.keys(drafts).length;
-  const authPage = pathname === "/dang-nhap" || pathname === "/dang-ky";
+  const authPage = ["/dang-nhap", "/dang-ky", "/quen-mat-khau"].includes(pathname);
   useEffect(() => {
     if (authPage) return;
     const controller = new AbortController();

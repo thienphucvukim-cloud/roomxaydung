@@ -11,10 +11,10 @@ export type Identity = { userId: string; email: string; displayName: string; sou
 export async function getAuthenticatedIdentity(): Promise<Identity | null> {
   const token = (await cookies()).get(AUTH_COOKIE)?.value;
   if (token && /^[a-f0-9]{64}$/.test(token)) {
-    const [account] = await getDb().select({ userId: websiteAccounts.userId, email: websiteAccounts.email, displayName: websiteAccounts.displayName, isOwner: websiteAccounts.isOwner })
+    const [account] = await getDb().select({ userId: websiteAccounts.userId, email: websiteAccounts.email, displayName: websiteAccounts.displayName, isOwner: websiteAccounts.isOwner, ownerVerified: websiteSessions.ownerVerified })
       .from(websiteSessions).innerJoin(websiteAccounts, eq(websiteSessions.userId, websiteAccounts.userId))
       .where(and(eq(websiteSessions.tokenHash, hashToken(token)), gt(websiteSessions.expiresAt, Date.now()))).limit(1);
-    if (account) return { ...account, source: "website" };
+    if (account && (!account.isOwner || account.ownerVerified)) return { ...account, source: "website" };
     // A stale website session must never silently turn into another account.
     return null;
   }
@@ -44,7 +44,7 @@ export function safeAuthReturn(value: string | null | undefined, fallback = "/ta
   if (!value?.startsWith("/") || value.startsWith("//")) return fallback;
   try {
     const url = new URL(value, "https://tipook.local");
-    if (url.origin !== "https://tipook.local" || /^\/(?:api|dang-nhap|dang-ky|signin-with-chatgpt|signout-with-chatgpt|callback)(?:\/|$)/.test(url.pathname)) return fallback;
+    if (url.origin !== "https://tipook.local" || /^\/(?:api|dang-nhap|dang-ky|quen-mat-khau|signin-with-chatgpt|signout-with-chatgpt|callback)(?:\/|$)/.test(url.pathname)) return fallback;
     return url.pathname + url.search + url.hash;
   } catch { return fallback; }
 }

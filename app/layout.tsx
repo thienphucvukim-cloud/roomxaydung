@@ -3,6 +3,7 @@ import "./globals.css";
 import { SiteChrome } from "@/components/site-chrome";
 import { getSiteContent } from "@/lib/site-content";
 import "./owner-editor.css";
+import "./account-security.css";
 export const dynamic = "force-dynamic";
 
 const metadata: Metadata = {
