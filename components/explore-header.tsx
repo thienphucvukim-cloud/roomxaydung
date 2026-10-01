@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { AnimatedTabNavigation } from "@/components/animated-tab-navigation";
+import { EditableImage, useSiteEditor } from "@/components/site-editor";
 
 const nav = [
   ["Mặt tiền", "/kho-mau-nha-dep-tipook", Images],
@@ -24,6 +25,7 @@ function isActive(pathname: string, href: string) {
 }
 
 export function ExploreHeader() {
+  const siteEditor = useSiteEditor();
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -55,7 +57,8 @@ export function ExploreHeader() {
     <div className="relative mx-auto grid h-[60px] min-h-[60px] max-h-[60px] max-w-[1360px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:h-[68px] lg:min-h-[68px] lg:max-h-[68px] lg:grid-cols-[1fr_minmax(300px,480px)_1fr] lg:px-5">
       <div className="flex min-w-0 items-center gap-3">
         <ClientNavigationLink href="/kho-mau-nha-dep-tipook" className="flex shrink-0 items-center" aria-label="Tipook - Mặt tiền">
-          <Image src="/tipook-logo.png" alt="Tipook" width={1774} height={887} priority className="h-auto max-h-[42px] w-[90px] object-contain sm:w-[102px] lg:max-h-none lg:w-[124px]"/>
+          <EditableImage contentKey="global.logo" src="/tipook-logo.png" alt={siteEditor.content["global.name"]?.value || "Tipook"} width={1774} height={887} className="h-auto max-h-[42px] w-[90px] object-contain sm:w-[102px] lg:max-h-none lg:w-[124px]"/>
+          {siteEditor.content["global.name"] && <span className="ml-2 hidden max-w-28 truncate text-xs font-bold lg:inline">{siteEditor.content["global.name"].value}</span>}
         </ClientNavigationLink>
         <form onSubmit={search} className={`absolute left-3 right-3 top-[calc(100%+8px)] z-50 min-w-0 rounded-2xl border border-[#dde5ed] bg-white p-2 shadow-xl ${mobileSearchExpanded ? "block" : "hidden"} sm:left-4 sm:right-4 lg:relative lg:left-auto lg:right-auto lg:top-auto lg:z-auto lg:block lg:flex-1 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none 2xl:w-[238px] 2xl:flex-none`}>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-[18px] -translate-y-1/2 text-[#64748b]"/>
@@ -72,6 +75,7 @@ export function ExploreHeader() {
       />
 
       <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-1.5">
+        {!member?.authenticated && <ClientNavigationLink href={`/dang-nhap?return_to=${encodeURIComponent(pathname)}`} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#073b74] px-3 text-xs font-semibold text-white hover:bg-[#0b4b8d]"><LogIn size={16}/><span className="hidden sm:inline">Đăng nhập</span></ClientNavigationLink>}
         <a href="/tai-khoan#vi-tipook" aria-label="Nạp tiền" title="Nạp tiền vào Ví Tipook" className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-50 text-[#168ac0] transition hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#168ac0] lg:h-10 lg:w-auto lg:gap-2 lg:px-3">
           <span className="relative"><WalletCards size={20}/><Plus size={10} strokeWidth={3} className="absolute -right-1 -top-1 rounded-full bg-sky-50"/></span>
           <span className="hidden text-sm font-bold lg:inline">Nạp tiền</span>
@@ -83,7 +87,14 @@ export function ExploreHeader() {
         </Popover>
         <Popover>
           <PopoverTrigger asChild><button className="flex items-center gap-1 rounded-full p-0.5 hover:bg-[#eef3f7] lg:p-1" aria-label="Tài khoản"><Image src="/avatars/user-nguyen-van-a.png" alt="Thành viên Tipook" width={36} height={36} className="size-8 rounded-full object-cover lg:size-9"/><ChevronDown className="mr-1 hidden size-4 lg:block"/></button></PopoverTrigger>
-<PopoverContent align="end" className="w-72 rounded-2xl border-[#dde5ed] p-2 shadow-xl"><ClientNavigationLink href="/tai-khoan" className="flex items-center gap-3 rounded-xl bg-[#f3f7fa] p-3"><Image src="/avatars/user-nguyen-van-a.png" alt="" width={44} height={44} className="size-11 rounded-full object-cover"/><span><b className="block text-sm">{member?.name || "Thành viên Tipook"}</b><small className="text-[#667085]">Xem trang cá nhân</small></span></ClientNavigationLink><ClientNavigationLink href="/tai-khoan" className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><UserRound size={18}/>Hoạt động của tôi</ClientNavigationLink><a href="/tai-khoan#vi-tipook" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#168ac0] hover:bg-[#f3f7fa]"><WalletCards size={18}/>Nạp tiền vào ví</a><a href="/tai-khoan#mau-ua-thich" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><Heart size={18}/>Mẫu ưa thích</a>{member?.isAdmin && <ClientNavigationLink href="/quan-tri/nap-tien" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><ShieldCheck size={18}/>Quản trị nạp tiền</ClientNavigationLink>}<a href={(member?.authenticated ? "/signout-with-chatgpt" : "/signin-with-chatgpt") + "?return_to=" + encodeURIComponent(pathname)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]">{member?.authenticated ? <><LogOut size={18}/>Đăng xuất</> : <><LogIn size={18}/>Đăng nhập</>}</a></PopoverContent>
+          <PopoverContent align="end" className="w-72 rounded-2xl border-[#dde5ed] p-2 shadow-xl">
+            <ClientNavigationLink href="/tai-khoan" className="flex items-center gap-3 rounded-xl bg-[#f3f7fa] p-3"><Image src="/avatars/user-nguyen-van-a.png" alt="" width={44} height={44} className="size-11 rounded-full object-cover"/><span><b className="block text-sm">{member?.name || "Thành viên Tipook"}</b><small className="text-[#667085]">Xem trang cá nhân</small></span></ClientNavigationLink>
+            <ClientNavigationLink href="/tai-khoan" className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><UserRound size={18}/>Hoạt động của tôi</ClientNavigationLink>
+            <a href="/tai-khoan#vi-tipook" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#168ac0] hover:bg-[#f3f7fa]"><WalletCards size={18}/>Nạp tiền vào ví</a>
+            <a href="/tai-khoan#mau-ua-thich" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><Heart size={18}/>Mẫu ưa thích</a>
+            {member?.isAdmin && <button type="button" onClick={() => siteEditor.manage("noi-dung")} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><ShieldCheck size={18}/>Quản lý website</button>}
+            {member?.authenticated ? <form action="/api/auth/logout" method="post"><button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><LogOut size={18}/>Đăng xuất</button></form> : <ClientNavigationLink href={"/dang-nhap?return_to=" + encodeURIComponent(pathname)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><LogIn size={18}/>Đăng nhập</ClientNavigationLink>}
+          </PopoverContent>
         </Popover>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild><button className="social-icon-button grid lg:hidden" aria-label="Mở menu"><Menu size={21}/></button></SheetTrigger>

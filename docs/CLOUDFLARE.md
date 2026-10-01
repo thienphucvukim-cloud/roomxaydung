@@ -52,8 +52,10 @@ Không dùng file `dist/server/wrangler.json` sinh từ `pnpm build` local để
 
 ## Đăng nhập và thanh toán
 
-Bản standalone Cloudflare chưa có nhà cung cấp đăng nhập. Phiên khách vẫn hoạt động;
-đăng nhập ChatGPT và quản trị yêu cầu tích hợp xác thực riêng. Worker loại bỏ header
+Bản standalone Cloudflare dùng đăng nhập email và mật khẩu tại `/dang-nhap`.
+Áp dụng các migration `0012_website_auth.sql`, `0013_website_content.sql`, `0014_owner_account.sql` và cấu hình
+`TIPOOK_ADMIN_EMAIL`, `TIPOOK_ADMIN_PASSWORD` để khởi tạo tài khoản chủ website.
+Chi tiết tại [WEBSITE_OWNER.md](WEBSITE_OWNER.md). Worker tiếp tục loại bỏ header
 `oai-authenticated-user-*` từ request công khai để ngăn giả mạo tài khoản.
 
 Các biến ngân hàng và secret ký link phải được cấu hình riêng trên Worker theo

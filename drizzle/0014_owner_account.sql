@@ -1,0 +1,1 @@
+ALTER TABLE website_accounts ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0;

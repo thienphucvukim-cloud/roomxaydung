@@ -1,20 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 import { env } from "cloudflare:workers";
-import { headers } from "next/headers";
+import { requireAdmin } from "../../../../lib/admin-auth";
+import { validOrigin } from "../../../../lib/website-auth";
 import { getDb } from "../../../../db";
 import { walletTopupRequests, walletTransactions } from "../../../../db/schema";
-
-async function requireAdmin() {
-  const bindings = env as unknown as Record<string, string | undefined>;
-  const expected = bindings.TIPOOK_ADMIN_USER_ID?.trim();
-  const expectedEmail = bindings.TIPOOK_ADMIN_EMAIL?.trim().toLowerCase();
-  const actual = (await headers()).get("oai-authenticated-user-id")?.trim();
-  const email = (await headers()).get("oai-authenticated-user-email")?.trim().toLowerCase();
-  if (!expected && !expectedEmail) return { error: Response.json({ error: "Chưa cấu hình tài khoản quản trị." }, { status: 503 }) };
-  if (!actual) return { error: Response.json({ error: "Vui lòng đăng nhập tài khoản quản trị." }, { status: 401 }) };
-  if (!((expected && actual === expected) || (expectedEmail && email === expectedEmail))) return { error: Response.json({ error: "Bạn không có quyền quản trị." }, { status: 403 }) };
-  return { userId: actual };
-}
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -35,8 +24,7 @@ export async function PATCH(request: Request) {
   const admin = await requireAdmin();
   if (admin.error || !admin.userId) return admin.error;
   try {
-    const requestOrigin = request.headers.get("origin");
-    if (requestOrigin && requestOrigin !== new URL(request.url).origin) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
+    if (!validOrigin(request)) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
     const body = await request.json() as { id?: unknown; status?: unknown };
     const id = Number(body.id);
     const status = body.status === "approved" || body.status === "rejected" ? body.status : "";

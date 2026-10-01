@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { currentMember } from "../../../lib/member-identity";
 import { env } from "cloudflare:workers";
 import { getDb } from "../../../db";
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     let attachmentRows: Array<typeof postAttachments.$inferSelect> = [];
     if (rows.length) {
       try {
-        attachmentRows = await db.select().from(postAttachments).where(inArray(postAttachments.postId, rows.map((post) => post.id)));
+        attachmentRows = await db.select().from(postAttachments).where(inArray(postAttachments.postId, rows.map((post) => post.id))).orderBy(asc(postAttachments.id));
       } catch {
         attachmentRows = [];
       }
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId, email, authorName } = await currentMember();
-    const body = await request.json() as { title?: string; content?: string; category?: string; location?: string; audience?: string; feeling?: string; pollQuestion?: string; attachments?: AttachmentInput[]; paidFiles?: AttachmentInput[] };
+    const body = await request.json() as { title?: string; content?: string; category?: string; location?: string; audience?: string; feeling?: string; pollQuestion?: string; attachments?: AttachmentInput[]; paidFiles?: AttachmentInput[]; coverImageKey?: unknown };
     const category = body.category?.trim() ?? "";
     if (!["Bản vẽ cộng đồng", "Nội thất cộng đồng", "Bộ sưu tập ảnh"].includes(category)) return Response.json({ error: "Danh mục đăng tải không hợp lệ." }, { status: 400 });
     const isFileListing = category === "Bản vẽ cộng đồng" || category === "Nội thất cộng đồng";
@@ -99,6 +99,14 @@ export async function POST(request: Request) {
       attachment.size > 0 &&
       attachment.size <= maxSize;
     const attachments = (body.attachments ?? []).slice(0, 10).filter((attachment) => validAttachment(attachment, 25 * 1024 * 1024));
+    if (body.coverImageKey !== undefined) {
+      if (typeof body.coverImageKey !== "string" || !attachments.some(attachment => attachment.key === body.coverImageKey)) {
+        return Response.json({ error: "Ảnh đại diện phải là một ảnh được chọn cho bài đăng." }, { status: 400 });
+      }
+      // The first public attachment is the cover, persisted by insertion order.
+      // Older posts keep their first uploaded image as their default cover.
+      attachments.sort((a, b) => Number(b.key === body.coverImageKey) - Number(a.key === body.coverImageKey));
+    }
     const paidFiles = (body.paidFiles ?? []).slice(0, 5).filter((attachment) => validAttachment(attachment, 100 * 1024 * 1024));
     if (isFileListing && !paidFiles.length) return Response.json({ error: "Vui lòng chọn ít nhất một file hồ sơ." }, { status: 400 });
     if (!isFileListing && paidFiles.length) return Response.json({ error: "Bộ sưu tập ảnh không hỗ trợ file bán." }, { status: 400 });
@@ -150,7 +158,7 @@ export async function POST(request: Request) {
     ];
     if (attachmentValues.length) {
       const inserted = await db.insert(postAttachments).values(attachmentValues).returning();
-      savedAttachments = inserted.filter((attachment) => attachment.accessType === "public").map(publicAttachment);
+      savedAttachments = inserted.filter((attachment) => attachment.accessType === "public").sort((a, b) => a.id - b.id).map(publicAttachment);
     }
 
     return Response.json({ post: { ...post, attachments: savedAttachments } }, { status: 201 });

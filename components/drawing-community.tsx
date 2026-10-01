@@ -1,4 +1,5 @@
 "use client";
+import { OwnerPostControls, useSiteEditor } from "@/components/site-editor";
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import { FileText, HardHat, LoaderCircle, LockKeyhole, Plus, Ruler, Search, Upload, X } from "lucide-react";
@@ -12,11 +13,12 @@ import { PurchaseActionButton } from "@/components/purchase-action-button";
 type ProfessionalRole = "engineer" | "architect";
 type Attachment = { key: string; name: string; type: string; size: number; url?: string; accessType?: "public" | "private" };
 type Post = { id: number; userId: string; authorName: string; title: string; content: string; category: string; location?: string | null; feeling?: string | null; pollQuestion?: string | null; attachments?: Attachment[] };
-type CatalogCard = { key: string; search: string; card: ReactNode };
+type CatalogCard = { key: string; search: string; card: ReactNode; contentPrefix?: string };
 export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = "", catalogCards = [] }: {
   variant?: "drawing" | "interior"; page?: number; searchQuery?: string; catalogCards?: CatalogCard[];
 }) {
   const router = useRouter();
+  const editor = useSiteEditor();
   const basePath = variant === "interior" ? "/noi-that" : "/file-ban-ve-nha-dep-tipook";
   const [totalPosts, setTotalPosts] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
   const inputRef = useRef<HTMLInputElement>(null);
   const drawingFileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { const update = () => setRefresh(value => value + 1); window.addEventListener("tipook-content-changed", update); return () => window.removeEventListener("tipook-content-changed", update); }, []);
   useEffect(() => {
     fetch("/api/professional-profile").then((response) => response.ok ? response.json() as Promise<{ profile?: { accountType?: string } }> : Promise.reject()).then((data) => {
       const accountType = data.profile?.accountType;
@@ -65,7 +68,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
   }, [category, page, searchQuery, refresh, itemLabel]);
 
   const normalized = searchQuery.toLocaleLowerCase("vi");
-  const filteredCards = catalogCards.filter(card => !normalized || card.search.toLocaleLowerCase("vi").includes(normalized));
+  const filteredCards = catalogCards.filter(card => !normalized || [card.search, ...Object.entries(editor.content).filter(([key]) => card.contentPrefix && key.startsWith(card.contentPrefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized));
   const pagination = catalogPageWindow(page, totalPosts, filteredCards.length);
   const visibleCards = filteredCards.slice(pagination.modelStart, pagination.modelEnd);
   const visiblePosts = posts;
@@ -152,7 +155,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
 
     {loading && <p role="status" className="mt-5 text-center text-sm text-[#667085]">Đang tải {itemLabel}...</p>}
     {!loading && <section className="mt-5 grid gap-x-5 gap-y-9 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" aria-label={`Danh sách ${marketLabel}`}>
-      {visiblePosts.map((post) => { const preview = post.attachments?.find((item) => item.type.startsWith("image/")); return <article key={post.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[#e3eaf2]">{preview ? <img src={preview.url} alt={post.title} className="aspect-[4/3] w-full shrink-0 object-cover"/> : <div className="grid aspect-[4/3] shrink-0 place-items-center bg-[#f3f6f9] text-[#168ac0]"><FileText size={42}/></div>}<p className="truncate border-b border-[#eef1f4] px-4 py-3 text-xs text-[#667085]">Đăng bởi <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="font-bold text-[#168ac0] hover:underline">{post.authorName}</a></p><div className="flex flex-1 flex-col p-4"><span className="min-h-4 text-xs font-bold text-[#168ac0]">{post.feeling}</span><h3 className="catalog-card-title mt-1 line-clamp-2 font-extrabold">{post.title}</h3><p className="catalog-card-detail mt-2 text-sm text-[#667085]">{post.location}{post.pollQuestion ? " · " + post.pollQuestion : ""}</p><p className="catalog-card-detail mt-2 line-clamp-2 text-sm text-[#667085]">{post.content}</p><div className="mt-auto flex items-center justify-end gap-3 pt-3"><span className="flex shrink-0 items-center gap-1.5"><RequestActionButton requestType="drawing-file-request" targetType="post" targetId={String(post.id)} recipientUserId={post.userId} label="Yêu cầu file" title={"Yêu cầu file: " + post.title} description={`Tin nhắn sẽ được gửi trực tiếp đến người đăng ${itemLabel}.`} iconOnly="file" className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"/><PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.pollQuestion || "Miễn phí"} label={!post.pollQuestion ? "Tải miễn phí" : undefined} className="grid size-9 place-items-center rounded-full bg-[#229ed9] text-white transition hover:bg-[#168ac0]"/></span></div></div></article>; })}
+      {visiblePosts.map((post) => { const preview = post.attachments?.find((item) => item.type.startsWith("image/")); return <article key={post.id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[#e3eaf2]">{preview ? <img src={preview.url} alt={post.title} className="aspect-[4/3] w-full shrink-0 object-cover"/> : <div className="grid aspect-[4/3] shrink-0 place-items-center bg-[#f3f6f9] text-[#168ac0]"><FileText size={42}/></div>}<p className="truncate border-b border-[#eef1f4] px-4 py-3 text-xs text-[#667085]">Đăng bởi <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="font-bold text-[#168ac0] hover:underline">{post.authorName}</a></p><div className="flex flex-1 flex-col p-4"><span className="min-h-4 text-xs font-bold text-[#168ac0]">{post.feeling}</span><OwnerPostControls postId={post.id}/><h3 className="catalog-card-title mt-1 line-clamp-2 font-extrabold">{post.title}</h3><p className="catalog-card-detail mt-2 text-sm text-[#667085]">{post.location}{post.pollQuestion ? " · " + post.pollQuestion : ""}</p><p className="catalog-card-detail mt-2 line-clamp-2 text-sm text-[#667085]">{post.content}</p><div className="mt-auto flex items-center justify-end gap-3 pt-3"><span className="flex shrink-0 items-center gap-1.5"><RequestActionButton requestType="drawing-file-request" targetType="post" targetId={String(post.id)} recipientUserId={post.userId} label="Yêu cầu file" title={"Yêu cầu file: " + post.title} description={`Tin nhắn sẽ được gửi trực tiếp đến người đăng ${itemLabel}.`} iconOnly="file" className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"/><PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.pollQuestion || "Miễn phí"} label={!post.pollQuestion ? "Tải miễn phí" : undefined} className="grid size-9 place-items-center rounded-full bg-[#229ed9] text-white transition hover:bg-[#168ac0]"/></span></div></div></article>; })}
       {visibleCards.map(card => <div key={card.key} className="min-w-0 [&>article]:h-full">{card.card}</div>)}
     </section>}
     {!loading && visiblePosts.length === 0 && visibleCards.length === 0 && <div className="mt-7 rounded-2xl border border-dashed border-[#b8c5d3] bg-white p-10 text-center text-sm text-[#667085]">{searchQuery ? `Không tìm thấy ${itemLabel} phù hợp trên trang này.` : `Trang này chưa có ${itemLabel}. Nhấn dấu + để đăng hồ sơ.`}</div>}

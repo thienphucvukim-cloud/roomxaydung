@@ -89,9 +89,14 @@ try {
   await a.send("/api/wallet/purchase", "POST", {targetType:"post",targetId:String(paid.id),purchaseId:crypto.randomUUID()},402);
   console.log("PASS: topup QR, pending approval, insufficient balance and admin header spoof rejection.");
 
-  // The localhost-only development admin approves a test topup. No bank API is called.
+  // Authenticate the website owner with the local configured credentials.
   const funded = await b.send("/api/wallet/topups", "POST", {amount:100000},201);
-  const adminCookie = "__sites_local_auth=1";
+  const localVars = readFileSync(".dev.vars", "utf8");
+  const setting = key => localVars.match(new RegExp(`^${key}[ \\t]*=[ \\t]*["']?([^\\s"']+)`, "m"))?.[1];
+  const ownerLogin = await fetch(origin + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: setting("TIPOOK_ADMIN_EMAIL"), password: setting("TIPOOK_ADMIN_PASSWORD") }) });
+  assert.equal(ownerLogin.status, 200, "Configure the local owner with scripts/setup-owner.mjs.");
+  const adminCookie = ownerLogin.headers.get("set-cookie")?.split(";")[0];
+  assert.ok(adminCookie);
   const adminMe = await (await fetch(origin + "/api/me", { headers: { Cookie: adminCookie } })).json();
   assert.ok(adminMe.user.isAdmin, "Configure TIPOOK_ADMIN_EMAIL in .dev.vars for the local admin.");
   const admin = async (method, body, status=200) => {
@@ -108,6 +113,26 @@ try {
   await admin("PATCH", {id:rejected.id,status:"approved"},409);
   assert.equal((await a.send("/api/wallet")).balance,0);
   console.log("PASS: admin approval and rejection cannot credit a request twice.");
+  const manage = async (resource, body, expected=200) => {
+    const response = await fetch(origin + "/api/admin/manage/" + resource, {method:"PATCH", headers:{Cookie:adminCookie,"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const result = await response.json(); assert.equal(response.status,expected,JSON.stringify(result)); return result;
+  };
+  await a.send("/api/admin/manage/posts", "PATCH", {id:gallery.id,title:marker+" edited",content:"Edited fixture"},401);
+  await manage("posts", {id:gallery.id,title:marker+" edited",content:"Edited fixture"});
+  assert.equal(db.prepare("SELECT title FROM posts WHERE id=?").get(gallery.id).title,marker+" edited");
+  await manage("posts", {id:paid.id,audience:"Ẩn bởi quản trị"});
+  assert.ok(!(await a.send("/api/posts?category="+encodeURIComponent("Bản vẽ cộng đồng")+"&page=1&q="+encodeURIComponent(marker))).posts.some(post=>post.id===paid.id));
+  await b.send("/api/wallet/purchase", "POST", {targetType:"post",targetId:String(paid.id),purchaseId:crypto.randomUUID()},404);
+  await manage("posts", {id:paid.id,audience:"Công khai"});
+  db.prepare("UPDATE posts SET audience='Riêng tư' WHERE id=?").run(gallery.id);
+  await manage("posts", {id:gallery.id,audience:"Công khai"},404);
+  db.prepare("UPDATE posts SET audience='Công khai' WHERE id=?").run(gallery.id);
+  const inquiry=(await b.send("/api/requests", "POST", {requestType:"design-consultation",targetType:"catalog",targetId:marker,recipientUserId:adminMe.user.id,subject:marker,content:"Owner inquiry fixture",channels:["internal"]},201)).request;
+  await manage("requests", {id:inquiry.id,status:"processing"});
+  assert.equal((await b.send("/api/requests")).requests.find(item=>item.id===inquiry.id).status,"processing");
+  const privateRequest=(await a.send("/api/requests")).requests[0];
+  await manage("requests", {id:privateRequest.id,status:"completed"},404);
+  console.log("PASS: inline owner management, post visibility, hidden listing checkout rejection and private-request isolation.");
   await Promise.all(Array.from({length:6},()=>b.send("/api/wallet/purchase", "POST", {targetType:"post",targetId:String(paid.id),purchaseId:crypto.randomUUID()},[200,201])));
   assert.equal((await b.send("/api/wallet")).balance,80000);
   assert.equal(db.prepare("SELECT count(*) AS n FROM wallet_transactions WHERE user_id=? AND kind='purchase'").get(b.userId).n,1);

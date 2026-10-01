@@ -4,6 +4,7 @@ import { posts } from "../../../db/schema";
 import { facadeModels } from "../../../lib/facade-catalog";
 import { drawings } from "../../../lib/drawing-catalog";
 import { catalogPageHref } from "../../../lib/catalog-pagination";
+import { getSiteContent } from "../../../lib/site-content";
 
 const resources = [
   { title: "Mẫu nhà đẹp", copy: "Thư viện mẫu nhà phố, nhà vườn và thiết kế hiện đại.", href: "/kho-mau-nha-dep-tipook", type: "Danh mục" },
@@ -19,10 +20,11 @@ export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q")?.trim().slice(0, 120) || "";
   if (!query) return Response.json({ results: [] });
   const normalized = query.toLocaleLowerCase("vi");
+  const content = await getSiteContent();
   const catalog = [
     ...resources,
-    ...facadeModels.map(model => ({ title: model.title, copy: `${model.meta} · ${model.style} · ${model.authorName}`, href: catalogPageHref("/kho-mau-nha-dep-tipook", 1, model.title), type: "Mặt tiền" })),
-    ...drawings.map(drawing => ({ title: drawing.title, copy: `${drawing.category} · ${drawing.price} · ${drawing.authorName}`, href: catalogPageHref("/file-ban-ve-nha-dep-tipook", 1, drawing.title), type: "Bản vẽ" })),
+    ...facadeModels.map((model, index) => ({ title: content[`facade.${index}.title`]?.value ?? model.title, copy: `${content[`facade.${index}.meta`]?.value ?? model.meta} · ${content[`facade.${index}.style`]?.value ?? model.style} · ${model.authorName}`, href: catalogPageHref("/kho-mau-nha-dep-tipook", 1, model.title), type: "Mặt tiền" })),
+    ...drawings.map((drawing, index) => ({ title: content[`drawing.${index}.title`]?.value ?? drawing.title, copy: `${content[`drawing.${index}.style`]?.value ?? drawing.category} · ${drawing.price} · ${drawing.authorName}`, href: catalogPageHref("/file-ban-ve-nha-dep-tipook", 1, drawing.title), type: "Bản vẽ" })),
   ].filter(item => `${item.title} ${item.copy}`.toLocaleLowerCase("vi").includes(normalized));
   try {
     const matchedPosts = await getDb().select().from(posts).where(and(

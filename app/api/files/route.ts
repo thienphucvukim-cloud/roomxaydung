@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { currentUserId } from "../../../lib/member-identity";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { postAttachments } from "../../../db/schema";
+import { postAttachments, websiteContent } from "../../../db/schema";
 
 const MAX_PUBLIC_FILE_SIZE = 25 * 1024 * 1024;
 const MAX_PRIVATE_FILE_SIZE = 100 * 1024 * 1024;
@@ -85,6 +85,8 @@ export async function DELETE(request: Request) {
     if (object.customMetadata?.ownerUserId !== await currentUserId()) return Response.json({ error: "Bạn không có quyền xóa tệp này." }, { status: 403 });
     const [attached] = await getDb().select({ id: postAttachments.id }).from(postAttachments).where(eq(postAttachments.objectKey, key)).limit(1);
     if (attached) return Response.json({ error: "Tệp đang được sử dụng trong bài đăng." }, { status: 409 });
+    const [usedOnWebsite] = await getDb().select({ key: websiteContent.key }).from(websiteContent).where(eq(websiteContent.value, "/api/files?key=" + key)).limit(1);
+    if (usedOnWebsite) return Response.json({ error: "Ảnh đang được sử dụng trên website." }, { status: 409 });
     await getBucket().delete(key);
     return Response.json({ ok: true });
   } catch (cause) {

@@ -29,7 +29,7 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-export function sites({ mockAuth = true } = {}): Plugin {
+export function sites({ mockAuth = true, localPasswordAuth = false } = {}): Plugin {
   let root = process.cwd();
   let command: "build" | "serve" = "build";
 
@@ -115,8 +115,16 @@ export function sites({ mockAuth = true } = {}): Plugin {
 
         const signIn = url.pathname === "/signin-with-chatgpt";
         const signOut = url.pathname === "/signout-with-chatgpt";
+        if (localPasswordAuth && (signIn || signOut)) {
+          response.statusCode = 302;
+          response.setHeader("Location", "/dang-nhap");
+          response.setHeader("Cache-Control", "private, no-store");
+          response.setHeader("Set-Cookie", `${localCookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+          response.end();
+          return;
+        }
         if (!signIn && !signOut) {
-          if (signInCookies.length === 1 && signInCookies[0] === "1") {
+          if (!localPasswordAuth && signInCookies.length === 1 && signInCookies[0] === "1") {
             setHeader(request, "oai-authenticated-user-id", localUserId);
             setHeader(request, "oai-authenticated-user-email", mockEmail);
             setHeader(

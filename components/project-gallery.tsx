@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Images, MapPin, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { EditableImage, EditableText, useSiteEditor } from "@/components/site-editor";
 
-type Model = { title: string; meta: string; style: string; image: string };
+type Model = { title: string; meta: string; style: string; image: string; photos?: string[]; editableKey?: string };
 
 export function ProjectGallery({ model, trigger = "text" }: { model: Model; trigger?: "text" | "overlay" }) {
-  const photos = [model.image, "/community-house.png", "/mau-nha-pho-xanh.png", "/mat-bang-5x20.png", model.image];
+  const editor = useSiteEditor();
+  const originals = model.photos?.length ? model.photos : [model.image, "/community-house.png", "/mau-nha-pho-xanh.png", "/mat-bang-5x20.png", model.image];
+  const photos = originals.map((photo, index) => model.editableKey ? editor.content[`${model.editableKey}.${index === 0 ? "image" : `photo.${index}`}`]?.value ?? photo : photo);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(0);
   const choose = (index: number) => setSelected(index);
@@ -19,11 +22,11 @@ export function ProjectGallery({ model, trigger = "text" }: { model: Model; trig
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-1.5rem)] max-w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-2xl border-0 bg-white p-0 sm:max-w-5xl" aria-describedby={undefined}><DialogClose className="absolute right-4 top-4 z-30 grid size-12 place-items-center rounded-full border border-[#e3eaf2] bg-white text-[#0b2e59] shadow-lg transition hover:bg-[#f7f9fc]" aria-label="Đóng xem ảnh"><X size={26}/><span className="sr-only">Đóng</span></DialogClose>
         <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-5 sm:p-8">
-          <p className="pr-10 text-xs font-extrabold uppercase tracking-[.13em] text-[#229ed9]">{model.style}</p>
-          <DialogTitle className="mt-2 pr-10 text-2xl font-extrabold tracking-[-.03em] text-[#0b2e59] sm:text-4xl">{model.title}</DialogTitle>
+          <p className="pr-10 text-xs font-extrabold uppercase tracking-[.13em] text-[#229ed9]">{model.editableKey ? <EditableText contentKey={`${model.editableKey}.style`}>{model.style}</EditableText> : model.style}</p>
+          <DialogTitle className="mt-2 pr-10 text-2xl font-extrabold tracking-[-.03em] text-[#0b2e59] sm:text-4xl">{model.editableKey ? <EditableText contentKey={`${model.editableKey}.title`}>{model.title}</EditableText> : model.title}</DialogTitle>
           <div className="mt-6 overflow-hidden rounded-xl bg-[#f7f9fc]">
             <div className="relative aspect-[16/10] bg-[#e5e4df]">
-              <img src={photos[selected]} alt={`${model.title} - ảnh ${selected + 1}`} className="h-full w-full object-contain"/>
+              {model.editableKey ? <EditableImage contentKey={`${model.editableKey}.${selected === 0 ? "image" : `photo.${selected}`}`} src={originals[selected]} alt={`${model.title} - ảnh ${selected + 1}`} className="h-full w-full object-contain"/> : <img src={photos[selected]} alt={`${model.title} - ảnh ${selected + 1}`} className="h-full w-full object-contain"/>}
               <button onClick={previous} aria-label="Ảnh trước" className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#0b2e59] shadow-md hover:bg-white"><ChevronLeft size={21}/></button>
               <button onClick={next} aria-label="Ảnh tiếp theo" className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#0b2e59] shadow-md hover:bg-white"><ChevronRight size={21}/></button>
             </div>

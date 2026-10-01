@@ -1,3 +1,4 @@
+import { EditableText } from "@/components/site-editor";
 import { DrawingCommunity } from "@/components/drawing-community";
 import { EditorialContent } from "@/components/editorial-content";
 
@@ -7,9 +8,9 @@ export function InteriorPage({ page = 1, query = "" }: { page?: number; query?: 
   return <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
     <DrawingCommunity key={`${page}:${query}`} variant="interior" page={page} searchQuery={query} />
     <section className="mt-9">
-      <p className="text-sm font-extrabold uppercase tracking-[.13em] text-[#229ed9]">Thư viện nội thất</p>
-      <h1 className="mt-2 text-3xl font-extrabold tracking-[-.04em] text-[#0b2e59] sm:text-4xl">Kho thiết kế nội thất từ cộng đồng</h1>
-      <p className="mt-3 max-w-3xl text-base leading-7 text-[#3f5064]">Khám phá, mua và tải hồ sơ nội thất phòng khách, phòng ngủ, bếp cùng bản vẽ CAD và file 3D phục vụ thi công.</p>
+      <p className="text-sm font-extrabold uppercase tracking-[.13em] text-[#229ed9]"><EditableText contentKey="interior.text.0">Thư viện nội thất</EditableText></p>
+      <h1 className="mt-2 text-3xl font-extrabold tracking-[-.04em] text-[#0b2e59] sm:text-4xl"><EditableText contentKey="interior.text.1">Kho thiết kế nội thất từ cộng đồng</EditableText></h1>
+      <p className="mt-3 max-w-3xl text-base leading-7 text-[#3f5064]"><EditableText contentKey="interior.text.2">Khám phá, mua và tải hồ sơ nội thất phòng khách, phòng ngủ, bếp cùng bản vẽ CAD và file 3D phục vụ thi công.</EditableText></p>
     </section>
     <EditorialContent
       eyebrow="KIỂM TRA HỒ SƠ NỘI THẤT"

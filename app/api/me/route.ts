@@ -1,7 +1,6 @@
 import { count, eq } from "drizzle-orm";
 import { currentMember } from "../../../lib/member-identity";
-import { env } from "cloudflare:workers";
-import { headers } from "next/headers";
+import { getAuthenticatedIdentity, isAdminIdentity } from "../../../lib/website-auth";
 import { getDb } from "../../../db";
 import { memberProfiles, posts, userActions, userRequests } from "../../../db/schema";
 
@@ -16,9 +15,9 @@ export async function GET() {
       db.select({ value: count() }).from(userRequests).where(eq(userRequests.userId, userId)),
       db.select({ accountType: memberProfiles.accountType, profession: memberProfiles.profession }).from(memberProfiles).where(eq(memberProfiles.userId, userId)).limit(1),
     ]);
-    const authenticated = Boolean((await headers()).get("oai-authenticated-user-id"));
-    const bindings = env as unknown as Record<string, string | undefined>;
-    const isAdmin = authenticated && (userId === bindings.TIPOOK_ADMIN_USER_ID?.trim() || Boolean(email && email.toLowerCase() === bindings.TIPOOK_ADMIN_EMAIL?.trim().toLowerCase()));
+    const identity = await getAuthenticatedIdentity();
+    const authenticated = Boolean(identity);
+    const isAdmin = isAdminIdentity(identity);
     return Response.json({ user: { id: userId, name, email, authenticated, isAdmin, accountType: profile?.accountType ?? "user", profession: profile?.profession ?? null }, counts: { posts: postCount.value, actions: actionCount.value, requests: requestCount.value } });
   } catch {
     return Response.json({ error: "Chưa thể tải hồ sơ." }, { status: 500 });

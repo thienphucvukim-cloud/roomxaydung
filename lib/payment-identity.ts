@@ -1,8 +1,9 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
+import { getAuthenticatedIdentity } from "./website-auth";
 import { GUEST_ID_PATTERN, MEMBER_SESSION_COOKIE as PAYMENT_SESSION_COOKIE } from "./session-cookie";
 
 export async function getPaymentBuyerId() {
-  const authenticatedId = (await headers()).get("oai-authenticated-user-id")?.trim();
+  const authenticatedId = (await getAuthenticatedIdentity())?.userId;
   if (authenticatedId) return authenticatedId.slice(0, 180);
   const value = (await cookies()).get(PAYMENT_SESSION_COOKIE)?.value ?? "";
   return GUEST_ID_PATTERN.test(value) ? value : null;

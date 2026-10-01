@@ -154,3 +154,32 @@ export const memberProfiles = sqliteTable("member_profiles", {
   upgradedAt: text("upgraded_at"),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [index("idx_member_profiles_type").on(table.accountType)]);
+
+export const websiteAccounts = sqliteTable("website_accounts", {
+  userId: text("user_id").primaryKey(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  isOwner: integer("is_owner", { mode: "boolean" }).notNull().default(false),
+  createdAt: text("created_at").notNull(),
+});
+
+export const websiteSessions = sqliteTable("website_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
+  expiresAt: integer("expires_at").notNull(),
+}, (table) => [index("idx_website_sessions_user").on(table.userId)]);
+
+export const authRateLimits = sqliteTable("auth_rate_limits", {
+  key: text("key").primaryKey(),
+  attempts: integer("attempts").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});
+
+export const websiteContent = sqliteTable("website_content", {
+  key: text("key").primaryKey(),
+  kind: text("kind").notNull(),
+  value: text("value").notNull(),
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

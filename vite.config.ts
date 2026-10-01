@@ -61,13 +61,17 @@ export default defineConfig(async () => {
     },
     plugins: [
       vinext(),
-      sites({ mockAuth: !managedLinux && !deployToCloudflare }),
+      sites({ mockAuth: !managedLinux && !deployToCloudflare, localPasswordAuth: true }),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
         ...(deployToCloudflare
           ? { configPath: "wrangler.jsonc" }
-          : { config: localBindingConfig }),
+          : { config: (config) => {
+            // Replace arrays instead of concatenating the production bindings
+            // discovered from wrangler.jsonc (including nodejs_compat).
+            Object.assign(config, localBindingConfig);
+          } }),
       }),
     ],
   };

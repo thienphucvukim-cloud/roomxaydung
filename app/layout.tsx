@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ExploreHeader } from "@/components/explore-header";
-import { SocialDock } from "@/components/social-dock";
+import { SiteChrome } from "@/components/site-chrome";
+import { getSiteContent } from "@/lib/site-content";
+import "./owner-editor.css";
+export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+const metadata: Metadata = {
   title: "Tipook — Cộng đồng tư vấn và thiết kế nhà",
   description: "Hỏi đáp, chia sẻ chi phí thực tế và kinh nghiệm từ những người đã và đang xây nhà.",
   icons: {
@@ -13,15 +15,22 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getSiteContent();
+  const name = content["global.name"]?.value || "Tipook";
+  return { ...metadata, title: `${name} — Cộng đồng tư vấn và thiết kế nhà` };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const initialContent = await getSiteContent();
   return (
     <html lang="vi">
       <head><meta charSet="utf-8" /></head>
-      <body className="antialiased"><ExploreHeader />{children}<SocialDock /></body>
+      <body className="antialiased"><SiteChrome initialContent={initialContent}>{children}</SiteChrome></body>
     </html>
   );
 }

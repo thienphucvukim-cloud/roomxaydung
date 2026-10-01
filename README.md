@@ -55,9 +55,10 @@ Dev server tự áp dụng các migration chưa chạy vào D1 local trước kh
 Các phiên khách được tách bằng cookie riêng; lưu mẫu, hồ sơ, tin nhắn và ví
 được giữ lại sau khi tải lại trang trong cùng phiên trình duyệt.
 
-Đăng nhập local mô phỏng tài khoản quản trị theo `TIPOOK_ADMIN_EMAIL` trong
-`.dev.vars`. Chi tiết nạp tiền và cấu hình production nằm trong
-[docs/PAYMENTS.md](docs/PAYMENTS.md).
+Đăng nhập bằng email và mật khẩu ngay tại `/dang-nhap`. Chủ website có thanh
+công cụ Chỉnh sửa, Quản lý và Cài đặt ngay trên trang đang xem. Cấu hình tài
+khoản chủ website theo [docs/WEBSITE_OWNER.md](docs/WEBSITE_OWNER.md).
+Chi tiết nạp tiền và cấu hình production nằm trong [docs/PAYMENTS.md](docs/PAYMENTS.md).
 
 ## Biến môi trường và dữ liệu
 
@@ -77,6 +78,7 @@ Khi dev server đang chạy, kiểm tra các luồng chức năng và phân tran
 ```bash
 node scripts/check-functional-flows.mjs
 node scripts/check-facade-pagination.mjs
+node scripts/check-website-auth.mjs
 ```
 
 ```bash
