@@ -3,6 +3,11 @@
 Repository: `thienphucvukim-cloud/roomxaydung`, nhánh production: `main`.
 Worker: `tipook-web`.
 
+URL production: https://tipook-web.thienphuc-vukim.workers.dev
+
+Ngày 01/10/2026, Worker đã được liên kết với repository trên Cloudflare Workers Builds.
+Push vào `main` kích hoạt build và deploy tự động; preview builds đang tắt.
+
 ## Tài nguyên
 
 - D1: `roomxaydung-db`, binding `DB`.
