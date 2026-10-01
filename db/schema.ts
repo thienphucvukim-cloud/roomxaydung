@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const posts = sqliteTable("posts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -10,12 +10,8 @@ export const posts = sqliteTable("posts", {
   location: text("location"),
   audience: text("audience").notNull().default("Công khai"),
   feeling: text("feeling"),
-  background: text("background"),
-  mentions: text("mentions"),
   pollQuestion: text("poll_question"),
-  pollOptions: text("poll_options"),
   comments: integer("comments").notNull().default(0),
-  likes: integer("likes").notNull().default(0),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
 
@@ -29,10 +25,6 @@ export const postComments = sqliteTable("post_comments", {
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [index("idx_post_comments_post_id").on(table.postId)]);
 
-export const postLikes = sqliteTable("post_likes", {
-  postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull(),
-}, (table) => [primaryKey({ columns: [table.postId, table.userId] })]);
 export const postAttachments = sqliteTable("post_attachments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
@@ -118,30 +110,41 @@ export const deliveryProfiles = sqliteTable("delivery_profiles", {
   internalChatId: text("internal_chat_id"),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
-export const paymentOrders = sqliteTable("payment_orders", {
+export const walletTransactions = sqliteTable("wallet_transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  orderCode: integer("order_code").notNull().unique(),
-  buyerUserId: text("buyer_user_id").notNull(),
-  buyerName: text("buyer_name").notNull(),
-  buyerEmail: text("buyer_email"),
-  sellerUserId: text("seller_user_id").notNull(),
-  targetType: text("target_type").notNull(),
-  targetId: text("target_id").notNull(),
-  productTitle: text("product_title").notNull(),
+  userId: text("user_id").notNull(),
+  kind: text("kind").notNull(),
   amount: integer("amount").notNull(),
-  provider: text("provider").notNull().default("payos"),
-  paymentLinkId: text("payment_link_id"),
-  checkoutUrl: text("checkout_url"),
+  orderCode: integer("order_code").notNull(),
+  reference: text("reference").notNull(),
+  targetType: text("target_type"),
+  targetId: text("target_id"),
+  sellerUserId: text("seller_user_id"),
+  description: text("description").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [
+  uniqueIndex("wallet_transactions_order_code_unique").on(table.orderCode),
+  uniqueIndex("wallet_transactions_reference_unique").on(table.reference),
+  index("idx_wallet_transactions_user").on(table.userId, table.createdAt),
+  index("idx_wallet_transactions_seller").on(table.sellerUserId, table.createdAt),
+]);
+
+export const walletTopupRequests = sqliteTable("wallet_topup_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  requestCode: text("request_code").notNull().unique(),
+  userId: text("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  transferContent: text("transfer_content").notNull().unique(),
   status: text("status").notNull().default("pending"),
-  transactionReference: text("transaction_reference"),
-  paidAt: text("paid_at"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: text("reviewed_at"),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [
-  index("idx_payment_orders_buyer").on(table.buyerUserId, table.createdAt),
-  index("idx_payment_orders_seller").on(table.sellerUserId, table.createdAt),
-  index("idx_payment_orders_status").on(table.status, table.createdAt),
+  index("idx_wallet_topups_user").on(table.userId, table.createdAt),
+  index("idx_wallet_topups_status").on(table.status, table.createdAt),
 ]);
+
 export const memberProfiles = sqliteTable("member_profiles", {
   userId: text("user_id").primaryKey(),
   displayName: text("display_name").notNull(),

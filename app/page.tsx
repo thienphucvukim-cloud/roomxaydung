@@ -1,5 +1,5 @@
-import CommunityClient from "./community-client";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <CommunityClient />;
+  redirect("/kho-mau-nha-dep-tipook");
 }

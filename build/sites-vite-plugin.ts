@@ -1,6 +1,6 @@
 // Vendored from @openai/sites-vite-plugin 0.2.0 (openai/sites#9).
 // See sites-vite-plugin.LICENSE for the upstream MIT license.
-import { access, cp, mkdir, rm } from "node:fs/promises";
+import { access, cp, mkdir, rm, readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
@@ -39,11 +39,22 @@ export function sites({ mockAuth = true } = {}): Plugin {
       root = config.root;
       command = config.command;
     },
-    configureServer(server) {
+    async configureServer(server) {
       if (!mockAuth) return;
       const secure = Boolean(server.config.server.https);
+      // The development login is a localhost-only simulation. Use the configured
+      // admin email so the owner can review topups in the local preview.
+      let mockEmail = localEmail;
+      let mockName = localFullName;
+      try {
+        const variables = await readFile(resolve(root, ".dev.vars"), "utf8");
+        const configuredEmail = variables.match(/^TIPOOK_ADMIN_EMAIL\s*=\s*["']?([^\s"']+)/m)?.[1];
+        if (configuredEmail) { mockEmail = configuredEmail; mockName = "Quản trị Tipook (local)"; }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
 
-      server.config.logger.info(`Sites local sign-in: ${localEmail}`);
+      server.config.logger.info("Sites local sign-in: localhost development account");
       server.middlewares.use((request, response, next) => {
         for (const name of Object.keys(request.headers)) {
           if (name.startsWith("oai-authenticated-user-")) {
@@ -107,11 +118,11 @@ export function sites({ mockAuth = true } = {}): Plugin {
         if (!signIn && !signOut) {
           if (signInCookies.length === 1 && signInCookies[0] === "1") {
             setHeader(request, "oai-authenticated-user-id", localUserId);
-            setHeader(request, "oai-authenticated-user-email", localEmail);
+            setHeader(request, "oai-authenticated-user-email", mockEmail);
             setHeader(
               request,
               "oai-authenticated-user-full-name",
-              localFullName,
+              encodeURIComponent(mockName),
             );
             setHeader(
               request,

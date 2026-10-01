@@ -1,11 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { currentUserId } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
 import { userActions } from "../../../db/schema";
-
-async function currentUserId() {
-  return (await headers()).get("oai-authenticated-user-id") ?? "private-member";
-}
 
 function valid(value: unknown, max = 120): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;

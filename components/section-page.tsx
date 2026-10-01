@@ -61,7 +61,7 @@ const content: Record<Section, PageContent> = {
     }
   },
   experts: {
-    eyebrow: "HỎI CHUYÊN GIA",
+    eyebrow: "TƯ VẤN",
     title: "Nhận tư vấn cho ngôi nhà của bạn",
     description: "Gửi câu hỏi về thiết kế, kết cấu, dự toán hoặc thi công để nhận gợi ý từ kiến trúc sư và kỹ sư.",
     action: "Đặt câu hỏi cho chuyên gia",

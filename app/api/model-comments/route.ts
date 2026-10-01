@@ -1,21 +1,9 @@
 import { and, asc, eq, sql } from "drizzle-orm";
-import { headers } from "next/headers";
+import { currentMember } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
 import { postComments, posts } from "../../../db/schema";
 
 const discussionCategory = "Thảo luận mẫu nhà";
-
-async function currentMember() {
-  const h = await headers();
-  const encodedName = h.get("oai-authenticated-user-full-name");
-  const email = h.get("oai-authenticated-user-email");
-  return {
-    userId: h.get("oai-authenticated-user-id") ?? "private-member",
-    authorName: encodedName && h.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedName)
-      : email?.split("@")[0] ?? "Thành viên",
-  };
-}
 
 async function findDiscussion(targetId: string) {
   const [post] = await getDb().select().from(posts).where(and(eq(posts.category, discussionCategory), eq(posts.title, targetId))).limit(1);

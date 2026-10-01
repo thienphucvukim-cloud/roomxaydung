@@ -1,11 +1,8 @@
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { currentUserId } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
 import { deliveryProfiles } from "../../../db/schema";
 
-async function currentUserId() {
-  return (await headers()).get("oai-authenticated-user-id") ?? "private-member";
-}
 function value(input: unknown) { return typeof input === "string" ? input.trim().slice(0, 180) : ""; }
 
 export async function GET() {

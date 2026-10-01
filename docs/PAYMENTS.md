@@ -1,35 +1,50 @@
-# Thanh toán bản vẽ bằng payOS
+# Ví Tipook và nạp tiền thủ công
+
+Tipook không dùng payOS. Người dùng chuyển khoản trực tiếp vào tài khoản ngân hàng của admin; admin kiểm tra sao kê và duyệt thủ công trước khi hệ thống cộng số dư.
 
 ## Biến môi trường bắt buộc
 
-Cấu hình ba secret phía máy chủ, không đặt trong mã nguồn hoặc biến `NEXT_PUBLIC_*`:
+Các giá trị này chỉ được cấu hình phía máy chủ, không dùng tiền tố `NEXT_PUBLIC_`:
 
-- `PAYOS_CLIENT_ID`
-- `PAYOS_API_KEY`
-- `PAYOS_CHECKSUM_KEY`
-- `DOWNLOAD_LINK_SECRET`: chuỗi bí mật ngẫu nhiên dùng để ký link tải 24 giờ (nếu bỏ trống, hệ thống dùng `PAYOS_CHECKSUM_KEY`).
+- `ADMIN_BANK_CODE`: mã ngân hàng dùng cho VietQR, ví dụ `VCB`.
+- `ADMIN_BANK_ACCOUNT`: số tài khoản nhận tiền của admin.
+- `ADMIN_BANK_NAME`: tên chủ tài khoản.
+- `TIPOOK_ADMIN_USER_ID` hoặc `TIPOOK_ADMIN_EMAIL`: ID hoặc email đăng nhập đã xác thực được phép duyệt nạp tiền. Không dùng tên hiển thị làm ID.
+- `ADMIN_BANK_QR_IMAGE` (tùy chọn): đường dẫn ảnh QR dự phòng trong `/payments/`, phải thuộc đúng tài khoản nhận tiền đang cấu hình.
+- `DOWNLOAD_LINK_SECRET`: chuỗi bí mật ngẫu nhiên dài dùng để ký link tải 24 giờ.
 
-Tùy chọn:
+Cloudflare D1 phải được bind với tên `DB`, R2 bind với tên `BUCKET`. Có thể dùng gói miễn phí khi lượng người dùng còn thấp.
 
-- `PAYOS_RETURN_URL_BASE`: domain công khai của website, ví dụ `https://tipook.vn`. Nếu bỏ trống, hệ thống dùng origin của request hiện tại.
+## Luồng nạp tiền
 
-## Webhook
+1. Người dùng tạo yêu cầu nạp tại trang Tài khoản.
+2. Máy chủ tạo mã riêng và nội dung chuyển khoản, sau đó hiển thị QR chuyển khoản vào ngân hàng admin.
+3. Yêu cầu giữ trạng thái `pending`; ảnh biên lai hoặc nút xác nhận của người dùng không làm tăng số dư.
+4. Admin mở `/quan-tri/nap-tien`, kiểm tra tiền thực tế trong tài khoản ngân hàng rồi bấm Duyệt.
+5. API quản trị kiểm tra ID hoặc email từ phiên đăng nhập đã xác thực và ghi giao dịch cộng tiền vào sổ cái. Một yêu cầu chỉ được cộng tiền một lần.
+6. Khi mua file, máy chủ tự lấy giá, trừ số dư bằng câu lệnh nguyên tử và lưu tác giả để admin đối soát, trả tiền riêng.
 
-Trong kênh thanh toán trên my.payos.vn, đặt webhook URL thành:
+## File bản vẽ
 
-`https://<domain>/api/payments/webhook`
+File bán được lưu private trong R2. API công khai không đọc được file private. Sau khi mua thành công, hệ thống tạo link có chữ ký gắn với tài khoản mua và hết hạn sau 24 giờ. Link tải luôn trả về dạng attachment, có `nosniff` và CSP sandbox.
 
-Webhook xác minh HMAC-SHA256, đối chiếu mã đơn và số tiền trước khi cập nhật trạng thái `paid`.
+Tệp không đặt giá được tải miễn phí. Nút “Tải lại” trong lịch sử ví cấp liên kết mới cho hồ sơ đã mua và không trừ tiền thêm. Máy chủ kiểm tra file và ký liên kết trước khi trừ số dư. Mua đồng thời cùng một hồ sơ chỉ ghi một giao dịch.
 
-## Cơ sở dữ liệu
+Các bản vẽ có sẵn trong danh mục là nội dung tham khảo chưa có file bán thật; API không trừ tiền cho các mục này. Người đăng cần tải hồ sơ thực tế lên để bán qua bài cộng đồng.
 
-Áp dụng các migration `drizzle/0008_payment_orders.sql`, `drizzle/0009_member_profiles.sql` và `drizzle/0010_private_drawing_files.sql` trước khi bật thanh toán.
+## Kiểm tra local
 
-## Luồng người dùng
+`.dev.vars` bị loại khỏi Git. Khi chạy local, đăng nhập mô phỏng chỉ hoạt động trên localhost và dùng email quản trị đã cấu hình. Đăng nhập rồi mở `/quan-tri/nap-tien` để thử duyệt yêu cầu. Mô phỏng này không áp dụng cho bản triển khai production.
 
-1. Người mua bấm icon Đặt mua và xác nhận.
-2. Máy chủ lấy giá từ danh mục hoặc bài đăng, tạo đơn `pending`, ký dữ liệu rồi gọi payOS.
-3. Trình duyệt chuyển đến checkout payOS để quét VietQR/thanh toán.
-4. payOS gọi webhook; Tipook chỉ xác nhận đơn sau khi chữ ký và số tiền hợp lệ.
-5. Với bản vẽ cộng đồng, người mua nhận link tải có chữ ký trong tin nhắn nội bộ. Link chỉ dùng đúng tài khoản mua và hết hạn sau 24 giờ.
-6. Ảnh đại diện được lưu công khai; file bán được đánh dấu `private` trong Cloudflare R2 và không thể đọc qua API tệp công khai.
+Chạy `node scripts/check-functional-flows.mjs` khi dev server đang mở. Bộ kiểm tra dùng hai phiên riêng, đăng dữ liệu thử, duyệt nạp thử trong database local, kiểm tra mua đồng thời và quyền tải file, rồi dọn dữ liệu đã tạo. Không có giao dịch ngân hàng thật.
+
+## Migration
+
+Áp dụng `drizzle/0011_wallet_transactions.sql` sau các migration hiện có trước khi bật tính năng ví.
+
+
+## Cấu hình Cloudflare
+
+Đặt các giá trị nhạy cảm bằng các lệnh `wrangler secret put ADMIN_BANK_ACCOUNT`, `wrangler secret put ADMIN_BANK_NAME`, `wrangler secret put TIPOOK_ADMIN_EMAIL` (hoặc `TIPOOK_ADMIN_USER_ID`) và `wrangler secret put DOWNLOAD_LINK_SECRET`. `ADMIN_BANK_CODE` có thể đặt bằng biến môi trường thường. `.dev.vars` chỉ cung cấp cấu hình local; các giá trị phải được cấu hình riêng trên máy chủ production.
+
+Áp dụng migration lên D1 production bằng lệnh tương ứng với cấu hình triển khai: `wrangler d1 execute DB --remote --file drizzle/0011_wallet_transactions.sql`. Kiểm tra đúng database trước khi chạy.

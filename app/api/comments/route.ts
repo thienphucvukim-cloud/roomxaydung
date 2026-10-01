@@ -1,22 +1,10 @@
 import { asc, eq, sql } from "drizzle-orm";
-import { headers } from "next/headers";
+import { currentMember } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
 import { postComments, posts } from "../../../db/schema";
 
 function validImageKey(value: string | null | undefined) {
   return typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value);
-}
-
-async function currentMember() {
-  const h = await headers();
-  const encodedName = h.get("oai-authenticated-user-full-name");
-  const email = h.get("oai-authenticated-user-email");
-  return {
-    userId: h.get("oai-authenticated-user-id") ?? "private-member",
-    authorName: encodedName && h.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedName)
-      : email?.split("@")[0] ?? "Thành viên",
-  };
 }
 
 export async function GET(request: Request) {
@@ -39,9 +27,9 @@ export async function POST(request: Request) {
     if (!Number.isInteger(postId) || (!content && !imageKey)) return Response.json({ error: "Vui lòng nhập bình luận hoặc chọn ảnh." }, { status: 400 });
     if (imageKey && !validImageKey(imageKey)) return Response.json({ error: "Ảnh bình luận không hợp lệ." }, { status: 400 });
     if (content.length > 600) return Response.json({ error: "Bình luận tối đa 600 ký tự." }, { status: 400 });
-    const member = await currentMember();
+    const { userId, authorName } = await currentMember();
     const db = getDb();
-    const [comment] = await db.insert(postComments).values({ postId, content, imageKey: imageKey || null, ...member }).returning();
+    const [comment] = await db.insert(postComments).values({ postId, content, imageKey: imageKey || null, userId, authorName }).returning();
     await db.update(posts).set({ comments: sql`${posts.comments} + 1` }).where(eq(posts.id, postId));
     return Response.json({ comment: { ...comment, imageUrl: validImageKey(comment.imageKey) ? "/api/files?key=" + encodeURIComponent(comment.imageKey as string) : null } }, { status: 201 });
   } catch {

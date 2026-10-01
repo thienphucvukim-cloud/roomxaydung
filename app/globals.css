@@ -34,6 +34,22 @@ html { scrollbar-gutter: stable; }
 html, body { width: 100%; max-width: 100%; overflow-x: clip; }
 body { min-width: 0; }
 main { min-width: 0; }
+/* Reserve matching text rows so catalog information stays aligned. */
+.catalog-card-title {
+  line-height: 1.5rem;
+  min-height: 3rem;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.catalog-card-author,
+.catalog-card-detail {
+  line-height: 1.25rem;
+  min-height: 2.5rem;
+  overflow-wrap: anywhere;
+}
 img, video, canvas { max-width: 100%; }
 body { margin: 0; background: var(--background); color: var(--foreground); line-height: 1.55; letter-spacing: -0.006em; text-rendering: optimizeLegibility; font-family: "Be Vietnam Pro"; }
 button, input, textarea, select { font: inherit; }
@@ -145,6 +161,98 @@ button { cursor: pointer; }
   font-weight: 650;
   line-height: 1;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* A shared liquid light follows the hovered, focused, or selected tab. */
+.animated-tab-nav {
+  isolation: isolate;
+  --tab-inset: 0px;
+}
+
+.animated-tab-nav:not(.mobile-social-nav) { position: relative; }
+.mobile-social-nav.animated-tab-nav { --tab-inset: 4px; }
+
+.tab-liquid-light {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  top: 6px;
+  bottom: 6px;
+  left: var(--tab-inset);
+  width: calc((100% - 2 * var(--tab-inset)) / var(--tab-count));
+  border: 1px solid #e1e5eb;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fafbfc 0%, #edf0f4 48%, #f5f6f8 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .9), 0 1px 3px rgba(16, 24, 40, .04);
+  transform: translateX(calc(var(--tab-index) * 100%)) scaleX(.9);
+  opacity: 0;
+  transition: transform .48s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
+}
+
+.tab-liquid-light[data-visible="true"] { opacity: 1; }
+.mobile-social-nav .tab-liquid-light { bottom: calc(env(safe-area-inset-bottom) + 6px); }
+
+.animated-tab-link {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  color: #52677f;
+  transition: color .22s ease;
+}
+
+.desktop-tab-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.animated-tab-link::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 6px 5%;
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, .55) 48%, transparent 75%);
+  transform: translateX(-120%) skewX(-12deg);
+  opacity: 0;
+}
+
+.animated-tab-link[data-highlighted="true"] { color: #253d58; }
+.animated-tab-link[aria-current="page"] { color: #0b2e59; }
+.animated-tab-link[data-highlighted="true"]::before { animation: tab-liquid-sweep .65s cubic-bezier(.22, 1, .36, 1) both; }
+
+.animated-tab-icon {
+  position: relative;
+  flex-shrink: 0;
+  transition: transform .4s cubic-bezier(.22, 1, .36, 1), filter .3s ease;
+}
+
+.animated-tab-link[data-highlighted="true"] .animated-tab-icon {
+  transform: translateY(-3px) scale(1.12);
+  filter: drop-shadow(0 1px 1px rgba(16, 24, 40, .08));
+}
+
+.animated-tab-link:active .animated-tab-icon { transform: translateY(-1px) scale(.94); }
+.animated-tab-link:focus-visible { outline: 2px solid #0b2e59; outline-offset: -3px; }
+.animated-tab-label { position: relative; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desktop-tab-link .animated-tab-label { font-size: 11px; font-weight: 600; line-height: 1; }
+
+.desktop-tab-link[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 8px 0;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: #0b2e59;
+}
+
+@keyframes tab-liquid-sweep {
+  0% { transform: translateX(-120%) skewX(-12deg); opacity: 0; }
+  25% { opacity: .8; }
+  100% { transform: translateX(120%) skewX(-12deg); opacity: 0; }
 }
 
 @media (max-width: 1023px) {

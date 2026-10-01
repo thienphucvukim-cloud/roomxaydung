@@ -78,6 +78,13 @@
                         "when":  1790299027374,
                         "tag":  "0010_private_drawing_files",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  11,
+                        "version":  "6",
+                        "when":  1790339400000,
+                        "tag":  "0011_wallet_transactions",
+                        "breakpoints":  true
                     }
                 ]
 }

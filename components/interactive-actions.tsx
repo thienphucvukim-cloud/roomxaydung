@@ -115,7 +115,7 @@ export function RequestActionButton({
   const [attachmentName, setAttachmentName] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [channels, setChannels] = useState(routedDelivery ? ["internal", "zalo", "messenger", "telegram"] : ["internal"]);
+  const [channels, setChannels] = useState(["internal"]);
 
   const upload = async (file?: File) => {
     if (!file) return;
@@ -212,4 +212,8 @@ export function FilterChips({ scope, items }: { scope: string; items: { label: s
     });
   };
   return <div className="flex flex-wrap gap-2">{items.map((item) => <button type="button" key={item.value} onClick={() => apply(item.value)} className={"rounded-full px-4 py-2 text-sm font-bold transition " + (active === item.value ? "bg-[#229ed9] text-white" : "border border-[#e3eaf2] bg-white text-[#3f5064] hover:border-[#229ed9]")}>{item.label}</button>)}</div>;
+}
+
+export function CatalogPublishButton({ className = "" }: { className?: string }) {
+  return <button type="button" onClick={() => document.getElementById("catalog-publish")?.click()} className={className}>Bắt đầu đăng bán</button>;
 }

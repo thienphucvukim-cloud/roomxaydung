@@ -1,23 +1,12 @@
 import { desc, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { currentMember } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
-import { deliveryProfiles, directMessages, posts, userRequests, virtualProfiles } from "../../../db/schema";
+import { deliveryProfiles, directMessages, memberProfiles, posts, userRequests, virtualProfiles } from "../../../db/schema";
+import { env } from "cloudflare:workers";
 import { deliverExternalMessages } from "../../../lib/request-delivery";
 
 const supportedChannels = ["internal", "zalo", "messenger", "telegram"] as const;
 type Channel = typeof supportedChannels[number];
-
-async function currentMember() {
-  const h = await headers();
-  const encodedName = h.get("oai-authenticated-user-full-name");
-  const email = h.get("oai-authenticated-user-email");
-  return {
-    userId: h.get("oai-authenticated-user-id") ?? "private-member",
-    authorName: encodedName && h.get("oai-authenticated-user-full-name-encoding") === "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedName)
-      : email?.split("@")[0] ?? "Thành viên Tipook",
-  };
-}
 
 function text(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -63,15 +52,24 @@ export async function POST(request: Request) {
     if (attachmentKey && !/^[0-9a-f-]{36}$/i.test(attachmentKey)) return Response.json({ error: "Tệp đính kèm không hợp lệ." }, { status: 400 });
     if (!requestType || !targetType || !targetId || !subject || !content || !channels.length) return Response.json({ error: "Vui lòng nhập đầy đủ nội dung và chọn ít nhất một kênh." }, { status: 400 });
 
-    const recipientUserId = await resolveRecipient(targetType, targetId, requestedRecipient);
+    let recipientUserId = await resolveRecipient(targetType, targetId, requestedRecipient);
     const routedRequest = requestType === "expert-question" || requestType === "drawing-purchase" || requestType === "drawing-file-request";
     if (routedRequest && !recipientUserId) return Response.json({ error: "Chưa xác định được người đăng để nhận tin nhắn." }, { status: 400 });
 
     const member = await currentMember();
     const db = getDb();
-    const effectiveRecipient = recipientUserId || "tipook-support";
+    const [sampleProfile] = recipientUserId ? await db.select({ id: virtualProfiles.id }).from(virtualProfiles).where(eq(virtualProfiles.id, recipientUserId)).limit(1) : [];
+    if (!recipientUserId || sampleProfile) {
+      const bindings = env as unknown as Record<string, string | undefined>;
+      const [adminProfile] = bindings.TIPOOK_ADMIN_EMAIL
+        ? await db.select({ userId: memberProfiles.userId }).from(memberProfiles).where(eq(memberProfiles.email, bindings.TIPOOK_ADMIN_EMAIL.trim().toLowerCase())).limit(1)
+        : [];
+      recipientUserId = bindings.TIPOOK_ADMIN_USER_ID?.trim() || adminProfile?.userId || "";
+      if (!recipientUserId) return Response.json({ error: "Quản trị viên cần đăng nhập lần đầu để kích hoạt hộp thư tiếp nhận tư vấn." }, { status: 503 });
+    }
+    const effectiveRecipient = recipientUserId;
     const [saved] = await db.insert(userRequests).values({
-      ...member, requestType, targetType, targetId, subject, content, contact: contact || null, attachmentKey: attachmentKey || null,
+      userId: member.userId, authorName: member.authorName, requestType, targetType, targetId, subject, content, contact: contact || null, attachmentKey: attachmentKey || null,
       recipientUserId: effectiveRecipient, channels: JSON.stringify(channels), deliveryStatus: JSON.stringify({ pending: channels }),
     }).returning();
 

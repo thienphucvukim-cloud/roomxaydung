@@ -1,0 +1,3 @@
+# Keep generated lockfile changes visible without expanding their full text in diffs.
+package-lock.json -diff
+pnpm-lock.yaml -diff

@@ -53,7 +53,10 @@ export default defineConfig(async () => {
   return {
     server: {
       ...(managedLinux ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] } : {}),
-      ...(isCodexSeatbeltSandbox ? { watch: { useFsEvents: false, usePolling: true } } : {}),
+      watch: {
+        ignored: ["**/.sites-runtime/**", "**/.wrangler/**", "**/.vinext/**", "**/.vscode/**"],
+        ...(isCodexSeatbeltSandbox || process.platform === "win32" ? { useFsEvents: false, usePolling: true } : {}),
+      },
     },
     plugins: [
       vinext(),

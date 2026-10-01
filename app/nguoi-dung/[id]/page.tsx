@@ -1,8 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
-import { BriefcaseBusiness, FileText, Info, Mail, MapPin, MessageCircle } from "lucide-react";
+import { getPaymentBuyerId } from "../../../lib/payment-identity";
+import { BriefcaseBusiness, FileText, Info, Mail, MapPin } from "lucide-react";
 import { getDb } from "../../../db";
 import { memberProfiles, postAttachments, posts, virtualProfiles } from "../../../db/schema";
 import { ProfileActions } from "@/components/profile-actions";
@@ -10,7 +9,7 @@ import { ProfileActions } from "@/components/profile-actions";
 export default async function PublicProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const userId = decodeURIComponent(id).slice(0, 180);
-  const currentUserId = (await headers()).get("oai-authenticated-user-id") ?? "private-member";
+  const currentUserId = await getPaymentBuyerId();
   const db = getDb();
   const [[member], authoredPosts] = await Promise.all([
     db.select().from(memberProfiles).where(eq(memberProfiles.userId, userId)).limit(1),
@@ -41,7 +40,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
     <section className="mt-6 grid gap-5 md:grid-cols-2">
       <article className="rounded-2xl border border-[#e3eaf2] bg-white p-5 shadow-sm"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Info size={20}/>Thông tin giới thiệu</h2><p className="mt-3 text-sm leading-7 text-[#667085]">{bio}</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-[#536273]"><span className="rounded-full bg-[#f1f5f9] px-3 py-1.5">{profession}</span>{location && <span className="rounded-full bg-[#f1f5f9] px-3 py-1.5">{location}</span>}</div></article>
-      <article className="rounded-2xl border border-[#e3eaf2] bg-white p-5 shadow-sm"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Mail size={20}/>Thông tin liên hệ</h2><p className="mt-3 text-sm leading-7 text-[#667085]">Thông tin liên hệ cá nhân được bảo vệ. Bạn có thể trao đổi trực tiếp với thành viên qua hệ thống tin nhắn Tipook.</p><Link href={`/chat?user=${encodeURIComponent(userId)}`} className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-[#229ed9] px-4 text-sm font-bold text-white hover:bg-[#168ac0]"><MessageCircle size={17}/>Nhắn tin cho {displayName}</Link></article>
+      <article className="rounded-2xl border border-[#e3eaf2] bg-white p-5 shadow-sm"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Mail size={20}/>Thông tin liên hệ</h2><p className="mt-3 text-sm leading-7 text-[#667085]">Thông tin liên hệ cá nhân được bảo vệ. Hãy dùng biểu mẫu yêu cầu trên từng nội dung để liên hệ đúng mục đích.</p></article>
     </section>
 
     <section className="mt-6"><h1 className="text-xl font-extrabold text-[#0b2e59]">Bài viết của {displayName}</h1>{authoredPosts.length ? <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{authoredPosts.map((post) => { const image = firstImage.get(post.id); return <article key={post.id} className="overflow-hidden rounded-2xl border border-[#e3eaf2] bg-white shadow-sm">{image ? <img src={`/api/files?key=${encodeURIComponent(image.objectKey)}`} alt={post.title} className="aspect-[4/3] w-full object-cover"/> : <div className="grid aspect-[4/3] place-items-center bg-[#f3f6f9] text-[#8aa0b5]"><FileText size={38}/></div>}<div className="p-4"><p className="text-xs font-bold text-[#168ac0]">{post.category}</p><h2 className="mt-1 line-clamp-2 font-extrabold text-[#182230]">{post.title}</h2><p className="mt-2 line-clamp-3 text-sm leading-6 text-[#667085]">{post.content}</p></div></article>; })}</div> : <div className="mt-4 rounded-2xl border border-dashed border-[#d0d5dd] bg-white py-14 text-center text-sm text-[#667085]">Người dùng này chưa có bài đăng công khai.</div>}</section>
