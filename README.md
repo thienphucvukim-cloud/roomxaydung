@@ -61,6 +61,9 @@ Các phiên khách được tách bằng cookie riêng; lưu mẫu, hồ sơ, ti
 
 ## Biến môi trường và dữ liệu
 
+Hướng dẫn kết nối GitHub và triển khai Worker `tipook-web` nằm trong
+[docs/CLOUDFLARE.md](docs/CLOUDFLARE.md).
+
 - Sao chép `.dev.vars.example` thành `.dev.vars` nếu cần cấu hình local.
 - Binding Cloudflare được khai báo trong `.openai/hosting.json`.
 - Không chỉnh sửa migration đã được áp dụng; tạo migration mới bằng

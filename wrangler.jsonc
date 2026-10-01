@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tipook-web",
+  "account_id": "05498f1dc5c2356a95f51b36598be449",
+  "main": "./worker/cloudflare.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "roomxaydung-db",
+      "database_id": "f4387000-f900-4b21-92a1-11f094c114e8",
+      "migrations_dir": "./drizzle"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "BUCKET", "bucket_name": "tipook-files" }
+  ]
+}

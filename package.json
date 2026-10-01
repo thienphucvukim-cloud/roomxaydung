@@ -10,6 +10,9 @@
     "dev": "node scripts/run-framework.mjs dev",
     "local": "node scripts/open-local.mjs",
     "build": "node scripts/run-framework.mjs build",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
+    "db:migrate:cloudflare": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
     "start": "node scripts/start-local.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
