@@ -10,3 +10,12 @@
 .in-account .email-code-input{max-width:100%}
 .password-visibility{justify-self:start;padding:3px 0}
 .email-code-actions button:focus-visible,.password-visibility:focus-visible{outline:2px solid #229ed9;outline-offset:4px}
+.totp-setup{padding:16px;border:1px solid #e4e7ec;border-radius:12px;margin:18px 0;text-align:center}
+.totp-qr{width:220px;max-width:100%;height:auto;margin:0 auto 12px}
+.totp-setup summary{cursor:pointer;font-size:13px;color:#197e91}
+.totp-secret{display:block;overflow-wrap:anywhere;user-select:all;font-size:15px;letter-spacing:1px;margin:14px 0}
+.totp-verification .auth-form>label>input,.password-recovery .auth-form>label>input{width:100%;border:1px solid #d0d5dd;border-radius:10px;padding:12px;background:white;color:#101828}
+.totp-recovery-codes ul{list-style:none;margin:16px 0;padding:0;display:grid;gap:8px;font-size:12px}
+.totp-recovery-codes li{background:#f8fafc;border:1px solid #e4e7ec;border-radius:8px;padding:9px;overflow-wrap:anywhere;user-select:all}
+.totp-saved{display:flex;align-items:center;gap:10px;margin:20px 0;font-size:13px;color:#344054}
+.totp-saved input{width:18px;height:18px;flex-shrink:0}

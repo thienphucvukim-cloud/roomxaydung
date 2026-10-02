@@ -5,7 +5,7 @@ import { clearLocalOwnerCooldown, finishLocalOwnerLogin } from "./test-auth-help
 
 const origin = process.env.TIPOOK_TEST_ORIGIN || "http://localhost:5173";
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname), "Functional fixtures are local only.");
-const directory = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
+const directory = `${process.env.TIPOOK_LOCAL_STATE_PATH || ".wrangler/state"}/v3/d1/miniflare-D1DatabaseObject`;
 const database = readdirSync(directory).find(file => file.endsWith(".sqlite") && file !== "metadata.sqlite");
 assert.ok(database, "Start the local server first.");
 const db = new DatabaseSync(`${directory}/${database}`);

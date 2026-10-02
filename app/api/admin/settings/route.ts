@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { requireAdmin } from "@/lib/admin-auth";
 import { authEmailReady } from "@/lib/auth-email";
+import { adminTotpReady } from "@/lib/admin-totp";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -16,5 +17,6 @@ export async function GET(request: Request) {
     downloads: Boolean(bindings.DOWNLOAD_LINK_SECRET && bindings.DOWNLOAD_LINK_SECRET.length >= 32),
     passwordAccount: admin.identity?.source === "website",
     authEmail: authEmailReady(request),
+    adminTotp: adminTotpReady(),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

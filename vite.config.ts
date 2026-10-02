@@ -67,6 +67,7 @@ export default defineConfig(async () => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
+        ...(!deployToCloudflare && process.env.TIPOOK_LOCAL_STATE_PATH ? { persistState: { path: process.env.TIPOOK_LOCAL_STATE_PATH } } : {}),
         ...(deployToCloudflare
           ? { configPath: "wrangler.jsonc" }
           : { config: (config) => {

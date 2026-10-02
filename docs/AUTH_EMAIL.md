@@ -1,51 +1,27 @@
-# Xác nhận email cho tài khoản quản lý
+# Email khôi phục mật khẩu thành viên
 
-Tài khoản chủ website phải xác nhận mã email **mỗi lần đăng nhập** và **mỗi lần đổi
-mật khẩu**. Thành viên có thể đổi mật khẩu tại **Tài khoản → Đổi mật khẩu và bảo mật**;
-chủ website cũng có form này trong **Cài đặt** trên thanh công cụ quản lý.
+Quản trị dùng TOTP và mã dự phòng theo [ADMIN_TOTP.md](ADMIN_TOTP.md), không phụ
+thuộc dịch vụ gửi email. Mã email không đăng nhập, đổi mật khẩu hay khôi phục quản trị.
 
-## Cách sử dụng
+## Sử dụng
 
-1. Đăng nhập bằng email và mật khẩu.
-2. Với chủ website, hệ thống gửi mã 6 chữ số tới email quản lý đã cấu hình.
-3. Nhập mã trên chính trình duyệt đang đăng nhập để mở quyền quản lý.
-4. Đổi mật khẩu: nhập mật khẩu hiện tại, mật khẩu mới và xác nhận; nhập tiếp mã email.
-5. Mật khẩu chỉ thay đổi sau khi mã hợp lệ. Các phiên khác được đăng xuất.
+Tại `/quen-mat-khau`, thành viên nhập email đã đăng ký, nhận mã 6 chữ số rồi đặt
+mật khẩu mới. Mã có hiệu lực 10 phút, dùng một lần, khóa sau 5 lần nhập sai; gửi lại
+cần chờ 60 giây. Yêu cầu gửi và xác nhận có giới hạn theo tài khoản và IP.
+Khôi phục thành công thu hồi mọi phiên cũ và yêu cầu đăng nhập lại.
 
-### Khi quên mật khẩu
+Phản hồi yêu cầu mã giống nhau cho email có/không có tài khoản. Tra cứu tài khoản
+và gửi email thực hiện sau phản hồi. Mã gắn với trình duyệt, yêu cầu khôi phục và
+phiên bản mật khẩu. Mã cũ không ghi đè mật khẩu đã đổi ở phiên khác; gửi lại làm
+mã trước trên cùng trình duyệt mất hiệu lực. Không tạo tài khoản mới qua khôi phục.
 
-Nhấn **Quên mật khẩu? Khôi phục qua email** tại `/dang-nhap`, hoặc mở
-`/quen-mat-khau`. Nhập email đã đăng ký, kiểm tra hộp thư rồi nhập mã cùng mật khẩu
-mới. Không cần mật khẩu cũ hoặc phiên đăng nhập. Khôi phục thành công thu hồi **mọi
-phiên cũ**, kể cả trình duyệt đang dùng; người dùng phải đăng nhập lại. Chủ website
-vẫn cần mã email trong lần đăng nhập tiếp theo.
+Nếu chưa cấu hình mail, khôi phục thành viên báo chưa có dịch vụ gửi mã. Đăng nhập
+thành viên và các chức năng bảo mật quản trị vẫn hoạt động độc lập.
 
-Thông báo yêu cầu mã giống nhau cho email có và không có tài khoản. Tra cứu và gửi
-email chạy sau khi trả phản hồi để hạn chế dò tài khoản qua nội dung hoặc thời gian
-gửi mail. Hệ thống chỉ gửi tới email của tài khoản đã tồn tại; không tạo tài khoản
-mới hay cấp quyền chủ website qua chức năng khôi phục. Nếu tài khoản chủ website
-online chưa được khởi tạo, cần hoàn tất cấu hình và khởi tạo trước.
+## Thiết lập gửi mail thật
 
-Mã khôi phục gắn với trình duyệt và thao tác khôi phục; không dùng để đăng nhập
-hoặc đổi mật khẩu thông thường. Không thay đổi mật khẩu trước khi mã hợp lệ. Mã
-khôi phục đang chờ bị vô hiệu nếu mật khẩu đã đổi ở phiên khác. Khi gửi lại mã,
-mã trước trên cùng trình duyệt không còn dùng được. Yêu cầu khôi phục có giới hạn
-riêng để bảo vệ việc gửi mail mà không khóa đăng nhập thông thường.
-
-Nếu mất quyền truy cập email, cần xác minh với người vận hành website để xử lý;
-không có cách bỏ qua bằng mật khẩu khởi tạo hoặc câu hỏi bí mật.
-
-Mã hết hạn sau 10 phút, dùng một lần và bị khóa sau 5 lần nhập sai. Gửi lại cần chờ
-60 giây; trong mỗi khoảng 15 phút, một tài khoản được yêu cầu tối đa 5 email xác
-nhận quản lý và 5 email khôi phục (giới hạn riêng). Mã mới vô hiệu
-mã trước của cùng thao tác trên cùng trình duyệt. Phiên quản lý cũ chưa từng xác nhận
-email phải đăng nhập lại sau khi triển khai chức năng này.
-
-## Thiết lập gửi email thật
-
-Chọn một trong hai cách dưới đây. Không dùng mật khẩu Gmail cá nhân, không ghi API
-key vào mã nguồn hoặc GitHub. Khi chưa cấu hình hoặc gửi mail thất bại, đăng nhập
-quản lý dừng ở bước xác nhận và thông báo lỗi rõ ràng; không có đường bỏ qua mã.
+Chọn Resend hoặc Cloudflare Email Service. API key chỉ lưu trong `.dev.vars` local
+hoặc secret Worker; không dùng mật khẩu Gmail cá nhân để cấu hình gửi mail.
 
 ### Resend
 
@@ -81,54 +57,18 @@ Không cần `RESEND_API_KEY` với cách này. Ứng dụng dùng
 Để dùng binding ở local, bổ sung tương ứng vào cấu hình local của Vite; không bật
 gửi email remote trong kiểm tra tự động.
 
-## Triển khai
+## Triển khai và kiểm tra
 
-Áp dụng migration `0015_auth_email_verification.sql`, `0016_password_recovery.sql`
-cùng các migration trước đó:
+Áp dụng toàn bộ migration đến `0017_admin_totp.sql` rồi build/deploy theo
+[CLOUDFLARE.md](CLOUDFLARE.md). Khóa TOTP và state kiểm tra thiết lập riêng theo
+[ADMIN_TOTP.md](ADMIN_TOTP.md).
+
+Chế độ `TIPOOK_AUTH_EMAIL_TEST=1` chỉ tạo outbox trên localhost dev; bị loại khỏi
+bản production. Mã không được trả qua HTTP hoặc ghi vào log. Kiểm tra bằng:
 
 ```bash
-pnpm run db:migrate:cloudflare
-```
-
-Cấu hình dịch vụ gửi mail và tài khoản chủ website **trước khi** triển khai bản yêu
-cầu OTP, rồi build/deploy theo [CLOUDFLARE.md](CLOUDFLARE.md). Không đưa mật khẩu
-khởi tạo local lên production khi chưa có sự cho phép của chủ website.
-
-## Kiểm tra local, không gửi mail thật
-
-Chế độ outbox chỉ hoạt động khi Vite chạy dev trên localhost. Bản build production
-loại bỏ chế độ này. Không có API công khai để đọc mã và mã không xuất hiện trong log.
-
-PowerShell:
-
-```powershell
-$env:TIPOOK_AUTH_EMAIL_TEST = '1'
-node scripts/run-framework.mjs dev --port 5174
-```
-
-Mở terminal khác:
-
-```powershell
-$env:TIPOOK_TEST_ORIGIN = 'http://localhost:5174'
-node scripts/check-website-auth.mjs
-node scripts/check-auth-email.mjs
 node scripts/check-password-recovery.mjs
-node scripts/check-functional-flows.mjs
 ```
 
-`check-auth-email.mjs` và `check-password-recovery.mjs` chỉ chạy localhost, tạm đổi
-mật khẩu chủ website local để kiểm tra rồi khôi phục hash cũ và dọn phiên thử
-trong `finally`. Các kiểm tra không
-sử dụng dữ liệu production. Không chạy khi đang sử dụng tài khoản local trong một
-phiên làm việc quan trọng vì ca thu hồi phiên sẽ đăng xuất các phiên local khác.
-
-## Chi tiết bảo mật
-
-Database production chỉ lưu hash mã gắn với challenge và bí mật cookie ngẫu nhiên,
-không lưu mã rõ. Challenge gắn với tài khoản, loại thao tác, phiên bản mật khẩu và
-trình duyệt; đổi mật khẩu còn gắn với phiên đăng nhập hiện tại. Tiêu thụ mã dùng
-`DELETE ... RETURNING` để ngăn hai yêu cầu đồng thời sử dụng cùng mã. Mật khẩu mới
-trong yêu cầu chờ được băm trước khi lưu. Đăng xuất hủy các yêu cầu chờ của trình duyệt.
-
-Đây là xác nhận email, không thay thế việc bảo vệ hộp thư quản lý. Hiện chưa có
-chức năng thay đổi email quản lý trong giao diện.
+`check-auth-email.mjs` chạy cùng bộ kiểm tra khôi phục thành viên để tương thích
+lệnh cũ. Các kiểm tra chỉ chạy local; không gửi mail hoặc sửa dữ liệu production.

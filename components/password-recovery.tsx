@@ -2,9 +2,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, RefreshCw } from "lucide-react";
 import type { EmailChallengeResult } from "@/components/email-code-form";
+import { AdminPasswordRecovery } from "@/components/admin-password-recovery";
 
 type RecoveryResult = EmailChallengeResult & { message: string };
-export function PasswordRecovery() {
+export function PasswordRecovery({ admin = false }: { admin?: boolean }) {
+  const [adminRecovery, setAdminRecovery] = useState(admin);
   const [email, setEmail] = useState("");
   const [challenge, setChallenge] = useState<RecoveryResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,8 +52,10 @@ export function PasswordRecovery() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể kết nối. Vui lòng thử lại."); }
     finally { setBusy(false); }
   }
-  if (complete) return <div className="password-recovery-success"><p className="email-code-notice" role="status"><Check size={20}/><span>Đã đặt mật khẩu mới và đăng xuất mọi phiên cũ. Hãy đăng nhập lại. Tài khoản quản lý vẫn cần mã email khi đăng nhập.</span></p><a className="auth-submit" href="/dang-nhap">Về đăng nhập<ArrowRight size={17}/></a></div>;
+  if (adminRecovery) return <AdminPasswordRecovery onBack={() => setAdminRecovery(false)}/>;
+  if (complete) return <div className="password-recovery-success"><p className="email-code-notice" role="status"><Check size={20}/><span>Đã đặt mật khẩu mới và đăng xuất mọi phiên cũ. Hãy đăng nhập lại.</span></p><a className="auth-submit" href="/dang-nhap">Về đăng nhập<ArrowRight size={17}/></a></div>;
   return <div className="password-recovery">
+    <p className="email-code-help">Khôi phục qua email dành cho thành viên. Quản trị dùng mã dự phòng đã lưu.</p><button type="button" className="password-visibility mb-5" onClick={() => setAdminRecovery(true)}>Khôi phục tài khoản quản trị</button>
     {challenge ? <>
       <p className="email-code-notice" role="status"><Mail size={18}/><span>{challenge.message}</span></p>
       <form className="auth-form" onSubmit={reset} method="post" action="/api/auth/reset" data-ready={ready}>

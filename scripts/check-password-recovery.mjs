@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { randomBytes, createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { clearLocalOwnerCooldown, localEmailCode, responseCookie, finishLocalOwnerLogin } from "./test-auth-helpers.mjs";
+import { clearLocalOwnerCooldown, responseCookie, finishLocalOwnerLogin } from "./test-auth-helpers.mjs";
 
 const origin = process.env.TIPOOK_TEST_ORIGIN || "http://localhost:5174";
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname), "Recovery checks must remain local.");
-const directory = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
+const directory = `${process.env.TIPOOK_LOCAL_STATE_PATH || ".wrangler/state"}/v3/d1/miniflare-D1DatabaseObject`;
 const file = readdirSync(directory).find(name => name.endsWith(".sqlite") && name !== "metadata.sqlite");
 const db = new DatabaseSync(`${directory}/${file}`);
 const vars = readFileSync(".dev.vars", "utf8");
@@ -107,15 +107,12 @@ try {
   const login = await fetch(origin + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: owner.email, password: setting("TIPOOK_ADMIN_PASSWORD") }) });
   ownerLoginCookie = (await finishLocalOwnerLogin(origin, db, login)).cookie; tokens.push(ownerLoginCookie.split("=")[1]);
   const ownerReset = await forgot(owner.email, undefined, owner.user_id);
-  const ownerCode = await codeFor(ownerReset.id);
-  await reset(ownerReset, ownerCode);
-  assert.equal((await send("/api/me", undefined, ownerLoginCookie)).data.user.authenticated, false);
-  assert.equal(db.prepare("SELECT is_owner FROM website_accounts WHERE user_id = ?").get(owner.user_id).is_owner, 1);
-  clearLocalOwnerCooldown(db, owner.user_id);
-  const nextLogin = await send("/api/auth/login", { email: owner.email, password: nextPassword });
-  assert.equal(nextLogin.data.requiresCode, true); assert.ok(!nextLogin.session); ids.push(nextLogin.data.challengeId);
-  await send("/api/auth/login", { email: owner.email, password: setting("TIPOOK_ADMIN_PASSWORD") }, undefined, 401);
-  console.log("PASS: owner recovery works without old password, revokes old admin sessions and still requires email OTP for the next login.");
+  await new Promise(resolve => setTimeout(resolve, 200));
+  assert.ok(!db.prepare("SELECT id FROM auth_email_test_outbox WHERE id = ?").get(ownerReset.id));
+  assert.ok(!db.prepare("SELECT id FROM auth_email_challenges WHERE id = ?").get(ownerReset.id));
+  assert.equal(db.prepare("SELECT password_hash FROM website_accounts WHERE user_id = ?").get(owner.user_id).password_hash, owner.password_hash);
+  assert.equal((await send("/api/me", undefined, ownerLoginCookie)).data.user.isAdmin, true);
+  console.log("PASS: admin email recovery is blocked; owner password and session remain unchanged.");
 } finally {
   db.prepare("UPDATE website_accounts SET password_hash = ? WHERE user_id = ?").run(owner.password_hash, owner.user_id);
   for (const id of ids) {

@@ -46,6 +46,7 @@ async function deliverRecoveryEmail(request: Request, email: string, id: string,
     .bind(email).first<{ userId: string; email: string; passwordHash: string; isOwner: number }>();
   if (!row) return;
   const account = { ...row, isOwner: row.isOwner === 1 };
+  if (account.isOwner) return; // Admin recovery requires a one-use offline recovery code.
   const configuredOwner = (env as unknown as Record<string, string | undefined>).TIPOOK_ADMIN_EMAIL?.trim().toLowerCase();
   // An ordinary account registered before owner configuration cannot recover
   // the reserved owner address or acquire owner access through password reset.

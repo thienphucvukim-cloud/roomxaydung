@@ -25,7 +25,7 @@ export function prepareLocalDatabase() {
   const result = spawnSync(process.execPath, [
     path.join(root, "node_modules/wrangler/bin/wrangler.js"),
     "d1", "migrations", "apply", hosting.d1, "--local",
-    "--config", configPath, "--persist-to", path.join(root, ".wrangler/state"),
+    "--config", configPath, "--persist-to", process.env.TIPOOK_LOCAL_STATE_PATH || path.join(root, ".wrangler/state"),
   ], { cwd: root, env: { ...process.env, CI: "true" }, encoding: "utf8", windowsHide: true });
   if (result.error) throw result.error;
   if (result.status !== 0) {

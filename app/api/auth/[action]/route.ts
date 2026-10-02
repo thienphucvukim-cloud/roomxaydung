@@ -5,24 +5,27 @@ import { getDb } from "@/db";
 import { websiteAccounts, websiteSessions } from "@/db/schema";
 import { equalSecret, hashPassword, hashToken, verifyPassword } from "@/lib/password";
 import { AUTH_COOKIE, authCookie, getAuthenticatedIdentity, isAdminIdentity, safeAuthReturn, validOrigin } from "@/lib/website-auth";
-import { cancelEmailChallenges, challengeCookie, consumeEmailChallenge, issueEmailChallenge, readEmailChallenge } from "@/lib/auth-challenges";
+import { cancelEmailChallenges, challengeCookie } from "@/lib/auth-challenges";
 import { AuthFlowError, limitAuthAttempts, requestIp } from "@/lib/auth-security";
 import { createWebsiteSession } from "@/lib/auth-sessions";
 import { requestPasswordRecovery, resetForgottenPassword } from "@/lib/password-recovery";
+import { beginTotpRotation, cancelTotpChallenges, issueTotpChallenge, recoverAdminPassword, totpCookie, verifyTotpChallenge } from "@/lib/admin-totp";
 
 export async function POST(request: Request, context: { params: Promise<{ action: string }> }) {
   if (!validOrigin(request)) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
   const { action } = await context.params;
-  if (!["login", "register", "logout", "password", "verify", "resend", "forgot", "reset"].includes(action)) return Response.json({ error: "Không tìm thấy chức năng." }, { status: 404 });
+  if (!["login", "register", "logout", "password", "verify", "resend", "forgot", "reset", "totp-verify", "totp-rotate", "admin-recover"].includes(action)) return Response.json({ error: "Không tìm thấy chức năng." }, { status: 404 });
   try {
     const db = getDb();
     if (action === "logout") {
       const token = (await cookies()).get(AUTH_COOKIE)?.value;
       if (token) await db.delete(websiteSessions).where(eq(websiteSessions.tokenHash, hashToken(token)));
       await cancelEmailChallenges();
+      await cancelTotpChallenges();
       const response = new Response(null, { status: 303, headers: { Location: "/dang-nhap", "Cache-Control": "no-store" } });
       response.headers.append("Set-Cookie", authCookie("", request, 0));
       response.headers.append("Set-Cookie", challengeCookie("", request, 0));
+      response.headers.append("Set-Cookie", totpCookie("", request, 0));
       response.headers.append("Set-Cookie", "__sites_local_auth=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
       return response;
     }
@@ -30,32 +33,12 @@ export async function POST(request: Request, context: { params: Promise<{ action
     let body: Record<string, unknown>;
     try { body = await request.json() as Record<string, unknown>; } catch { return Response.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 }); }
     if (!body || typeof body !== "object") return Response.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
+    if (action === "totp-verify") return await verifyTotpChallenge(request, body);
+    if (action === "totp-rotate") return await beginTotpRotation(request, body);
+    if (action === "admin-recover") return await recoverAdminPassword(request, body);
     if (action === "forgot") return await requestPasswordRecovery(request, body.email);
     if (action === "reset") return await resetForgottenPassword(request, body);
-    if (action === "verify" || action === "resend") {
-      if (action === "resend") {
-        const { challenge, account } = await readEmailChallenge(request, body.challengeId);
-        if (challenge.purpose === "reset") throw new AuthFlowError("Hãy yêu cầu mã mới tại trang Quên mật khẩu.");
-        return await issueEmailChallenge(request, account, challenge.purpose, challenge.redirect_to, challenge.new_password_hash, challenge.session_hash);
-      }
-      const { challenge, account } = await consumeEmailChallenge(request, body.challengeId, body.code, ["login", "password"]);
-      let response: Response;
-      if (challenge.purpose === "password") {
-        if (!challenge.new_password_hash) throw new AuthFlowError("Yêu cầu đổi mật khẩu không hợp lệ.");
-        const changed = await env.DB!.prepare("UPDATE website_accounts SET password_hash = ? WHERE user_id = ? AND password_hash = ? AND EXISTS (SELECT 1 FROM website_sessions WHERE token_hash = ? AND user_id = ? AND expires_at > ? AND owner_verified = 1) RETURNING user_id")
-          .bind(challenge.new_password_hash, account.userId, account.passwordHash, challenge.session_hash, account.userId, Date.now()).first();
-        if (!changed) throw new AuthFlowError("Tài khoản hoặc phiên đăng nhập đã thay đổi. Vui lòng bắt đầu lại.", 401);
-        await env.DB!.batch([
-          env.DB!.prepare("DELETE FROM website_sessions WHERE user_id = ? AND token_hash != ?").bind(account.userId, challenge.session_hash),
-          env.DB!.prepare("DELETE FROM auth_email_challenges WHERE user_id = ?").bind(account.userId),
-        ]);
-        response = Response.json({ ok: true, passwordChanged: true }, { headers: { "Cache-Control": "no-store" } });
-      } else {
-        response = await createWebsiteSession(request, account, challenge.redirect_to, true);
-      }
-      response.headers.append("Set-Cookie", challengeCookie("", request, 0));
-      return response;
-    }
+    if (action === "verify" || action === "resend") throw new AuthFlowError("Quản trị dùng ứng dụng xác thực; mã email chỉ dùng ở trang khôi phục thành viên.");
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
     const identity = action === "password" ? await getAuthenticatedIdentity() : null;
@@ -74,7 +57,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
       if (!account || !await verifyPassword(password, account.passwordHash)) return Response.json({ error: "Mật khẩu hiện tại không đúng." }, { status: 400 });
       const token = (await cookies()).get(AUTH_COOKIE)?.value || "";
       const passwordHash = await hashPassword(nextPassword);
-      if (account.isOwner) return await issueEmailChallenge(request, account, "password", "/tai-khoan", passwordHash, hashToken(token));
+      if (account.isOwner) return await issueTotpChallenge(request, account, "password", "/tai-khoan", passwordHash, hashToken(token));
       await env.DB!.batch([
         env.DB!.prepare("UPDATE website_accounts SET password_hash = ? WHERE user_id = ?").bind(passwordHash, account.userId),
         env.DB!.prepare("DELETE FROM website_sessions WHERE user_id = ? AND token_hash != ?").bind(account.userId, hashToken(token)),
@@ -114,7 +97,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
     const redirectTo = safeAuthReturn(typeof body.returnTo === "string" ? body.returnTo : null, isAdmin ? "/kho-mau-nha-dep-tipook" : "/tai-khoan");
     if (account.isOwner) {
       if (!isAdmin) throw new AuthFlowError("Tài khoản quản lý chưa được cấu hình đúng.", 403);
-      return await issueEmailChallenge(request, account, "login", redirectTo);
+      return await issueTotpChallenge(request, account, "login", redirectTo);
     }
     return await createWebsiteSession(request, account, redirectTo);
   } catch (error) {

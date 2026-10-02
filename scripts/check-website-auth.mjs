@@ -9,7 +9,7 @@ const vars = readFileSync(".dev.vars", "utf8");
 const setting = key => vars.match(new RegExp(`^${key}[ \\t]*=[ \\t]*["']?([^\\s"']+)`, "m"))?.[1];
 const adminEmail = setting("TIPOOK_ADMIN_EMAIL"), adminPassword = setting("TIPOOK_ADMIN_PASSWORD");
 assert.ok(adminEmail && adminPassword, "Run scripts/setup-owner.mjs before testing.");
-const directory = ".wrangler/state/v3/d1/miniflare-D1DatabaseObject";
+const directory = `${process.env.TIPOOK_LOCAL_STATE_PATH || ".wrangler/state"}/v3/d1/miniflare-D1DatabaseObject`;
 const file = readdirSync(directory).find(name => name.endsWith(".sqlite") && name !== "metadata.sqlite");
 const db = new DatabaseSync(`${directory}/${file}`);
 const fixtureEmail = `test_${crypto.randomUUID()}@example.test`;

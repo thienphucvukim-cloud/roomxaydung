@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { PasswordChange } from "@/components/password-change";
+import { AdminTotpSettings } from "@/components/admin-totp-settings";
 import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, FileText, LoaderCircle, Mail, Search, Settings2, Users, WalletCards } from "lucide-react";
 import { OwnerFinance } from "@/components/owner-finance";
 import { AdminEmpty, AdminError, AdminLoading, ReloadButton, StatusBadge } from "@/components/admin-ui";
@@ -50,14 +51,14 @@ function OwnerRecords({ resource, selectedPost }: { resource: "posts" | "request
       <div className="admin-pagination"><span>{total} mục · Trang {page}/{Math.max(1, Math.ceil(total / 20))}</span><div className="admin-pagination-controls"><button type="button" className="admin-row-button" disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)} aria-label="Trang trước"><ChevronLeft size={16}/></button><button type="button" className="admin-row-button" disabled={page * 20 >= total || loading} onClick={() => setPage(value => value + 1)} aria-label="Trang sau"><ChevronRight size={16}/></button></div></div>
     </section></>;
 }
-type SettingsData = { adminEmail?: string; bankCode?: string; bankAccount?: string; bankName?: string; database?: boolean; storage?: boolean; downloads?: boolean; passwordAccount?: boolean; authEmail?: boolean };
+type SettingsData = { adminEmail?: string; bankCode?: string; bankAccount?: string; bankName?: string; database?: boolean; storage?: boolean; downloads?: boolean; passwordAccount?: boolean; authEmail?: boolean; adminTotp?: boolean };
 function OwnerSettings({ onEdit }: { onEdit: (key: string, kind: ContentValue["kind"], fallback: string, label: string) => void }) {
   const [data, setData] = useState<SettingsData | null>(null);
   const [error, setError] = useState("");
   useEffect(() => { const controller = new AbortController(); fetch("/api/admin/settings", { signal: controller.signal, cache: "no-store" }).then(async response => { const result = await response.json() as SettingsData & { error?: string }; if (!response.ok) throw new Error(result.error); return result; }).then(setData).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Chưa thể tải cấu hình."); }); return () => controller.abort(); }, []);
   return <><AdminError error={error}/><div className="owner-settings-grid"><section className="owner-settings-card"><h2>Diện mạo website</h2><p>Chỉnh sửa các thông tin chung và xem ngay trên giao diện.</p><div className="owner-setting-buttons"><button type="button" onClick={() => onEdit("global.name", "text", "Tipook", "Tên website")}>Tên website</button><button type="button" onClick={() => onEdit("global.logo", "image", "/tipook-logo.png", "Logo website")}>Thay logo</button><button type="button" onClick={() => onEdit("global.accent", "color", "#229ed9", "Màu chủ đạo")}>Màu chủ đạo</button></div><p className="owner-setting-help">Bạn có thể sửa tiêu đề, mô tả, bài hướng dẫn và ảnh mẫu ngay trên từng trang bằng nút “Chỉnh sửa”.</p></section>
-    <section className="owner-settings-card"><h2>Tài khoản chủ website</h2><p>{data?.adminEmail || "Đang tải email chủ website..."}</p>{data?.passwordAccount && <PasswordChange emailRequired/>}</section>
-    <section className="owner-settings-card"><h2>Kết nối dữ liệu</h2>{data ? <div className="owner-connection-list">{[["Cơ sở dữ liệu", data.database], ["Kho ảnh và tệp", data.storage], ["Liên kết tải bản vẽ", data.downloads], ["Email xác nhận bảo mật", data.authEmail]].map(([label, ok]) => <div key={String(label)}><span>{label}</span><StatusBadge status={ok ? "completed" : "pending"} label={ok ? "Đã kết nối" : "Chưa cấu hình"}/></div>)}</div> : <AdminLoading/>}</section>
+    <section className="owner-settings-card"><h2>Tài khoản chủ website</h2><p>{data?.adminEmail || "Đang tải email chủ website..."}</p>{data?.passwordAccount && <><PasswordChange admin/><AdminTotpSettings/></>}</section>
+    <section className="owner-settings-card"><h2>Kết nối dữ liệu</h2>{data ? <div className="owner-connection-list">{[["Cơ sở dữ liệu", data.database], ["Kho ảnh và tệp", data.storage], ["Liên kết tải bản vẽ", data.downloads], ["Xác thực quản trị TOTP", data.adminTotp], ["Email khôi phục thành viên", data.authEmail]].map(([label, ok]) => <div key={String(label)}><span>{label}</span><StatusBadge status={ok ? "completed" : "pending"} label={ok ? "Đã kết nối" : "Chưa cấu hình"}/></div>)}</div> : <AdminLoading/>}</section>
     <section className="owner-settings-card"><h2>Tài khoản nhận tiền</h2><div className="owner-connection-list"><div><span>Ngân hàng</span><strong>{data?.bankCode || "Chưa cấu hình"}</strong></div><div><span>Số tài khoản</span><strong>{data?.bankAccount || "Chưa cấu hình"}</strong></div><div><span>Chủ tài khoản</span><strong>{data?.bankName || "Chưa cấu hình"}</strong></div></div><p className="owner-setting-help">Thông tin nhận tiền và quyền chủ website được cấu hình trong biến môi trường của máy chủ.</p></section>
   </div></>;
 }

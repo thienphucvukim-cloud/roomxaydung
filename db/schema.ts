@@ -213,3 +213,22 @@ export const authPasswordResetRequests = sqliteTable("auth_password_reset_reques
   createdAt: integer("created_at").notNull(),
   expiresAt: integer("expires_at").notNull(),
 }, (table) => [index("idx_auth_password_reset_email").on(table.email)]);
+
+export const adminTotpCredentials = sqliteTable("admin_totp_credentials", {
+  userId: text("user_id").primaryKey().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
+  secretEncrypted: text("secret_encrypted").notNull(),
+  lastStep: integer("last_step").notNull().default(-1),
+  createdAt: integer("created_at").notNull(),
+});
+export const adminRecoveryCodes = sqliteTable("admin_recovery_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
+}, (table) => [index("idx_admin_recovery_codes_user").on(table.userId)]);
+export const adminTotpChallenges = sqliteTable("admin_totp_challenges", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
+  purpose: text("purpose").notNull(), browserHash: text("browser_hash").notNull(),
+  passwordVersion: text("password_version").notNull(), credentialVersion: text("credential_version"),
+  pendingSecret: text("pending_secret"), newPasswordHash: text("new_password_hash"), sessionHash: text("session_hash"),
+  redirectTo: text("redirect_to").notNull(), attempts: integer("attempts").notNull().default(0), expiresAt: integer("expires_at").notNull(),
+}, (table) => [index("idx_admin_totp_challenges_user").on(table.userId)]);

@@ -21,6 +21,8 @@ async function browserSecret() { return (await cookies()).get(CHALLENGE_COOKIE)?
 function codeHash(id: string, secret: string, code: string) { return hashToken(`${id}:${secret}:${code}`); }
 
 export async function issueEmailChallenge(request: Request, account: OwnerAccount, purpose: EmailChallenge["purpose"], redirectTo: string, newPasswordHash: string | null = null, sessionHash: string | null = null, seed?: { id: string; secret: string }) {
+  const owner = await env.DB!.prepare("SELECT is_owner FROM website_accounts WHERE user_id = ?").bind(account.userId).first<{ is_owner: number }>();
+  if (owner?.is_owner) throw new AuthFlowError("Quản trị dùng ứng dụng xác thực hoặc mã khôi phục, không dùng mã email.", 403);
   if (!authEmailReady(request)) throw new AuthFlowError("Chưa cấu hình dịch vụ gửi mã xác nhận. Vui lòng liên hệ chủ website.", 503);
   const now = Date.now();
   const cooldown = hashToken(`email:${account.userId}:${purpose}`);
@@ -57,6 +59,7 @@ export async function readEmailChallenge(request: Request, id: unknown) {
   const row = await env.DB!.prepare("SELECT user_id AS userId, email, display_name AS displayName, password_hash AS passwordHash, is_owner AS isOwner FROM website_accounts WHERE user_id = ?")
     .bind(challenge.user_id).first<OwnerAccount & { displayName: string; isOwner: number }>();
   const account = row ? { ...row, isOwner: row.isOwner === 1 } : null;
+  if (account?.isOwner) throw new AuthFlowError("Quản trị dùng ứng dụng xác thực hoặc mã khôi phục, không dùng mã email.", 403);
   if (!account || ((challenge.purpose !== "reset" || account.isOwner) && !isAdminIdentity(account)) || hashToken(account.passwordHash) !== challenge.password_version) throw new AuthFlowError("Tài khoản đã thay đổi. Vui lòng đăng nhập lại.", 401);
   if (challenge.purpose === "password") {
     const token = (await cookies()).get(AUTH_COOKIE)?.value || "";
