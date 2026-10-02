@@ -40,6 +40,8 @@ try {
   const stored = db.prepare("SELECT password_hash FROM website_accounts WHERE user_id=?").get(userId);
   assert.ok(stored.password_hash.startsWith("scrypt-v1:")); assert.ok(!stored.password_hash.includes(password));
   await send("/api/site-content", "PUT", { changes: [{ key: contentKey, content: { kind: "text", value: "forbidden" } }] }, memberCookie, 403);
+  await send("/api/admin/manage/posts", "DELETE", { id: 1 }, memberCookie, 403);
+  await send("/api/admin/manage/posts", "PATCH", { id: 1, action: "restore" }, memberCookie, 403);
   await send("/api/auth/login", "POST", { email: fixtureEmail, password, role: "admin" }, undefined, 403);
   await send("/api/auth/login", "POST", { email: fixtureEmail, password: "wrong-password" }, undefined, 401);
   await send("/api/auth/login", "POST", { email: fixtureEmail, password }, undefined, 403, { Origin: "https://another.example" });

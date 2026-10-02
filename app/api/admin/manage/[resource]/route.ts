@@ -22,7 +22,9 @@ export async function GET(request: Request, context: Context) {
   try {
     let items, total;
     if (resource === "posts") {
-      const condition = and(inArray(posts.audience, ["Công khai", "Ẩn bởi quản trị"]), requestedId ? eq(posts.id, requestedId) : undefined, query ? or(sql`instr(lower(${posts.title}), lower(${query})) > 0`, sql`instr(lower(${posts.authorName}), lower(${query})) > 0`) : undefined, filter ? eq(posts.audience, filter === "hidden" ? "Ẩn bởi quản trị" : "Công khai") : undefined);
+      const audiences: Record<string, string> = { public: "Công khai", hidden: "Ẩn bởi quản trị", deleted: "Đã xóa bởi quản trị" };
+      if (filter && !Object.hasOwn(audiences, filter)) return Response.json({ error: "Bộ lọc bài viết không hợp lệ." }, { status: 400 });
+      const condition = and(filter ? eq(posts.audience, audiences[filter]) : inArray(posts.audience, ["Công khai", "Ẩn bởi quản trị"]), requestedId ? eq(posts.id, requestedId) : undefined, query ? or(sql`instr(lower(${posts.title}), lower(${query})) > 0`, sql`instr(lower(${posts.authorName}), lower(${query})) > 0`) : undefined);
       [items, [total]] = await Promise.all([db.select({ id: posts.id, title: posts.title, content: posts.content, authorName: posts.authorName, category: posts.category, audience: posts.audience, createdAt: posts.createdAt }).from(posts).where(condition).orderBy(desc(posts.createdAt), desc(posts.id)).limit(size).offset((page - 1) * size), db.select({ value: count() }).from(posts).where(condition)]);
     } else if (resource === "requests") {
       const condition = and(eq(userRequests.recipientUserId, admin.userId!), ne(userRequests.requestType, "direct-message"), query ? or(sql`instr(lower(${userRequests.subject}), lower(${query})) > 0`, sql`instr(lower(${userRequests.authorName}), lower(${query})) > 0`) : undefined, filter ? eq(userRequests.status, filter) : undefined);
@@ -41,10 +43,16 @@ export async function PATCH(request: Request, context: Context) {
   if (!validOrigin(request)) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
   const { resource } = await context.params;
   try {
-    const body = await request.json() as { id?: unknown; audience?: unknown; status?: unknown; title?: unknown; content?: unknown };
+    const body = await request.json() as { id?: unknown; audience?: unknown; status?: unknown; title?: unknown; content?: unknown; action?: unknown };
     if (typeof body.id !== "number" || !Number.isSafeInteger(body.id) || body.id < 1) return Response.json({ error: "Mã dữ liệu không hợp lệ." }, { status: 400 });
     let rows;
     if (resource === "posts") {
+      if (body.action === "restore") {
+        const restored = await getDb().update(posts).set({ audience: "Ẩn bởi quản trị" }).where(and(eq(posts.id, body.id), eq(posts.audience, "Đã xóa bởi quản trị"))).returning({ id: posts.id });
+        if (!restored.length) return Response.json({ error: "Không tìm thấy bài đăng trong thùng rác." }, { status: 404 });
+        return Response.json({ ok: true });
+      }
+      if (body.action !== undefined) return Response.json({ error: "Thao tác không hợp lệ." }, { status: 400 });
       const updates: { title?: string; content?: string; audience?: string } = {};
       if (body.audience !== undefined) {
         if (body.audience !== "Công khai" && body.audience !== "Ẩn bởi quản trị") return Response.json({ error: "Trạng thái bài viết không hợp lệ." }, { status: 400 });
@@ -63,4 +71,22 @@ export async function PATCH(request: Request, context: Context) {
     if (!rows.length) return Response.json({ error: "Không tìm thấy nội dung có thể quản lý." }, { status: 404 });
     return Response.json({ ok: true });
   } catch { return Response.json({ error: "Chưa thể cập nhật dữ liệu." }, { status: 500 }); }
+}
+
+export async function DELETE(request: Request, context: Context) {
+  const admin = await requireAdmin();
+  if (admin.error) return admin.error;
+  if (!validOrigin(request)) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
+  const { resource } = await context.params;
+  if (resource !== "posts") return Response.json({ error: "Chức năng không được hỗ trợ." }, { status: 404 });
+  let body: { id?: unknown };
+  try { body = await request.json(); }
+  catch { return Response.json({ error: "Dữ liệu yêu cầu không hợp lệ." }, { status: 400 }); }
+  if (!body || typeof body.id !== "number" || !Number.isSafeInteger(body.id) || body.id < 1) return Response.json({ error: "Mã bài đăng không hợp lệ." }, { status: 400 });
+  try {
+    // Keep attachments and purchase records available to existing buyers.
+    const rows = await getDb().update(posts).set({ audience: "Đã xóa bởi quản trị" }).where(and(eq(posts.id, body.id), inArray(posts.audience, ["Công khai", "Ẩn bởi quản trị"]))).returning({ id: posts.id });
+    if (!rows.length) return Response.json({ error: "Không tìm thấy bài đăng có thể xóa." }, { status: 404 });
+    return Response.json({ ok: true });
+  } catch { return Response.json({ error: "Chưa thể xóa bài đăng." }, { status: 500 }); }
 }

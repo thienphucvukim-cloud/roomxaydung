@@ -20,7 +20,7 @@ không xóa bài đăng hoặc dữ liệu thành viên.
 
 Mục **Quản lý** mở ngay trong trang, gồm:
 
-- Nội dung: tìm kiếm, sửa bài đăng và ẩn/hiện bài cộng đồng.
+- Nội dung: tìm kiếm, sửa, ẩn/hiện và xóa bài cộng đồng.
 - Yêu cầu: đọc nội dung và liên hệ, cập nhật trạng thái tư vấn gửi tới bạn.
 - Thành viên: tra cứu tài khoản và hồ sơ.
 - Giao dịch: duyệt nạp tiền sau khi kiểm tra sao kê và đối soát bản vẽ đã bán.
@@ -28,6 +28,13 @@ Mục **Quản lý** mở ngay trong trang, gồm:
 
 Các mục ẩn bởi chủ website không xuất hiện trong danh sách công khai và không thể
 được mua mới. Người đã mua vẫn có lịch sử giao dịch của họ.
+
+Để xóa bài đăng, mở **Quản lý → Nội dung**, nhấn **Xóa** ở dòng bài đăng hoặc
+trong khung chỉnh sửa và xác nhận. Bài được chuyển vào **Thùng rác**, không còn
+xuất hiện trong danh sách công khai hoặc tìm kiếm. File và lịch sử mua được giữ
+để người đã mua tiếp tục tải bản vẽ của họ.
+Chọn bộ lọc **Thùng rác → Khôi phục** để lấy lại bài ở trạng thái ẩn;
+chọn **Đã ẩn → Hiện** khi muốn đăng lại.
 
 ## Khởi tạo local
 

@@ -66,6 +66,8 @@
 .admin-table-title { max-width: 280px; color: #406981; font-size: 12px; font-weight: 500; background: none; border: 0; text-align: left; overflow-wrap: anywhere; }
 .admin-muted { color: #91a3b5; } .admin-row-actions { display: flex; align-items: center; gap: 8px; }
 .admin-row-button { border: 1px solid #dfe8f0; border-radius: 6px; padding: 7px 9px; background: white; color: #7095a7; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; } .admin-row-button:disabled { opacity: .4; cursor: default; }
+.admin-row-button.danger { border-color: #fecaca; color: #b91c1c; gap: 5px; }
+.admin-row-button.danger:hover:not(:disabled) { background: #fef2f2; }
 .admin-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 5px; padding: 5px 8px; white-space: nowrap; font-size: 10px; background: #f2f6f9; color: #8b9fae; } .admin-badge i { width: 4px; height: 4px; background: currentColor; border-radius: 50%; }
 .admin-badge.status-pending { color: #b89a5a; background: #fdf6e8; } .admin-badge.status-processing { color: #5d94c3; background: #eaf4fd; } .admin-badge.status-completed, .admin-badge.status-public { color: #62967f; background: #edf8f2; } .admin-badge.status-hidden, .admin-badge.status-rejected { color: #be8590; background: #fff0f2; }
 .admin-empty { display: flex; flex-direction: column; gap: 12px; justify-content: center; align-items: center; padding: 45px 20px; color: #a0b2c2; text-align: center; } .admin-empty strong { font-size: 13px; font-weight: 500; color: #7d99ab; } .admin-empty p { font-size: 11px; } .admin-empty-icon { background: #f1f7fa; padding: 17px; border-radius: 50%; }

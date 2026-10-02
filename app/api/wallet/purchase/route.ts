@@ -37,8 +37,6 @@ export async function POST(request: Request) {
     if (!targetType || !targetId || !/^[0-9a-f-]{36}$/i.test(purchaseId)) return Response.json({ error: "Yêu cầu mua không hợp lệ." }, { status: 400 });
     if (targetType === "drawing") return Response.json({ error: "Hồ sơ tham khảo chưa có file để bán. Vui lòng dùng Yêu cầu file để liên hệ người đăng." }, { status: 409 });
 
-    const product = await resolveWalletProduct(targetType, targetId);
-    if (!product) return Response.json({ error: "Bản vẽ chưa có giá hợp lệ hoặc không còn tồn tại." }, { status: 404 });
     const db = getDb();
 
     const [prior] = await db.select().from(walletTransactions).where(and(eq(walletTransactions.userId, userId), eq(walletTransactions.kind, "purchase"), eq(walletTransactions.targetType, targetType), eq(walletTransactions.targetId, targetId))).limit(1);
@@ -46,6 +44,9 @@ export async function POST(request: Request) {
       const downloadLinks = await deliveryFor(request, userId, prior.orderCode, targetType, targetId);
       return Response.json({ ok: true, alreadyPurchased: true, orderCode: prior.orderCode, downloadLinks, message: downloadLinks.length ? "Bạn đã mua bản vẽ này. Link tải mới có hiệu lực 24 giờ." : "Bạn đã mua bản vẽ này. Admin hoặc tác giả sẽ gửi file qua tin nhắn." });
     }
+
+    const product = await resolveWalletProduct(targetType, targetId);
+    if (!product) return Response.json({ error: "Bản vẽ chưa có giá hợp lệ hoặc không còn tồn tại." }, { status: 404 });
 
     const database = env.DB;
     if (!database) throw new Error("D1 chưa được cấu hình.");

@@ -155,6 +155,43 @@ try {
   const freeOrder=await a.send("/api/wallet/purchase", "POST", {targetType:"post",targetId:String(free.id),purchaseId:crypto.randomUUID()},201);
   assert.equal(freeOrder.downloadLinks.length,1);assert.equal((await a.send("/api/wallet")).balance,0);
   console.log("PASS: free file checkout without topup.");
+
+  const content = async (method = "GET", body, expected = 200, suffix = "", extra = {}) => {
+    const response = await fetch(origin + "/api/admin/manage/posts" + suffix, { method, headers: { Cookie: adminCookie, "Content-Type": "application/json", ...extra }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const data = response.headers.get("content-type")?.includes("application/json") ? await response.json() : await response.text();
+    assert.equal(response.status, expected, JSON.stringify(data)); return data;
+  };
+  await a.send("/api/admin/manage/posts", "DELETE", { id: paid.id }, 401);
+  await content("DELETE", { id: paid.id }, 403, "", { Origin: "https://untrusted.example" });
+  await content("DELETE", { id: paid.id }, 403, "", { "Sec-Fetch-Site": "cross-site" });
+  for (const id of [0, -1, 1.5, "1"]) await content("DELETE", { id }, 400);
+  await content("DELETE", null, 400);
+  await content("GET", undefined, 400, "?filter=invalid");
+  db.prepare("UPDATE posts SET audience='Riêng tư' WHERE id=?").run(gallery.id);
+  await content("DELETE", { id: gallery.id }, 404);
+  db.prepare("UPDATE posts SET audience='Công khai' WHERE id=?").run(gallery.id);
+  const filesBeforeDelete = db.prepare("SELECT count(*) AS n FROM post_attachments WHERE post_id=?").get(paid.id).n;
+  await content("DELETE", { id: paid.id });
+  await content("DELETE", { id: paid.id }, 404);
+  assert.equal(db.prepare("SELECT audience FROM posts WHERE id=?").get(paid.id).audience, "Đã xóa bởi quản trị");
+  assert.ok(!(await content("GET", undefined, 200, "?id=" + paid.id)).items.length);
+  assert.ok((await content("GET", undefined, 200, "?filter=deleted&id=" + paid.id)).items.some(post => post.id === paid.id));
+  assert.ok(!(await a.send("/api/posts?category=" + encodeURIComponent("Bản vẽ cộng đồng") + "&page=1&q=" + encodeURIComponent(marker))).posts.some(post => post.id === paid.id));
+  assert.ok(!(await a.send("/api/search?q=" + encodeURIComponent(marker))).results.some(result => result.title === paid.title));
+  await manage("posts", { id: paid.id, audience: "Công khai" }, 404);
+  await a.send("/api/wallet/purchase", "POST", { targetType: "post", targetId: String(paid.id), purchaseId: crypto.randomUUID() }, 404);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM post_attachments WHERE post_id=?").get(paid.id).n, filesBeforeDelete);
+  const renewed = await b.send("/api/wallet/purchase", "POST", { targetType: "post", targetId: String(paid.id), purchaseId: crypto.randomUUID() });
+  assert.equal(renewed.alreadyPurchased, true); assert.equal((await b.send("/api/wallet")).balance, 80000);
+  const deletedDownload = await fetch(renewed.downloadLinks[0].url, { headers: { Cookie: b.cookie } });
+  assert.equal(deletedDownload.status, 200); assert.equal(await deletedDownload.text(), contents);
+  await manage("posts", { id: paid.id, action: "restore" });
+  await manage("posts", { id: paid.id, action: "restore" }, 404);
+  assert.equal(db.prepare("SELECT audience FROM posts WHERE id=?").get(paid.id).audience, "Ẩn bởi quản trị");
+  assert.ok(!(await content("GET", undefined, 200, "?filter=deleted&id=" + paid.id)).items.length);
+  await manage("posts", { id: paid.id, audience: "Công khai" });
+  assert.ok((await a.send("/api/posts?category=" + encodeURIComponent("Bản vẽ cộng đồng") + "&page=1&q=" + encodeURIComponent(marker))).posts.some(post => post.id === paid.id));
+  console.log("PASS: admin trash, validation, CSRF, private-post protection, restore, public search removal and paid download renewal without charging again.");
   console.log("All functional flows passed.");
 } finally {
   if (adminCookie) await fetch(origin + "/api/auth/logout", { method: "POST", headers: { Cookie: adminCookie }, redirect: "manual" });
