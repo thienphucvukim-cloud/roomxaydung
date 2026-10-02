@@ -33,7 +33,7 @@ export function AuthScreen({ register = false, admin = false, recovery = false, 
   return <main className="auth-page">
     <section className="auth-story" aria-label="Giới thiệu Tipook">
       <div className="auth-story-grid"/>
-      <Link href="/" className="auth-brand"><EditableImage contentKey="global.logo" src="/tipook-logo.png" alt="Tipook" width={140} height={70}/><span>{admin ? "Website của bạn" : "Cộng đồng xây nhà"}</span></Link>
+      <Link href="/" className="auth-brand"><EditableImage contentKey="global.logo" src="/nhadepchat-symbol.png" alt="NhàĐẹpChất" width={106} height={53}/><span>{admin ? "Website của bạn" : "Cộng đồng xây nhà"}</span></Link>
       <div className="auth-story-content"><span className="auth-eyebrow"><span/>{admin ? "TIPOOK ADMIN" : "MỘT Ý TƯỞNG. MỘT TỔ ẤM."}</span>
         <h1>{admin ? <>Quản lý hiệu quả.<br/><em>Phát triển mỗi ngày.</em></> : <>Ngôi nhà mơ ước<br/>bắt đầu từ <em>đây.</em></>}</h1>
         <p>{admin ? "Một không gian tập trung để quản lý nội dung, chăm sóc cộng đồng và theo dõi mọi giao dịch trên website." : "Lưu mẫu nhà yêu thích, khám phá bản vẽ và kết nối với những người cùng xây dựng tổ ấm."}</p>

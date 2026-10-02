@@ -57,7 +57,7 @@ export function ExploreHeader() {
     <div className="relative mx-auto grid h-[60px] min-h-[60px] max-h-[60px] max-w-[1360px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:h-[68px] lg:min-h-[68px] lg:max-h-[68px] lg:grid-cols-[1fr_minmax(300px,480px)_1fr] lg:px-5">
       <div className="flex min-w-0 items-center gap-3">
         <ClientNavigationLink href="/kho-mau-nha-dep-tipook" className="flex shrink-0 items-center" aria-label="Tipook - Mặt tiền">
-          <EditableImage contentKey="global.logo" src="/tipook-logo.png" alt={siteEditor.content["global.name"]?.value || "Tipook"} width={1774} height={887} className="h-auto max-h-[42px] w-[90px] object-contain sm:w-[102px] lg:max-h-none lg:w-[124px]"/>
+          <EditableImage contentKey="global.logo" src="/nhadepchat-symbol.png" alt={siteEditor.content["global.name"]?.value || "NhàĐẹpChất"} width={1774} height={887} className="h-[40px] w-[80px] object-contain sm:h-[42px] sm:w-[84px] lg:h-[48px] lg:w-[96px]"/>
           {siteEditor.content["global.name"] && <span className="ml-2 hidden max-w-28 truncate text-xs font-bold lg:inline">{siteEditor.content["global.name"].value}</span>}
         </ClientNavigationLink>
         <form onSubmit={search} className={`absolute left-3 right-3 top-[calc(100%+8px)] z-50 min-w-0 rounded-2xl border border-[#dde5ed] bg-white p-2 shadow-xl ${mobileSearchExpanded ? "block" : "hidden"} sm:left-4 sm:right-4 lg:relative lg:left-auto lg:right-auto lg:top-auto lg:z-auto lg:block lg:flex-1 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none 2xl:w-[238px] 2xl:flex-none`}>
