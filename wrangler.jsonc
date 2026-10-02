@@ -6,6 +6,10 @@
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "routes": [
+    { "pattern": "nhadepchat.top", "custom_domain": true },
+    { "pattern": "www.nhadepchat.top", "custom_domain": true }
+  ],
   "observability": { "enabled": true },
   "d1_databases": [
     {

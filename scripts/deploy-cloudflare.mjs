@@ -13,11 +13,12 @@ try {
 const identity = config => ({
   name: config.name,
   account_id: config.account_id,
+  routes: config.routes ?? [],
   d1_databases: (config.d1_databases ?? []).map(({ binding, database_name, database_id }) => ({ binding, database_name, database_id })),
   r2_buckets: (config.r2_buckets ?? []).map(({ binding, bucket_name }) => ({ binding, bucket_name })),
 });
 assert.deepEqual(identity(built), identity(source),
-  "The build uses different Cloudflare bindings. Run pnpm run build:cloudflare before deploying.");
+  "The build uses different Cloudflare bindings or domains. Run pnpm run build:cloudflare before deploying.");
 const result = spawnSync(process.execPath, [
   fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url)),
   "deploy", "--config", "dist/server/wrangler.json", ...process.argv.slice(2),

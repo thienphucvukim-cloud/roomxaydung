@@ -3,7 +3,14 @@
 Repository: `thienphucvukim-cloud/roomxaydung`, nhánh production: `main`.
 Worker: `tipook-web`.
 
-URL production: https://tipook-web.thienphuc-vukim.workers.dev
+URL production: https://nhadepchat.top
+
+Đăng nhập quản trị: https://nhadepchat.top/dang-nhap?role=admin
+
+Hai Custom Domain `nhadepchat.top` và `www.nhadepchat.top` được khai báo trong
+`wrangler.jsonc` để giữ cấu hình qua các lần triển khai. Cloudflare quản lý DNS
+và chứng chỉ HTTPS cho hai tên miền này.
+URL Workers dự phòng: https://tipook-web.thienphuc-vukim.workers.dev
 
 Ngày 01/10/2026, Worker đã được liên kết với repository trên Cloudflare Workers Builds.
 Push vào `main` kích hoạt build và deploy tự động; preview builds đang tắt.
@@ -14,7 +21,7 @@ Push vào `main` kích hoạt build và deploy tự động; preview builds đan
 - R2: `tipook-files`, binding `BUCKET`. Chủ tài khoản phải kích hoạt R2 trên dashboard trước khi tạo bucket.
 - Cấu hình production nằm trong `wrangler.jsonc`.
 - `pnpm build:cloudflare` dùng binding production; `pnpm dev` và `pnpm build` giữ cấu hình local/Sites.
-- `pnpm deploy:cloudflare` kiểm tra binding của bản build trước khi upload, từ chối bản build local.
+- `pnpm deploy:cloudflare` kiểm tra binding và tên miền của bản build trước khi upload, từ chối bản build local hoặc cấu hình cũ.
 
 ## Kết nối GitHub
 
