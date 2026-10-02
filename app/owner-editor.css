@@ -1,5 +1,13 @@
 .owner-site { --site-accent: #229ed9; }
 .owner-post-control { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #cee5dd; background: #f1faf6; border-radius: 7px; padding: 7px 10px; color: #508d7b; font-size: 10px; margin: 10px 12px 0; align-self: flex-start; }
+.admin-post-controls { display: flex; flex: 0 0 auto; width: 100%; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; font-weight: 600; color: #168ac0; }
+.admin-post-controls button { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid #cfeaf5; border-radius: 8px; background: #f1faff; cursor: pointer; }
+.admin-post-controls button:hover { background: #e2f5fc; }
+.admin-post-controls button:focus-visible { outline: 2px solid #229ed9; outline-offset: 2px; }
+.admin-post-controls button:disabled { opacity: .5; cursor: wait; }
+.admin-post-controls button.danger { color: #be123c; border-color: #fecdd3; background: #fff1f2; }
+.admin-post-controls button.danger:hover { background: #ffe4e6; }
+.admin-post-error { flex-basis: 100%; color: #be123c; font-weight: 400; }
 .owner-site [class*="bg-[#229ed9]"] { background-color: var(--site-accent); }
 .owner-site [class*="text-[#229ed9]"] { color: var(--site-accent); }
 .owner-toolbar { position: sticky; top: 0; z-index: 70; color: #c4d8e6; background: #102f49; border-bottom: 1px solid #274c64; }
@@ -29,6 +37,8 @@
 .owner-edit-form label { color: #5c7288; font-size: 12px; font-weight: 500; }
 .owner-edit-form input:not([type=file]), .owner-edit-form textarea { display: block; width: 100%; border: 1px solid #dce5ed; border-radius: 9px; padding: 11px 13px; margin-top: 7px; font-size: 13px; color: #28435c; background: white; outline-color: #6cb5ad; font-weight: 400; }
 .owner-edit-form input[type=color] { height: 55px; padding: 5px; }
+.owner-edit-form .admin-reset-verification { display: flex; align-items: flex-start; gap: 8px; line-height: 1.6; }
+.owner-edit-form .admin-reset-verification input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; padding: 0; }
 .owner-edit-form textarea { resize: vertical; min-height: 100px; }
 .owner-edit-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
 .owner-primary, .owner-secondary { display: inline-flex; gap: 8px; align-items: center; justify-content: center; padding: 11px 16px; border: 1px solid #dce5ed; border-radius: 8px; background: white; color: #658096; font-size: 12px; }

@@ -23,7 +23,7 @@ for (const postCount of [0, 10, 14, 19, 20, 21, 30, 40, 45, 100]) {
 }
 }
 assert.equal(facadePageWindow(1, 0, 0).totalPages, 1);
-for (const base of ["/kho-mau-nha-dep-tipook", "/file-ban-ve-nha-dep-tipook", "/noi-that"]) {
+for (const base of ["/kho-mau-nha-dep-chat", "/file-ban-ve-nha-dep-chat", "/noi-that"]) {
 assert.equal(catalogPageHref(base, 1), `${base}/page/1`);
 const searchLink = new URL(catalogPageHref(base, 2, " Mặt tiền & 5m "), "https://example.test");
 assert.equal(searchLink.pathname, `${base}/page/2`);

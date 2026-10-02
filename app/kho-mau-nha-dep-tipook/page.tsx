@@ -1,12 +1,14 @@
-import type { Metadata } from "next";
-import { FacadePage } from "@/components/facade-page";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Mặt tiền đẹp hiện đại, dễ xây | Tipook",
-  description: "Tham khảo mẫu mặt tiền nhà phố, nhà vườn và nhà hiện đại theo kích thước đất.",
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function BeautifulHouseModels({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const { q } = await searchParams;
-  return <FacadePage query={q?.trim().slice(0, 120) ?? ""} />;
+export default async function LegacyFacadePage({ searchParams }: PageProps) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (Array.isArray(value)) value.forEach(item => query.append(key, item));
+    else if (value !== undefined) query.set(key, value);
+  }
+  permanentRedirect("/kho-mau-nha-dep-chat" + (query.size ? "?" + query.toString() : ""));
 }

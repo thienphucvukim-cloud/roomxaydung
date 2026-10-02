@@ -1,0 +1,133 @@
+// Run with node --experimental-vm-modules scripts/test-news-feed.mjs.
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
+import { posix } from "node:path";
+import ts from "typescript";
+import { drizzle } from "drizzle-orm/sqlite-proxy";
+import * as schema from "../db/schema.ts";
+
+const sqlite = new DatabaseSync(":memory:");
+for (const file of readdirSync("drizzle").filter(name => name.endsWith(".sql")).sort()) sqlite.exec(readFileSync(`drizzle/${file}`, "utf8"));
+const db = drizzle(async (sql, params, method) => {
+  const statement = sqlite.prepare(sql);
+  if (method === "run") return { rows: [], ...statement.run(...params) };
+  statement.setReturnArrays(true);
+  return { rows: method === "get" ? statement.get(...params) : statement.all(...params) };
+});
+const context = createContext({ URL, URLSearchParams, Response, Request, console });
+const cache = new Map();
+let signedIn = true;
+const objects = new Map();
+async function load(specifier, referencing) {
+  const path = specifier.startsWith(".") ? posix.normalize(posix.join(posix.dirname(referencing.identifier), specifier)) : specifier;
+  if (cache.has(path)) return cache.get(path);
+  const namespace = path === "@/db" ? { getDb: () => db } : path === "@/db/schema" ? schema
+    : path === "@/lib/member-access" ? { memberAccessResponse: async () => signedIn ? null : Response.json({ error: "Login required" }, { status: 401 }) }
+    : path === "@/lib/member-identity" ? { currentMember: async () => ({ userId: "member", authorName: "Member", email: "member@example.test" }) }
+    : path === "cloudflare:workers" ? { env: { BUCKET: { head: async key => objects.get(key) ?? null } } }
+    : !path.startsWith("@/") ? await import(path) : null;
+  const vmModule = namespace ? new SyntheticModule(Object.keys(namespace), function () {
+    for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
+  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + ".ts", "utf8"), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText, { context, identifier: path });
+  cache.set(path, vmModule);
+  return vmModule;
+}
+const route = await load("@/app/api/news-feed/route");
+await route.link(load);
+await route.evaluate();
+const publishing = await load("@/app/api/posts/route");
+await publishing.link(load);
+await publishing.evaluate();
+async function publish(body, status = 201) {
+  const response = await publishing.namespace.POST(new Request("http://localhost/api/posts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+  const payload = await response.json();
+  assert.equal(response.status, status, JSON.stringify(payload));
+  return payload;
+}
+async function read(params = {}, status = 200) {
+  const response = await route.namespace.GET(new Request("http://localhost/api/news-feed?" + new URLSearchParams(params)));
+  const result = await response.json();
+  assert.equal(response.status, status, JSON.stringify(result));
+  if (status === 200) assert.equal(response.headers.get("Cache-Control"), "no-store");
+  return result;
+}
+const insert = sqlite.prepare("INSERT INTO posts (user_id, author_name, category, title, content, audience, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id");
+const add = (category, title, createdAt, audience = "Công khai") => insert.get("author", "Người chia sẻ", category, title, "Nội dung thực tế", audience, createdAt).id;
+try {
+  assert.equal((await read()).total, 0);
+  assert.equal((await read()).totalPages, 1);
+  const oldest = add("Bộ sưu tập ảnh", "Mặt tiền cũ", "2026-01-01T00:00:00.000Z");
+  for (let day = 2; day <= 22; day++) add("Bộ sưu tập ảnh", `Mặt tiền ${day}`, `2026-01-${String(day).padStart(2, "0")}T00:00:00.000Z`);
+  const drawing = add("Bản vẽ cộng đồng", "Bản vẽ mới", "2026-02-01T00:00:00.000Z");
+  const interior = add("Nội thất cộng đồng", "Nội thất mới", "2026-02-01T00:00:00.000Z");
+  add("Bộ sưu tập ảnh", "Bài riêng tư", "2026-03-01T00:00:00.000Z", "Chỉ mình tôi");
+  add("Bộ sưu tập ảnh", "Bài đã ẩn", "2026-03-01T00:00:00.000Z", "Ẩn bởi quản trị");
+  add("Bộ sưu tập ảnh", "Bài đã xóa", "2026-03-01T00:00:00.000Z", "Đã xóa bởi quản trị");
+  add("Thảo luận mẫu nhà", "Bình luận mẫu nhà", "2026-03-01T00:00:00.000Z");
+  const attach = sqlite.prepare("INSERT INTO post_attachments (post_id, object_key, file_name, mime_type, size, access_type, created_at) VALUES (?, ?, ?, ?, 10, ?, '2026-02-01T00:00:00.000Z')");
+  attach.run(drawing, "cover", "cover.png", "image/png", "public");
+  attach.run(drawing, "second", "second.png", "image/png", "public");
+  attach.run(drawing, "private-preview", "secret.png", "image/png", "private");
+  attach.run(drawing, "paid-file", "paid.pdf", "application/pdf", "private");
+  const first = await read();
+  assert.equal(first.posts[0].avatarUrl, null);
+  sqlite.prepare("INSERT INTO member_profiles (user_id, display_name, avatar_key, google_avatar_url, updated_at) VALUES ('author', 'Người chia sẻ', 'custom-avatar', 'https://google.test/avatar', 'now')").run();
+  assert.equal((await read()).posts[0].avatarUrl, "/api/files?key=custom-avatar");
+  sqlite.prepare("UPDATE member_profiles SET avatar_key=NULL WHERE user_id='author'").run();
+  assert.equal((await read()).posts[0].avatarUrl, "https://google.test/avatar");
+  assert.equal(first.total, 24);
+  assert.equal(first.posts.length, 20);
+  assert.equal(first.totalPages, 2);
+  assert.equal(first.posts[0].id, interior, "Equal timestamps use descending ID order.");
+  assert.equal(first.posts[1].id, drawing);
+  assert.deepEqual(first.posts[1].images.map(image => image.name), ["cover.png", "second.png"]);
+  assert.ok(!JSON.stringify(first).includes("paid-file"));
+  assert.ok(!JSON.stringify(first).includes("private-preview"));
+  const second = await read({ page: "2" });
+  assert.equal(second.posts.length, 4);
+  assert.equal(second.posts.at(-1).id, oldest);
+  assert.equal(new Set([...first.posts, ...second.posts].map(post => post.id)).size, 24);
+  const filtered = await read({ category: "Bộ sưu tập ảnh", q: "Mặt tiền cũ" });
+  assert.equal(filtered.total, 1);
+  assert.equal(filtered.posts[0].sourceHref, `/kho-mau-nha-dep-chat/page/2#post-${oldest}`, "Search must not change source page rank.");
+  assert.equal((await read({ q: "Người chia sẻ" })).total, 24);
+  assert.equal((await read({ category: "Bản vẽ cộng đồng" })).posts[0].sourceHref, `/file-ban-ve-nha-dep-chat/page/1#post-${drawing}`);
+  assert.equal(first.posts[0].sourceHref, `/noi-that/page/1#post-${interior}`);
+  assert.equal((await read({ q: "không có" })).total, 0);
+  for (const page of ["0", "-1", "1.5", "NaN", "1000001"]) await read({ page }, 400);
+  await read({ category: "Không hợp lệ" }, 400);
+  const latest = add("Bộ sưu tập ảnh", "Bài vừa đăng", "2026-04-01T00:00:00.000Z");
+  assert.equal((await read()).posts[0].id, latest, "New publications appear without copying or rebuilding feed data.");
+  sqlite.prepare("UPDATE posts SET audience = 'Ẩn bởi quản trị' WHERE id = ?").run(latest);
+  assert.ok(!(await read()).posts.some(post => post.id === latest));
+  sqlite.prepare("DELETE FROM posts WHERE id = ?").run(oldest);
+  assert.equal((await read({ q: "Mặt tiền cũ" })).total, 0);
+  const direct = add("Bảng tin", "Bài đăng trực tiếp", "2026-05-01T00:00:00.000Z");
+  const directFeed = await read({ category: "Bảng tin" });
+  assert.equal(directFeed.posts[0].id, direct);
+  assert.equal(directFeed.posts[0].sourceHref, `/bai-viet/${direct}`);
+  assert.equal((await read({ postId: String(direct) })).posts.length, 1);
+  assert.equal((await read({ postId: String(direct) })).posts[0].id, direct);
+  sqlite.prepare("UPDATE posts SET audience = 'Chỉ mình tôi' WHERE id = ?").run(direct);
+  assert.equal((await read({ postId: String(direct) })).posts.length, 0);
+  for (const postId of ["0", "-1", "NaN", "1.5"]) await read({ postId }, 400);
+  const textPost = await publish({ category: "Bảng tin", content: "Chia sẻ trực tiếp từ bảng tin" });
+  assert.equal(textPost.post.userId, "member");
+  assert.equal(textPost.post.audience, "Công khai");
+  assert.equal((await read({ postId: String(textPost.post.id) })).posts[0].content, "Chia sẻ trực tiếp từ bảng tin");
+  await publish({ category: "Bảng tin", content: "   " }, 400);
+  await publish({ category: "Bảng tin", attachments: [{ key: "invalid" }] }, 400);
+  await publish({ category: "Bảng tin", content: "x".repeat(1201) }, 400);
+  signedIn = false;
+  await publish({ category: "Bảng tin", content: "Anonymous" }, 401);
+  signedIn = true;
+  const image = { key: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "photo.png", type: "image/png", size: 100 };
+  objects.set(image.key, { size: 100, customMetadata: { ownerUserId: "member", accessType: "public" }, httpMetadata: { contentType: "image/png" } });
+  const photoPost = await publish({ category: "Bảng tin", attachments: [image] });
+  assert.equal((await read({ postId: String(photoPost.post.id) })).posts[0].images[0].name, "photo.png");
+  console.log("PASS: direct text/photo publishing, authentication, validation, aggregation, privacy, filters, pagination and source links.");
+} finally { sqlite.close(); }

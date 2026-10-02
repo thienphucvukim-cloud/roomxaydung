@@ -2,7 +2,7 @@
 
 ## Sử dụng
 
-1. Nhấn **Đăng nhập** trên website hoặc mở `/dang-nhap`.
+1. Mở trang đăng nhập quản trị tại `https://nhadepchat.top/admin` (local: `/admin`).
 2. Đăng nhập với email và mật khẩu chủ website.
    Nhập tiếp mã 6 chữ số từ ứng dụng xác thực. Lần đầu quét QR và lưu mã khôi phục.
 3. Thanh công cụ **Website của bạn** xuất hiện phía trên giao diện.
@@ -96,6 +96,28 @@ mật khẩu bí mật phía máy chủ. Tài khoản thành viên có sẵn ch�
 khi nhập đúng mật khẩu khởi tạo được cấu hình trên máy chủ; các phiên cũ của tài khoản
 đó bị thu hồi khi kích hoạt quyền chủ website.
 
+## Hỗ trợ thành viên quên mật khẩu
+
+Trong **Quản trị → Thành viên**, tìm theo tên, email hoặc tên đăng nhập, kiểm tra
+mã tài khoản rồi chọn **Đặt lại mật khẩu**. Chỉ hỗ trợ sau khi xác minh chủ tài
+khoản qua kênh liên hệ hoặc thông tin đã có từ trước; tên hiển thị đơn thuần
+không đủ để xác minh. Hệ thống yêu cầu ghi cách xác minh (10–500 ký tự), xác nhận
+đã xác minh, nhập mật khẩu mới (10–128 ký tự) hai lần và mật khẩu quản trị hiện tại.
+Việc xác minh do người quản trị thực hiện; hệ thống lưu xác nhận này để đối soát.
+
+Sau khi đặt lại, mọi phiên đăng nhập và mã xác nhận/khôi phục cũ của thành viên
+bị thu hồi. Chuyển mật khẩu mới qua kênh đã xác minh và hướng dẫn thành viên
+đổi mật khẩu sau khi đăng nhập. Không ghi mật khẩu hay giấy tờ nhạy cảm vào nội
+dung xác minh. Lịch sử ghi admin thực hiện, thời gian và cách xác minh; không
+lưu mật khẩu. Thao tác đổi mật khẩu, ghi lịch sử và thu hồi phiên chạy trong
+một giao dịch; lỗi ghi lịch sử sẽ hủy toàn bộ thay đổi.
+
+Chức năng hỗ trợ cả tài khoản không có email, chỉ áp dụng cho tài khoản đăng
+nhập của thành viên. Tài khoản quản trị dùng quy trình khôi phục riêng. API
+`/api/admin/member-password` kiểm tra quyền admin, nguồn yêu cầu, mật khẩu quản trị
+và giới hạn số lần thử. Cần áp dụng migration
+`drizzle/0022_admin_member_password_resets.sql` trước khi sử dụng trên máy chủ.
+
 ## Kiểm tra
 
 Khởi động server kiểm tra với state riêng theo [ADMIN_TOTP.md](ADMIN_TOTP.md):
@@ -105,6 +127,7 @@ node scripts/test-totp-crypto.mjs
 node scripts/check-admin-totp.mjs
 node scripts/check-website-auth.mjs
 node scripts/check-password-recovery.mjs
+node --experimental-vm-modules scripts/test-admin-member-password-reset.mjs
 node scripts/check-functional-flows.mjs
 node scripts/check-facade-pagination.mjs
 ```

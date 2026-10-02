@@ -8,7 +8,7 @@ const managedLinux = readExecutionProfile() === "managed-linux";
 
 if (!managedLinux && command === "dev") {
   const { prepareLocalDatabase } = await import("./prepare-local-db.mjs");
-  prepareLocalDatabase();
+  await prepareLocalDatabase();
 }
 
 if (managedLinux && command === "build") {

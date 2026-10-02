@@ -9,9 +9,10 @@ export type DrawingCatalogItem = {
   image: string;
   authorId: string;
   authorName: string;
+  isDemo: boolean;
 };
 
-const drawingItems: Omit<DrawingCatalogItem, "authorId" | "authorName">[] = [
+const drawingItems: Omit<DrawingCatalogItem, "authorId" | "authorName" | "isDemo">[] = [
   { category: "BẢN VẼ NHÀ PHỐ 1 TẦNG", title: "Nhà cấp 4 mái Thái 1 tầng 11 × 13m, diện tích 130m²", price: "150.000đ", amount: 150000, views: 17, downloads: 8, rating: "4.9", image: "/mau-nha-pho-xanh.png" },
   { category: "FILE CAD VĂN PHÒNG", title: "File CAD thiết kế văn phòng 300m² đầy đủ hạng mục", price: "150.000đ", amount: 150000, views: 31, downloads: 14, rating: "4.8", image: "/mat-bang-5x20.png" },
   { category: "BẢN VẼ NHÀ PHỐ 3 TẦNG", title: "Nhà phố 2 tầng + 1 tum, kích thước 7 × 16m", price: "95.000đ", amount: 95000, views: 24, downloads: 11, rating: "4.7", image: "/community-house.png" },
@@ -39,7 +40,7 @@ const drawingAuthors = [
 
 export const drawings: DrawingCatalogItem[] = drawingItems.map((drawing, index) => {
   const [authorId, authorName] = drawingAuthors[index];
-  return { ...drawing, authorId, authorName };
+  return { ...drawing, authorId, authorName, isDemo: true };
 });
 
 export function parseVndPrice(value: string | null | undefined) {

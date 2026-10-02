@@ -34,10 +34,15 @@ Nhấp đúp `MO-WEB-LOCAL.bat`. Script tái sử dụng server đang chạy ho�
 động dev server nền tại:
 
 ```text
-http://localhost:5173/kho-mau-nha-dep-tipook
+http://localhost:5173/
 ```
 
 Log local nằm tại `.sites-runtime/local/dev-server.log`.
+
+Trang chủ `/` (Bảng tin) tổng hợp bài công khai từ Mặt tiền, Kho bản vẽ và Nội thất,
+xếp mới nhất trước, hỗ trợ tìm kiếm, lọc danh mục và phân trang. Bảng tin tự
+cập nhật mỗi 30 giây và dẫn đến đúng bài ở trang gốc; bài bị ẩn hoặc xóa sẽ
+không xuất hiện.
 
 ## Lệnh phát triển
 
@@ -52,10 +57,14 @@ corepack pnpm build
 thể xóa và tạo lại bất kỳ lúc nào.
 
 Dev server tự áp dụng các migration chưa chạy vào D1 local trước khi mở web.
-Các phiên khách được tách bằng cookie riêng; lưu mẫu, hồ sơ, tin nhắn và ví
-được giữ lại sau khi tải lại trang trong cùng phiên trình duyệt.
+Khách có thể xem nội dung công khai, tìm kiếm và mở bộ ảnh. Đăng bài, bình luận,
+lưu mẫu, chia sẻ, nhắn tin, đánh giá, tính vật tư và sử dụng ví yêu cầu tài khoản
+đã đăng nhập. Cookie khách chỉ phục vụ thống kê lượt xem, không cấp quyền tài khoản.
 
-Đăng nhập bằng email và mật khẩu ngay tại `/dang-nhap`. Chủ website có thanh
+Thành viên đăng ký không cần email, dùng tên đăng nhập và mật khẩu tối thiểu
+6 ký tự. Đăng nhập bằng tên đăng nhập, email của tài khoản cũ hoặc Google tại
+`/dang-nhap`; cấu hình Google theo [docs/GOOGLE_LOGIN.md](docs/GOOGLE_LOGIN.md).
+Chủ website có thanh
 công cụ Chỉnh sửa, Quản lý và Cài đặt ngay trên trang đang xem. Cấu hình tài
 khoản chủ website theo [docs/WEBSITE_OWNER.md](docs/WEBSITE_OWNER.md).
 Quản trị dùng mật khẩu + TOTP và mã khôi phục, không cần dịch vụ gửi email;
@@ -82,6 +91,7 @@ Khi dev server đang chạy, kiểm tra các luồng chức năng và phân tran
 node scripts/check-functional-flows.mjs
 node scripts/check-facade-pagination.mjs
 node scripts/check-website-auth.mjs
+node --experimental-vm-modules scripts/test-news-feed.mjs
 ```
 
 ```bash

@@ -42,7 +42,7 @@ export async function requestPasswordRecovery(request: Request, value: unknown) 
 }
 
 async function deliverRecoveryEmail(request: Request, email: string, id: string, secret: string) {
-  const row = await env.DB!.prepare("SELECT user_id AS userId, email, password_hash AS passwordHash, is_owner AS isOwner FROM website_accounts WHERE email = ?")
+  const row = await env.DB!.prepare("SELECT user_id AS userId, email, password_hash AS passwordHash, is_owner AS isOwner FROM website_accounts WHERE email = ? AND NOT EXISTS (SELECT 1 FROM member_profiles WHERE user_id = website_accounts.user_id AND account_status != 'active')")
     .bind(email).first<{ userId: string; email: string; passwordHash: string; isOwner: number }>();
   if (!row) return;
   const account = { ...row, isOwner: row.isOwner === 1 };
@@ -59,7 +59,7 @@ async function deliverRecoveryEmail(request: Request, email: string, id: string,
 export async function resetForgottenPassword(request: Request, body: Record<string, unknown>) {
   const password = typeof body.newPassword === "string" ? body.newPassword : "";
   const code = typeof body.code === "string" ? body.code.trim() : "";
-  if (password.length < 10 || password.length > 128) throw new AuthFlowError("Mật khẩu mới cần từ 10 đến 128 ký tự.");
+  if (password.length < 6 || password.length > 128) throw new AuthFlowError("Mật khẩu mới cần từ 6 đến 128 ký tự.");
   if (!/^\d{6}$/.test(code)) throw new AuthFlowError("Vui lòng nhập mã xác nhận gồm 6 chữ số.");
   await limitAuthAttempts(`reset-verify-ip:${requestIp(request)}`, 60);
   const secret = (await cookies()).get(CHALLENGE_COOKIE)?.value || "";
@@ -80,7 +80,7 @@ export async function resetForgottenPassword(request: Request, body: Record<stri
   // Conditional writes protect against a password change in another request.
   // A D1 batch atomically changes the password and revokes sessions/challenges.
   const updated = await env.DB!.batch([
-    env.DB!.prepare("UPDATE website_accounts SET password_hash = ? WHERE user_id = ? AND password_hash = ? AND EXISTS (SELECT 1 FROM auth_password_reset_requests WHERE id = ? AND browser_hash = ? AND expires_at > ?) RETURNING user_id")
+    env.DB!.prepare("UPDATE website_accounts SET password_hash = ? WHERE user_id = ? AND password_hash = ? AND NOT EXISTS (SELECT 1 FROM member_profiles WHERE user_id = website_accounts.user_id AND account_status != 'active') AND EXISTS (SELECT 1 FROM auth_password_reset_requests WHERE id = ? AND browser_hash = ? AND expires_at > ?) RETURNING user_id")
       .bind(passwordHash, result.account.userId, result.account.passwordHash, id, hashToken(secret), Date.now()),
     env.DB!.prepare("DELETE FROM website_sessions WHERE user_id = ? AND EXISTS (SELECT 1 FROM website_accounts WHERE user_id = ? AND password_hash = ?)").bind(result.account.userId, result.account.userId, passwordHash),
     env.DB!.prepare("DELETE FROM auth_email_challenges WHERE user_id = ? AND EXISTS (SELECT 1 FROM website_accounts WHERE user_id = ? AND password_hash = ?)").bind(result.account.userId, result.account.userId, passwordHash),

@@ -3,7 +3,7 @@ import { getDb } from "../db";
 import { posts } from "../db/schema";
 import { drawings, parseVndPrice } from "./drawing-catalog";
 
-export type WalletProduct = { title: string; amount: number; sellerUserId: string; targetType: "drawing" | "post"; targetId: string };
+export type WalletProduct = { title: string; amount: number; sellerUserId: string; targetType: "drawing" | "post"; targetId: string; category?: string };
 
 export async function resolveWalletProduct(targetType: string, targetId: string): Promise<WalletProduct | null> {
   if (targetType === "drawing") {
@@ -15,7 +15,7 @@ export async function resolveWalletProduct(targetType: string, targetId: string)
     const amount = parseVndPrice(post?.price);
     const free = !post?.price?.trim() || /^(?:0\s*đ?|miễn phí)$/i.test(post.price.trim());
     return post && ["Bản vẽ cộng đồng", "Nội thất cộng đồng"].includes(post.category) && (amount || free)
-      ? { title: post.title, amount, sellerUserId: post.userId, targetType, targetId }
+      ? { title: post.title, amount, sellerUserId: post.userId, targetType, targetId, category: post.category }
       : null;
   }
   return null;

@@ -1,12 +1,13 @@
 import { EditableText } from "@/components/site-editor";
 import { DrawingCommunity } from "@/components/drawing-community";
 import { EditorialContent } from "@/components/editorial-content";
+import type { FileCatalogSort } from "@/lib/file-catalog-sort";
 
 
 
-export function InteriorPage({ page = 1, query = "" }: { page?: number; query?: string }) {
+export function InteriorPage({ page = 1, query = "", targetPostId, sort = "latest" }: { page?: number; query?: string; targetPostId?: string; sort?: FileCatalogSort }) {
   return <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
-    <DrawingCommunity key={`${page}:${query}`} variant="interior" page={page} searchQuery={query} />
+    <DrawingCommunity key={`${page}:${query}:${targetPostId ?? ""}:${sort}`} variant="interior" page={page} searchQuery={query} targetPostId={targetPostId} sort={sort} />
     <section className="mt-9">
       <p className="text-sm font-extrabold uppercase tracking-[.13em] text-[#229ed9]"><EditableText contentKey="interior.text.0">Thư viện nội thất</EditableText></p>
       <h1 className="mt-2 text-3xl font-extrabold tracking-[-.04em] text-[#0b2e59] sm:text-4xl"><EditableText contentKey="interior.text.1">Kho thiết kế nội thất từ cộng đồng</EditableText></h1>

@@ -15,7 +15,7 @@ const owner = db.prepare("SELECT * FROM website_accounts WHERE email = ? AND is_
 assert.ok(owner, "Run check-website-auth.mjs first.");
 const marker = crypto.randomUUID();
 const email = `recovery_${marker}@example.test`, unknown = `unknown_${marker}@example.test`;
-const password = "Original-test-password-234", nextPassword = "Replacement-test-password-987";
+const password = "Original-test-password-234", nextPassword = "654321";
 const digest = value => createHash("sha256").update(value).digest("hex");
 const ids = [], userIds = [], tokens = [];
 let ownerLoginCookie;

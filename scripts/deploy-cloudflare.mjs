@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { requireProductionSchema } from "./cloudflare-data.mjs";
 
 const source = JSON.parse(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
 let built;
@@ -19,6 +20,7 @@ const identity = config => ({
 });
 assert.deepEqual(identity(built), identity(source),
   "The build uses different Cloudflare bindings or domains. Run pnpm run build:cloudflare before deploying.");
+requireProductionSchema();
 const result = spawnSync(process.execPath, [
   fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url)),
   "deploy", "--config", "dist/server/wrangler.json", ...process.argv.slice(2),

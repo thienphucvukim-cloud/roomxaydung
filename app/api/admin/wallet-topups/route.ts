@@ -4,17 +4,23 @@ import { requireAdmin } from "../../../../lib/admin-auth";
 import { validOrigin } from "../../../../lib/website-auth";
 import { getDb } from "../../../../db";
 import { walletTopupRequests, walletTransactions } from "../../../../db/schema";
+import { saleAdminPercent, withdrawalColumns } from "@/lib/seller-wallet";
 
 export async function GET() {
   const admin = await requireAdmin();
   if (admin.error) return admin.error;
   try {
     const db = getDb();
-    const [requests, purchases] = await Promise.all([
+    const database = env.DB;
+    if (!database) throw new Error("D1 chưa được cấu hình.");
+    const [requests, purchases, credits, withdrawals, adminPercent] = await Promise.all([
       db.select().from(walletTopupRequests).orderBy(desc(walletTopupRequests.createdAt)).limit(100),
       db.select().from(walletTransactions).where(eq(walletTransactions.kind, "purchase")).orderBy(desc(walletTransactions.createdAt)).limit(100),
+      database.prepare("SELECT purchase_id AS purchaseId, amount, gross_amount AS grossAmount, admin_percent AS adminPercent, reviewed_by AS reviewedBy, created_at AS createdAt, revoked_by AS revokedBy, revoked_at AS revokedAt, revocation_reason AS revocationReason FROM wallet_sale_credits WHERE purchase_id IN (SELECT id FROM wallet_transactions WHERE kind = 'purchase' ORDER BY created_at DESC LIMIT 100)").all(),
+      database.prepare(`SELECT ${withdrawalColumns} FROM wallet_withdrawals ORDER BY CASE WHEN status = 'pending' THEN 0 ELSE 1 END, created_at DESC LIMIT 100`).all(),
+      saleAdminPercent(database),
     ]);
-    return Response.json({ requests, purchases });
+    return Response.json({ requests, purchases: purchases.map(purchase => ({ ...purchase, saleCredit: credits.results.find(credit => credit.purchaseId === purchase.id) ?? null })), withdrawals: withdrawals.results, adminPercent });
   } catch {
     return Response.json({ error: "Chưa thể tải dữ liệu đối soát." }, { status: 500 });
   }

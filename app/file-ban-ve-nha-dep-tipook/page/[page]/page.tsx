@@ -1,19 +1,17 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { DrawingFilesPage } from "@/components/drawing-files-page";
+import { notFound, permanentRedirect } from "next/navigation";
 
 type PageProps = {
   params: Promise<{ page: string }>;
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export default async function LegacyPage({ params, searchParams }: PageProps) {
   const { page } = await params;
-  return { title: `Kho bản vẽ — Trang ${page} | Tipook` };
-}
-
-export default async function Page({ params, searchParams }: PageProps) {
-  const [{ page }, { q }] = await Promise.all([params, searchParams]);
   if (!/^[1-9]\d*$/.test(page) || Number(page) > 1000000) notFound();
-  return <DrawingFilesPage page={Number(page)} query={typeof q === "string" ? q.trim().slice(0, 120) : ""} />;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (Array.isArray(value)) value.forEach(item => query.append(key, item));
+    else if (value !== undefined) query.set(key, value);
+  }
+  permanentRedirect(`/file-ban-ve-nha-dep-chat/page/${page}` + (query.size ? "?" + query.toString() : ""));
 }

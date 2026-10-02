@@ -15,6 +15,7 @@ const db = new DatabaseSync(`${directory}/${file}`);
 const fixtureEmail = `test_${crypto.randomUUID()}@example.test`;
 const password = "Test-only-password-987";
 let userId, adminCookie, memberCookie;
+let usernameUserId;
 const contentKey = "__test.owner.persistence";
 const existing = db.prepare("SELECT * FROM website_content WHERE key=?").get(contentKey);
 async function send(path, method = "GET", body, cookie, expected = 200, extra = {}) {
@@ -23,6 +24,23 @@ async function send(path, method = "GET", body, cookie, expected = 200, extra = 
   return { response, data: expected === 303 ? null : response.headers.get("content-type")?.includes("application/json") ? await response.json() : await response.text(), cookie: response.headers.get("set-cookie")?.split(";")[0] };
 }
 try {
+  const username = `member_${crypto.randomUUID().slice(0, 12)}`;
+  await send("/api/auth/register", "POST", { username, password: "12345", name: "No Email" }, undefined, 400);
+  await send("/api/auth/register", "POST", { username: "bad name", password: "123456", name: "No Email" }, undefined, 400);
+  const noEmail = await send("/api/auth/register", "POST", { username: username.toUpperCase(), password: "123456", name: "No Email" });
+  const profile = await send("/api/me", "GET", undefined, noEmail.cookie);
+  usernameUserId = profile.data.user.id;
+  assert.equal(profile.data.user.email, null);
+  assert.equal(profile.data.user.username, username);
+  assert.equal(profile.data.user.passwordAccount, true);
+  await send("/api/auth/register", "POST", { username, password: "123456", name: "Duplicate" }, undefined, 409);
+  await send("/api/auth/login", "POST", { login: username.toUpperCase(), password: "123456" });
+  await send("/api/auth/login", "POST", { login: username, password: "incorrect" }, undefined, 401);
+  await send("/api/auth/login", "POST", { login: username, password: "123456", role: "admin" }, undefined, 403);
+  await send("/api/auth/password", "POST", { password: "123456", newPassword: "12345" }, noEmail.cookie, 400);
+  await send("/api/auth/password", "POST", { password: "123456", newPassword: "654321" }, noEmail.cookie);
+  await send("/api/auth/login", "POST", { login: username, password: "654321" });
+  console.log("PASS: no-email registration, normalized usernames, six-character passwords, duplicate protection and password changes by user ID.");
   await send("/api/admin/manage/posts", "GET", undefined, undefined, 401, { "oai-authenticated-user-id": "forged", "oai-authenticated-user-email": adminEmail });
   await send("/api/admin/manage/posts", "GET", undefined, "__sites_local_auth=1", 401);
   await send("/api/auth/register", "POST", { email: adminEmail, password, name: "Fake owner" }, undefined, 409);
@@ -82,6 +100,11 @@ try {
     db.prepare("DELETE FROM website_sessions WHERE user_id=?").run(userId);
     db.prepare("DELETE FROM website_accounts WHERE user_id=?").run(userId);
     db.prepare("DELETE FROM member_profiles WHERE user_id=?").run(userId);
+  }
+  if (usernameUserId) {
+    db.prepare("DELETE FROM website_sessions WHERE user_id=?").run(usernameUserId);
+    db.prepare("DELETE FROM website_accounts WHERE user_id=?").run(usernameUserId);
+    db.prepare("DELETE FROM member_profiles WHERE user_id=?").run(usernameUserId);
   }
   db.prepare("DELETE FROM website_content WHERE key=?").run(contentKey);
   if (existing) db.prepare("INSERT INTO website_content (key, kind, value, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)").run(existing.key, existing.kind, existing.value, existing.updated_by, existing.updated_at);

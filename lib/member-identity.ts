@@ -1,12 +1,11 @@
 import { getAuthenticatedIdentity } from "./website-auth";
-import { getPaymentBuyerId } from "./payment-identity";
 
 export async function currentMember() {
-  const userId = await getPaymentBuyerId();
-  if (!userId) throw new Error("Phiên tài khoản đã hết hạn. Vui lòng tải lại trang.");
   const identity = await getAuthenticatedIdentity();
-  const email = identity?.email || null;
-  const displayName = identity?.displayName || "Thành viên Tipook";
+  if (!identity) throw new Error("Vui lòng đăng ký hoặc đăng nhập tài khoản.");
+  const userId = identity.userId;
+  const email = identity.email || null;
+  const displayName = identity.displayName;
   return { userId, email, displayName, authorName: displayName };
 }
 

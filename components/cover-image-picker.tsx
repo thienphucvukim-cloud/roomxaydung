@@ -1,14 +1,16 @@
 "use client";
 
 import { Check, X } from "lucide-react";
+import type { ChangeEvent } from "react";
 
 type ImageChoice = { id: string; url: string; name: string };
 
-export function CoverImagePicker({ images, selectedId, onSelect, onRemove, disabled = false }: {
+export function CoverImagePicker({ images, selectedId, onSelect, onRemove, onReplace, disabled = false }: {
   images: ImageChoice[];
   selectedId?: string;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
+  onReplace?: (id: string, event: ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
 }) {
   if (!images.length) return null;
@@ -28,6 +30,7 @@ export function CoverImagePicker({ images, selectedId, onSelect, onRemove, disab
               {selected && <Check size={13}/>}{selected ? "Ảnh đại diện" : "Chọn làm đại diện"}
             </span>
           </label>
+          {onReplace && <label className={`mt-1 flex cursor-pointer justify-center rounded-lg border px-2 py-1.5 text-xs font-semibold text-[#168ac0] ${disabled ? "pointer-events-none opacity-60" : "hover:bg-[#eef9fd]"}`}>Thay ảnh<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={disabled} onChange={event => onReplace(image.id, event)} aria-label={`Thay ảnh ${index + 1}`} className="sr-only"/></label>}
           <button type="button" onClick={() => onRemove(image.id)} className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/65 text-white hover:bg-black/80 disabled:cursor-wait" aria-label={`Xóa ảnh ${index + 1}`}><X size={15}/></button>
         </div>;
       })}

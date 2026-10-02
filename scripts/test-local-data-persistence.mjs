@@ -1,0 +1,43 @@
+// node scripts/test-local-data-persistence.mjs
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { backupLocalDatabases, localBindings, localBuildConfig, migrationFingerprint } from "./local-data.mjs";
+
+mkdirSync(".sites-runtime/tests", { recursive: true });
+const directory = mkdtempSync(path.resolve(".sites-runtime/tests/local-data-"));
+const state = path.join(directory, "state");
+const sqliteDirectory = path.join(state, "v3/d1/miniflare-D1DatabaseObject");
+mkdirSync(sqliteDirectory, { recursive: true });
+const source = path.join(sqliteDirectory, "fixture.sqlite");
+const database = new DatabaseSync(source);
+database.exec("PRAGMA journal_mode = WAL; CREATE TABLE orders (id INTEGER PRIMARY KEY, amount INTEGER); INSERT INTO orders VALUES (1, 100000)");
+// Snapshot while the writer remains open: committed data in WAL must survive.
+const destination = await backupLocalDatabases(state, path.join(directory, "backups"));
+const copy = new DatabaseSync(path.join(destination, "fixture.sqlite"), { readOnly: true });
+assert.equal(copy.prepare("SELECT amount FROM orders WHERE id = 1").get().amount, 100000);
+assert.equal(copy.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
+copy.close();
+database.close();
+const reopened = new DatabaseSync(source, { readOnly: true });
+assert.equal(reopened.prepare("SELECT count(*) AS n FROM orders").get().n, 1);
+reopened.close();
+const built = { name: "production", account_id: "account", main: "index.js", assets: { directory: "../client" }, routes: ["production.example"], d1_databases: [{ database_id: "production-id" }], r2_buckets: [{ bucket_name: "production-files" }] };
+const original = JSON.stringify(built);
+const local = localBuildConfig(built);
+assert.equal(JSON.stringify(built), original, "Production build configuration must stay unchanged");
+assert.deepEqual(local.d1_databases, localBindings.d1_databases);
+assert.deepEqual(local.r2_buckets, localBindings.r2_buckets);
+assert.equal(local.main, built.main);
+assert.deepEqual(local.assets, built.assets);
+assert.deepEqual(local.routes, []);
+const migrations = path.join(directory, "migrations");
+mkdirSync(migrations);
+writeFileSync(path.join(migrations, "0001.sql"), "CREATE TABLE settings (id INTEGER)");
+const before = migrationFingerprint(migrations);
+writeFileSync(path.join(migrations, "0002.sql"), "ALTER TABLE settings ADD COLUMN name TEXT");
+assert.notEqual(migrationFingerprint(migrations), before);
+assert.equal(readdirSync(destination).filter(name => name.endsWith(".sqlite")).length, 1);
+assert.equal(JSON.parse(readFileSync(path.join(destination, "manifest.json"), "utf8")).statePath, state);
+console.log("PASS: local build shares dev D1/R2 identities, production config is preserved, committed WAL data backs up intact, reopen preserves orders and migration changes trigger a new fingerprint.");

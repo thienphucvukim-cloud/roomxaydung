@@ -12,7 +12,11 @@
     "build": "node scripts/run-framework.mjs build",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
-    "db:migrate:cloudflare": "wrangler d1 migrations apply DB --remote --config wrangler.jsonc",
+    "db:migrate:cloudflare": "node scripts/migrate-cloudflare-safe.mjs",
+    "deploy:finance-backup": "wrangler deploy --config wrangler.finance-backup.jsonc",
+    "db:archive:cloudflare": "node --experimental-strip-types scripts/archive-finance-now.mjs",
+    "db:backup:local-cloud": "node scripts/sync-local-cloud-backup.mjs",
+    "db:verify:cloud-backups": "node scripts/verify-cloud-backups.mjs",
     "start": "node scripts/start-local.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

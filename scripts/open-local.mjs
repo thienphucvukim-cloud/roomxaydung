@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
-const localUrl = "http://localhost:5173/kho-mau-nha-dep-tipook";
+const localUrl = "http://localhost:5173/";
 const runtimeDirectory = path.join(projectRoot, ".sites-runtime", "local");
 const logPath = path.join(runtimeDirectory, "dev-server.log");
 

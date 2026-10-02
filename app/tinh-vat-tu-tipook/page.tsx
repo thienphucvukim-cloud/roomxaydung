@@ -1,13 +1,14 @@
-import type {Metadata} from "next";
-import {MaterialCalculator} from "./material-calculator";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata:Metadata={
-  title:"Tính vật tư xây nhà | Tipook",
-  description:"Tính bê tông, xây tường, trát, lát gạch và sơn nước."
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default function Page(){
-  return <main className="social-shell mx-auto max-w-[1360px] px-3 py-5 sm:px-4 lg:px-5">
-    <MaterialCalculator/>
-  </main>
+export default async function LegacyPage({ searchParams }: PageProps) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (Array.isArray(value)) value.forEach(item => query.append(key, item));
+    else if (value !== undefined) query.set(key, value);
+  }
+  permanentRedirect("/tinh-vat-tu-nha-dep-chat" + (query.size ? "?" + query.toString() : ""));
 }

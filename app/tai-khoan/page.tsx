@@ -1,84 +1,192 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Bookmark, FileText, Heart, Info, Mail, MessageSquareText, UserPlus, Users } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Bookmark, BriefcaseBusiness, ChevronRight, ExternalLink, FileText, Heart, Info, LoaderCircle, Mail, MessageCircle, Settings, ShieldCheck, UserPlus, Users, WalletCards } from "lucide-react";
 import { WalletPanel } from "@/components/wallet-panel";
 import { PasswordChange } from "@/components/password-change";
-import { InboxPanel, type InboxMessage } from "@/components/inbox-panel";
+import { MyPosts } from "@/components/my-posts";
+import { InboxPanel } from "@/components/inbox-panel";
+import { AvatarEditor } from "@/components/avatar-editor";
+import { MemberAvatar } from "@/components/member-avatar";
+import "./profile.css";
 
-type Me = { user?: { id: string; name: string; email: string | null; authenticated?: boolean; isAdmin?: boolean; passwordAccount?: boolean; accountType?: string; profession?: string | null }; counts?: { posts: number; actions: number; requests: number } };
+type Me = { user?: { id: string; name: string; email: string | null; avatarUrl?: string | null; hasCustomAvatar?: boolean; username?: string | null; authenticated?: boolean; isAdmin?: boolean; passwordAccount?: boolean; accountType?: string; profession?: string | null }; counts?: { posts: number; actions: number; requests: number } };
 type Action = { id: number; actionType: string; targetType: string; targetId: string; createdAt: string };
-type Request = { id: number; requestType: string; subject: string; status: string; createdAt: string };
-type DirectMessage = InboxMessage;
+type Member = { id: string; name: string; avatarUrl?: string | null };
+type UserRequest = { id: number; requestType: string; subject: string; status: string; createdAt: string };
 type DeliveryProfile = { zaloUserId?: string | null; messengerPsid?: string | null; telegramChatId?: string | null };
+const tabs = [
+  { id: "bai-viet-cua-toi", label: "Bài viết", Icon: FileText },
+  { id: "mau-ua-thich", label: "Đã lưu", Icon: Bookmark },
+  { id: "ket-noi", label: "Kết nối", Icon: Users },
+  { id: "tin-nhan", label: "Tin nhắn", Icon: MessageCircle },
+  { id: "vi-tipook", label: "Ví Tipook", Icon: WalletCards },
+  { id: "cai-dat", label: "Cài đặt", Icon: Settings },
+] as const;
+type Tab = typeof tabs[number]["id"];
+function tabForHash(hash: string): Tab {
+  const id = hash.replace(/^#/, "");
+  if (["bao-mat", "kenh-nhan-tin", "yeu-cau"].includes(id)) return "cai-dat";
+  if (id.startsWith("my-post-")) return "bai-viet-cua-toi";
+  return tabs.find(tab => tab.id === id)?.id ?? "bai-viet-cua-toi";
+}
+const actionLabels: Record<string, string> = { save: "Đã lưu", follow: "Đang theo dõi", friend: "Kết bạn", like: "Đã thích" };
+const targetLabels: Record<string, string> = { "house-model": "Mẫu nhà", drawing: "Bản vẽ", interior: "Nội thất", post: "Bài viết", profile: "Thành viên" };
+const statusLabels: Record<string, string> = { pending: "Đang chờ", approved: "Đã duyệt", rejected: "Từ chối", completed: "Hoàn tất", processing: "Đang xử lý", sent: "Đã gửi", delivered: "Đã gửi", failed: "Chưa gửi được", closed: "Đã đóng", cancelled: "Đã hủy" };
+const requestLabels: Record<string, string> = { "admin-help": "Hỗ trợ từ admin", "drawing-file-request": "Yêu cầu bản vẽ", "drawing-purchase": "Mua bản vẽ", "expert-question": "Hỏi chuyên gia", consultation: "Tư vấn", contact: "Liên hệ" };
+
+function EmptyState({ icon: Icon, title, children }: { icon: typeof Bookmark; title: string; children: ReactNode }) {
+  return <div className="profile-empty"><span><Icon size={26}/></span><h3>{title}</h3><p>{children}</p></div>;
+}
 
 export default function AccountPage() {
   const [me, setMe] = useState<Me>({});
   const [actions, setActions] = useState<Action[]>([]);
-  const [requests, setRequests] = useState<Request[]>([]);
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [requests, setRequests] = useState<UserRequest[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [delivery, setDelivery] = useState<DeliveryProfile>({});
   const [deliveryNotice, setDeliveryNotice] = useState("");
+  const [deliveryLoaded, setDeliveryLoaded] = useState(false);
+  const [savingDelivery, setSavingDelivery] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const [activeTab, setActiveTab] = useState<Tab>("bai-viet-cua-toi");
+  const [visited, setVisited] = useState<Set<Tab>>(new Set(["bai-viet-cua-toi"]));
+  const [connectionFilter, setConnectionFilter] = useState<"all" | "follow" | "friend">("all");
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/me").then((response) => response.json() as Promise<Me>),
-      fetch("/api/actions").then((response) => response.json() as Promise<{ actions?: Action[] }>),
-      fetch("/api/requests").then((response) => response.json() as Promise<{ requests?: Request[] }>),
-      fetch("/api/messages").then((response) => response.json() as Promise<{ messages?: DirectMessage[] }>),
-      fetch("/api/delivery-profile").then((response) => response.json() as Promise<{ profile?: DeliveryProfile }>),
-    ]).then(([profile, actionData, requestData, messageData, deliveryData]) => {
-      setMe(profile);
-      setActions(actionData.actions ?? []);
-      setRequests(requestData.requests ?? []);
-      setMessages(messageData.messages ?? []);
-      setDelivery(deliveryData.profile ?? {});
-    }).catch(() => {});
+    const syncHash = () => {
+      const tab = tabForHash(window.location.hash);
+      setActiveTab(tab);
+      setVisited(current => new Set([...current, tab]));
+    };
+    const timer = window.setTimeout(syncHash, 0);
+    window.addEventListener("hashchange", syncHash);
+    window.addEventListener("popstate", syncHash);
+    return () => { window.clearTimeout(timer); window.removeEventListener("hashchange", syncHash); window.removeEventListener("popstate", syncHash); };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const read = async <T,>(url: string): Promise<T> => {
+      const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+      const data = await response.json() as T & { error?: string };
+      if (!response.ok) throw new Error(data.error || "Chưa thể tải thông tin hồ sơ.");
+      return data as T;
+    };
+    void Promise.resolve().then(async () => {
+      setLoading(true); setError("");
+      const results = await Promise.allSettled([
+        read<Me>("/api/me"),
+        read<{ actions?: Action[]; members?: Member[] }>("/api/actions?withProfiles=true"),
+        read<{ requests?: UserRequest[] }>("/api/requests"),
+        read<{ profile?: DeliveryProfile }>("/api/delivery-profile"),
+      ]);
+      if (controller.signal.aborted) return;
+      const [profile, activity, requestData, deliveryData] = results;
+      if (profile.status === "fulfilled") setMe(profile.value);
+      if (activity.status === "fulfilled") { setActions(activity.value.actions ?? []); setMembers(activity.value.members ?? []); }
+      if (requestData.status === "fulfilled") setRequests(requestData.value.requests ?? []);
+      if (deliveryData.status === "fulfilled") { setDelivery(deliveryData.value.profile ?? {}); setDeliveryLoaded(true); }
+      if (results.some(result => result.status === "rejected")) setError("Một số thông tin chưa tải được. Bạn có thể thử lại.");
+      setLoading(false);
+    });
+    const refresh = () => setRevision(value => value + 1);
+    window.addEventListener("tipook-content-changed", refresh);
+    return () => { controller.abort(); window.removeEventListener("tipook-content-changed", refresh); };
+  }, [revision]);
+
+  useEffect(() => {
+    // A hash target can be inside a panel that was hidden when the link was followed.
+    if (!window.location.hash) return;
+    const timer = window.setTimeout(() => {
+      const id = window.location.hash.slice(1);
+      if (id !== activeTab) document.getElementById(id)?.scrollIntoView({ block: "start" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, loading]);
+
+  function selectTab(tab: Tab, hash: string = tab, scroll = false) {
+    setActiveTab(tab);
+    setVisited(current => new Set([...current, tab]));
+    if (window.location.hash !== `#${hash}`) window.history.pushState(null, "", `#${hash}`);
+    if (scroll) window.requestAnimationFrame(() => {
+      const target = hash === tab ? contentRef.current : document.getElementById(hash);
+      target?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    });
+  }
+
   const saveDelivery = async () => {
-    setDeliveryNotice("Đang lưu...");
+    if (savingDelivery || !deliveryLoaded) return;
+    setSavingDelivery(true); setDeliveryNotice("");
     try {
       const response = await fetch("/api/delivery-profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(delivery) });
       const data = await response.json() as { error?: string; profile?: DeliveryProfile };
       if (!response.ok) throw new Error(data.error || "Chưa thể lưu.");
-      setDelivery(data.profile ?? delivery);
-      setDeliveryNotice("Đã lưu cấu hình nhận tin.");
-    } catch (error) { setDeliveryNotice(error instanceof Error ? error.message : "Chưa thể lưu cấu hình."); }
+      setDelivery(data.profile ?? delivery); setDeliveryNotice("Đã lưu kênh nhận tin.");
+    } catch (cause) { setDeliveryNotice(cause instanceof Error ? cause.message : "Chưa thể lưu kênh nhận tin."); }
+    finally { setSavingDelivery(false); }
   };
-  const favoriteModels = actions.filter((item) => item.actionType === "save" && ["house-model", "drawing", "interior"].includes(item.targetType));
-  const following = actions.filter((item) => item.actionType === "follow" && item.targetType === "profile");
-  const friends = actions.filter((item) => item.actionType === "friend" && item.targetType === "profile");
-  const followingCount = following.length;
-  const friendCount = friends.length;
-  const stats: { label: string; value: number; Icon: LucideIcon }[] = [
-    { label: "Bài đã đăng", value: me.counts?.posts ?? 0, Icon: MessageSquareText },
-    { label: "Nội dung đã lưu", value: me.counts?.actions ?? 0, Icon: Bookmark },
-    { label: "Yêu cầu đã gửi", value: me.counts?.requests ?? 0, Icon: FileText },
-  ];
 
-  return <main className="mx-auto min-h-[calc(100vh-72px)] max-w-5xl px-4 py-8 lg:px-8">
-    <section className="flex flex-col gap-5 rounded-3xl bg-[#073b74] p-7 text-white sm:flex-row sm:items-center">
-      <img src="/avatars/user-nguyen-van-a.png" alt={me.user?.name || "Thành viên"} className="size-24 rounded-full border-4 border-white/30 object-cover"/>
-      <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-3xl font-extrabold">{me.user?.name || "Thành viên Tipook"}</h1>{me.user?.profession && <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">{me.user.profession}</span>}</div><p className="mt-1 text-white/75">{me.user?.email}</p>{me.user?.id && <a href={`/nguoi-dung/${encodeURIComponent(me.user.id)}`} className="mt-3 inline-flex rounded-xl bg-white/15 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/25">Xem hồ sơ và bài đã đăng</a>}<div className="mt-3 flex flex-wrap gap-2"><a href="#ket-noi" className="inline-flex h-9 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition hover:bg-white/25"><UserPlus size={16}/>Đang theo dõi <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-xs">{followingCount}</span></a><a href="#ket-noi" className="inline-flex h-9 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition hover:bg-white/25"><Users size={16}/>Kết bạn <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-xs">{friendCount}</span></a></div></div>
+  const saved = actions.filter(item => item.actionType === "save");
+  const favoriteModels = saved.filter(item => ["house-model", "drawing", "interior"].includes(item.targetType));
+  const following = actions.filter(item => item.actionType === "follow" && item.targetType === "profile");
+  const friends = actions.filter(item => item.actionType === "friend" && item.targetType === "profile");
+  const connections = Array.from(new Set([...following, ...friends].map(item => item.targetId))).map(id => ({
+    id, member: members.find(member => member.id === id),
+    following: following.some(item => item.targetId === id), friend: friends.some(item => item.targetId === id),
+  })).filter(item => connectionFilter === "all" || (connectionFilter === "follow" ? item.following : item.friend));
+  const name = me.user?.name || (loading ? "Đang tải hồ sơ…" : "Thành viên Tipook");
+  const profession = me.user?.profession || (me.user?.accountType === "engineer" ? "Kỹ sư" : me.user?.accountType === "architect" ? "Kiến trúc sư" : "Thành viên");
+  const bio = me.user?.profession ? `${profession} · Chia sẻ kinh nghiệm và ý tưởng thiết kế, xây dựng nhà ở.` : "Cùng cộng đồng Tipook tìm ý tưởng và chia sẻ kinh nghiệm xây nhà.";
+  const actionHref = (item: Action) => item.targetType === "profile" ? `/nguoi-dung/${encodeURIComponent(item.targetId)}` : `/tim-kiem?q=${encodeURIComponent(item.targetId)}`;
+  const panel = (tab: Tab, children: ReactNode) => <div key={tab} role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} hidden={activeTab !== tab} tabIndex={0} className="profile-panel">{visited.has(tab) && children}</div>;
+
+  return <main className="account-profile">
+    <section className="profile-header" aria-label="Hồ sơ của bạn">
+      <div className="profile-cover" aria-hidden="true"><div className="profile-cover-grid"/><div className="profile-cover-house"/><span className="profile-cover-caption">Không gian của bạn trên Tipook</span></div>
+      <div className="profile-identity">
+        <div className="profile-avatar"><AvatarEditor name={me.user?.name || ""} avatarUrl={me.user?.avatarUrl ?? null} hasCustomAvatar={Boolean(me.user?.hasCustomAvatar)} authenticated={Boolean(me.user?.authenticated)} onChange={avatar => setMe(current => ({ ...current, user: current.user ? { ...current.user, ...avatar } : undefined }))}/></div>
+        <div className="profile-name"><div className="profile-name-line"><h1>{name}</h1><span className="profile-profession"><BriefcaseBusiness size={13}/>{profession}</span></div>{me.user?.username && <p className="profile-handle">@{me.user.username}</p>}<p className="profile-bio">{bio}</p><div className="profile-counts"><button type="button" onClick={() => selectTab("bai-viet-cua-toi")}><b>{me.counts?.posts ?? 0}</b> bài viết</button><button type="button" onClick={() => { setConnectionFilter("follow"); selectTab("ket-noi"); }}><b>{following.length}</b> đang theo dõi</button><button type="button" onClick={() => { setConnectionFilter("friend"); selectTab("ket-noi"); }}><b>{friends.length}</b> bạn bè</button></div></div>
+        <div className="profile-header-actions"><button type="button" className="profile-button profile-button-primary" onClick={() => selectTab("cai-dat", "cai-dat", true)}><Settings size={16}/>Cài đặt hồ sơ</button>{me.user?.id && <a className="profile-button" href={`/nguoi-dung/${encodeURIComponent(me.user.id)}`}><ExternalLink size={16}/>Xem hồ sơ công khai</a>}</div>
+      </div>
+      <div className="profile-tabs" role="tablist" aria-label="Nội dung hồ sơ">{tabs.map(({ id, label, Icon }, index) => <button key={id} ref={element => { tabRefs.current[index] = element; }} type="button" role="tab" id={`tab-${id}`} aria-selected={activeTab === id} aria-controls={`panel-${id}`} tabIndex={activeTab === id ? 0 : -1} onClick={() => selectTab(id)} onKeyDown={event => {
+        let next = index;
+        if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+        else if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = tabs.length - 1;
+        else return;
+        event.preventDefault(); selectTab(tabs[next].id); tabRefs.current[next]?.focus();
+      }}><Icon size={18}/><span>{label}</span>{id === "mau-ua-thich" && saved.length > 0 && <small>{saved.length}</small>}</button>)}</div>
     </section>
-    <section id="mau-ua-thich" className="mt-5 scroll-mt-24 rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Heart size={20} className="text-rose-500"/>Mẫu ưa thích</h2><div className="mt-4 grid gap-2 sm:grid-cols-2">{favoriteModels.map((item) => <a key={item.id} href={`/tim-kiem?q=${encodeURIComponent(item.targetId)}`} className="flex items-center gap-3 rounded-xl bg-[#f6f8fb] px-4 py-3 text-sm font-semibold text-[#182230] hover:bg-[#eef9fd]"><Heart size={16} className="shrink-0 fill-rose-500 text-rose-500"/><span>{item.targetId}</span></a>)}{!favoriteModels.length && <p className="py-6 text-center text-sm text-[#667085] sm:col-span-2">Chưa có mẫu ưa thích. Nhấn trái tim trên mẫu để lưu vào đây.</p>}</div></section>
-    <WalletPanel/>
-    <section className="mt-5 grid gap-3 sm:grid-cols-3">
-      {stats.map(({ label, value, Icon }) => <div key={String(label)} className="rounded-2xl border border-[#e3eaf2] bg-white p-5"><Icon className="text-[#229ed9]" size={22}/><strong className="mt-3 block text-2xl text-[#0b2e59]">{String(value)}</strong><span className="text-sm text-[#667085]">{String(label)}</span></div>)}
-    </section>
-    <section className="mt-5 grid gap-5 lg:grid-cols-2">
-      <article className="rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Info size={20}/>Thông tin giới thiệu</h2><p className="mt-3 text-sm leading-7 text-[#667085]">{me.user?.profession ? `${me.user.profession} đang chia sẻ kinh nghiệm và nội dung chuyên môn trên Tipook.` : "Thành viên cộng đồng Tipook, quan tâm đến thiết kế và xây dựng nhà ở."}</p><p className="mt-2 text-sm text-[#667085]">Loại tài khoản: <strong className="text-[#344054]">{me.user?.accountType === "engineer" ? "Kỹ sư" : me.user?.accountType === "architect" ? "Kiến trúc sư" : "Thành viên"}</strong></p></article>
-      <article className="rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Mail size={20}/>Thông tin liên hệ</h2><div className="mt-3 space-y-2 text-sm text-[#667085]"><p>Email: <strong className="text-[#344054]">{me.user?.email || "Chưa cập nhật"}</strong></p><p>Zalo: <strong className="text-[#344054]">{delivery.zaloUserId || "Chưa cập nhật"}</strong></p><p>Messenger: <strong className="text-[#344054]">{delivery.messengerPsid || "Chưa cập nhật"}</strong></p><p>Telegram: <strong className="text-[#344054]">{delivery.telegramChatId || "Chưa cập nhật"}</strong></p></div></article>
-    </section>
-    <section id="ket-noi" className="mt-5 rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><UserPlus size={20}/>Đang theo dõi và kết bạn</h2><div className="mt-4 grid gap-2 sm:grid-cols-2">{following.map((item) => <a key={`follow-${item.id}`} href={`/nguoi-dung/${encodeURIComponent(item.targetId)}`} className="flex items-center justify-between rounded-xl bg-[#f6f8fb] px-4 py-3 text-sm font-semibold text-[#182230] hover:bg-[#eef9fd]"><span className="truncate">{item.targetId}</span><span className="ml-3 shrink-0 rounded-full bg-sky-50 px-2 py-1 text-[11px] text-[#168ac0]">Đang theo dõi</span></a>)}{friends.map((item) => <a key={`friend-${item.id}`} href={`/nguoi-dung/${encodeURIComponent(item.targetId)}`} className="flex items-center justify-between rounded-xl bg-[#f6f8fb] px-4 py-3 text-sm font-semibold text-[#182230] hover:bg-[#eef9fd]"><span className="truncate">{item.targetId}</span><span className="ml-3 shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700">Kết bạn</span></a>)}{!following.length && !friends.length && <p className="py-6 text-center text-sm text-[#667085] sm:col-span-2">Chưa theo dõi hoặc kết bạn với thành viên nào.</p>}</div></section>
-    <div className="mt-6 grid gap-5 lg:grid-cols-2">
-      <section className="rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><Bookmark size={20}/>Đã lưu và theo dõi</h2><div className="mt-4 space-y-2">{actions.map((item) => <div key={item.id} className="rounded-xl bg-[#f6f8fb] px-4 py-3"><p className="text-sm font-semibold text-[#182230]">{item.targetId}</p><p className="mt-1 text-xs text-[#667085]">{item.actionType} · {item.targetType}</p></div>)}{!actions.length && <p className="py-8 text-center text-sm text-[#667085]">Chưa lưu nội dung nào.</p>}</div></section>
-      <section className="rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><FileText size={20}/>Yêu cầu của bạn</h2><div className="mt-4 space-y-2">{requests.map((item) => <div key={item.id} className="rounded-xl bg-[#f6f8fb] px-4 py-3"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-semibold text-[#182230]">{item.subject}</p><span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{item.status === "pending" ? "Đang chờ" : item.status}</span></div><p className="mt-1 text-xs text-[#667085]">{item.requestType}</p></div>)}{!requests.length && <p className="py-8 text-center text-sm text-[#667085]">Chưa gửi yêu cầu nào.</p>}</div></section>
+
+    {error && <div role="alert" className="profile-load-error">{error}<button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)}>Thử lại</button></div>}
+    <div className="profile-body" ref={contentRef}>
+      <aside className="profile-sidebar">
+        <section className="profile-card"><h2><Info size={18}/>Giới thiệu</h2><p className="profile-muted profile-intro">{bio}</p><div className="profile-intro-row"><BriefcaseBusiness size={17}/><span>{profession} tại cộng đồng Tipook</span></div>{me.user?.email && <div className="profile-intro-row"><Mail size={17}/><span className="break-all">{me.user.email}</span></div>}<button type="button" className="profile-button profile-button-full" onClick={() => selectTab("cai-dat", "cai-dat", true)}>Thông tin tài khoản<ChevronRight size={15}/></button></section>
+        <section className="profile-card"><div className="profile-card-heading"><h2><Heart size={18} className="text-rose-500"/>Mẫu ưa thích</h2><button type="button" onClick={() => selectTab("mau-ua-thich", "mau-ua-thich", true)}>Xem tất cả</button></div>{favoriteModels.length ? <div className="profile-favorites-preview">{favoriteModels.slice(0, 3).map(item => <a key={item.id} href={actionHref(item)}><span className="profile-favorite-icon"><Heart size={16}/></span><span>{item.targetId}<small>{targetLabels[item.targetType] || "Nội dung"}</small></span><ChevronRight size={15}/></a>)}</div> : <p className="profile-muted profile-intro">Lưu mẫu nhà bạn thích để dễ tìm lại khi cần.</p>}</section>
+        <section className="profile-card profile-shortcuts"><h2>Truy cập nhanh</h2><button type="button" onClick={() => selectTab("vi-tipook", "vi-tipook", true)}><WalletCards size={18}/><span>Ví & lịch sử giao dịch</span><ChevronRight size={15}/></button><button type="button" onClick={() => selectTab("cai-dat", "yeu-cau", true)}><FileText size={18}/><span>Yêu cầu của bạn</span><small>{requests.length}</small></button>{me.user?.passwordAccount && <button type="button" onClick={() => selectTab("cai-dat", "bao-mat", true)}><ShieldCheck size={18}/><span>Mật khẩu & bảo mật</span><ChevronRight size={15}/></button>}</section>
+        <p className="profile-sidebar-note">Trang cá nhân · Cộng đồng Tipook</p>
+      </aside>
+
+      <div className="profile-content" aria-busy={loading}>
+        {panel("bai-viet-cua-toi", <MyPosts author={me.user}/>)}
+        {panel("mau-ua-thich", <section id="mau-ua-thich" className="profile-card"><div className="profile-card-heading"><h2><Bookmark size={20}/>Nội dung đã lưu</h2><span className="profile-total">{saved.length} nội dung</span></div><p className="profile-muted">Những ý tưởng và nội dung bạn muốn xem lại.</p><div className="profile-saved-grid">{saved.map(item => <a className="profile-saved-item" key={item.id} href={actionHref(item)}><span className="profile-saved-symbol"><Bookmark size={24}/></span><span className="min-w-0"><small>{targetLabels[item.targetType] || "Nội dung"}</small><strong>{item.targetId}</strong></span><ArrowRight size={17}/></a>)}</div>{!saved.length && <EmptyState icon={Bookmark} title="Lưu lại ý tưởng bạn yêu thích">Nhấn biểu tượng lưu hoặc trái tim trên nội dung để thêm vào đây. <a href="/kho-mau-nha-dep-chat">Khám phá mẫu nhà<ArrowRight size={14}/></a></EmptyState>}</section>)}
+        {panel("ket-noi", <section id="ket-noi" className="profile-card"><h2><Users size={20}/>Kết nối của bạn</h2><p className="profile-muted">Những thành viên bạn kết bạn và theo dõi trên Tipook.</p><div className="profile-filters" aria-label="Lọc kết nối">{([{ id: "all", label: "Tất cả" }, { id: "follow", label: `Đang theo dõi (${following.length})` }, { id: "friend", label: `Bạn bè (${friends.length})` }] as const).map(item => <button key={item.id} type="button" aria-pressed={connectionFilter === item.id} onClick={() => setConnectionFilter(item.id)}>{item.label}</button>)}</div><div className="profile-connections">{connections.map(item => <a key={item.id} href={`/nguoi-dung/${encodeURIComponent(item.id)}`}><MemberAvatar name={item.member?.name || "Thành viên"} src={item.member?.avatarUrl} className="size-12 text-lg"/><span className="min-w-0"><strong>{item.member?.name || "Thành viên Tipook"}</strong><small>{[item.following ? "Đang theo dõi" : "", item.friend ? "Bạn bè" : ""].filter(Boolean).join(" · ")}</small></span><ChevronRight size={17}/></a>)}</div>{!connections.length && <EmptyState icon={UserPlus} title="Mở rộng kết nối của bạn">Theo dõi hoặc kết bạn trên hồ sơ thành viên để giữ liên lạc và xem thêm nội dung.</EmptyState>}</section>)}
+        {panel("tin-nhan", <InboxPanel active={activeTab === "tin-nhan"}/>)}
+        {panel("vi-tipook", <WalletPanel/>)}
+        {panel("cai-dat", <div className="profile-settings">
+          <section id="cai-dat" className="profile-card"><h2><Settings size={20}/>Thông tin tài khoản</h2><p className="profile-muted">Thông tin liên hệ và các tùy chọn dành riêng cho bạn.</p><dl className="profile-details"><div><dt>Họ và tên</dt><dd>{me.user?.name || "Chưa cập nhật"}</dd></div><div><dt>Tên người dùng</dt><dd>{me.user?.username ? `@${me.user.username}` : "Chưa cập nhật"}</dd></div><div><dt>Email</dt><dd>{me.user?.email || "Chưa cập nhật"}</dd></div><div><dt>Loại tài khoản</dt><dd>{profession}</dd></div></dl></section>
+          <section id="kenh-nhan-tin" className="profile-card"><h2><Mail size={20}/>Kênh nhận tin</h2><p className="profile-muted">Chọn kênh để nhận phản hồi và nội dung được gửi cho bạn.</p><form onSubmit={event => { event.preventDefault(); void saveDelivery(); }}><div className="profile-delivery-fields">{([{ key: "zaloUserId", label: "Zalo", placeholder: "Zalo User ID" }, { key: "messengerPsid", label: "Messenger", placeholder: "Messenger PSID" }, { key: "telegramChatId", label: "Telegram", placeholder: "Telegram Chat ID" }] as const).map(field => <label key={field.key}>{field.label}<input disabled={savingDelivery || loading || !deliveryLoaded} value={delivery[field.key] ?? ""} onChange={event => setDelivery(current => ({ ...current, [field.key]: event.target.value }))} placeholder={field.placeholder}/></label>)}</div><details className="profile-delivery-help"><summary>Cách lấy thông tin kênh nhận tin</summary><p>Dùng ID do Zalo OA, Messenger hoặc Telegram Bot cung cấp để kết nối kênh. Bạn có thể để trống những kênh chưa sử dụng.</p></details><div className="profile-save-row"><p role="status">{deliveryNotice}</p><button disabled={savingDelivery || loading || !deliveryLoaded} className="profile-button profile-button-primary">{savingDelivery && <LoaderCircle size={16} className="animate-spin"/>}{savingDelivery ? "Đang lưu…" : "Lưu kênh nhận tin"}</button></div></form></section>
+          {me.user?.passwordAccount && <section id="bao-mat" className="profile-card"><h2><ShieldCheck size={20}/>Mật khẩu & bảo mật</h2><div className="mt-4"><PasswordChange admin={me.user.isAdmin}/></div></section>}
+          <section id="yeu-cau" className="profile-card"><div className="profile-card-heading"><h2><FileText size={20}/>Yêu cầu của bạn</h2><span className="profile-total">{requests.length} yêu cầu</span></div><div className="profile-request-list">{requests.map(item => <article key={item.id}><div><h3>{item.subject}</h3><p>{requestLabels[item.requestType] || "Yêu cầu hỗ trợ"}{item.createdAt && ` · ${new Date(item.createdAt).toLocaleDateString("vi-VN")}`}</p></div><span className="profile-status" data-status={item.status}>{statusLabels[item.status] || "Đã tiếp nhận"}</span></article>)}</div>{!requests.length && <EmptyState icon={FileText} title="Chưa có yêu cầu">Các yêu cầu tư vấn, hỗ trợ và nhận tài liệu sẽ xuất hiện tại đây.</EmptyState>}</section>
+          <section className="profile-card"><h2>Hoạt động gần đây</h2><div className="profile-activity">{actions.slice(0, 10).map(item => <a key={item.id} href={actionHref(item)}><span className="profile-activity-dot"/><span><strong>{item.targetType === "profile" ? members.find(member => member.id === item.targetId)?.name || "Thành viên Tipook" : item.targetId}</strong><small>{actionLabels[item.actionType] || "Đã tương tác"} · {targetLabels[item.targetType] || "Nội dung"}</small></span><ChevronRight size={15}/></a>)}</div>{!actions.length && <p className="profile-muted profile-intro">Chưa có hoạt động gần đây.</p>}</section>
+        </div>)}
+      </div>
     </div>
-    <section className="mt-5 rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="text-lg font-bold text-[#0b2e59]">Kênh nhận tin trực tiếp</h2><p className="mt-1 text-sm text-[#667085]">Cấu hình ID do Zalo OA, Messenger Platform và Telegram Bot cung cấp. Không nhập mật khẩu hoặc token cá nhân.</p><div className="mt-4 grid gap-3 md:grid-cols-3"><input value={delivery.zaloUserId ?? ""} onChange={(event) => setDelivery((current) => ({ ...current, zaloUserId: event.target.value }))} className="h-11 rounded-xl border px-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Zalo User ID"/><input value={delivery.messengerPsid ?? ""} onChange={(event) => setDelivery((current) => ({ ...current, messengerPsid: event.target.value }))} className="h-11 rounded-xl border px-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Messenger PSID"/><input value={delivery.telegramChatId ?? ""} onChange={(event) => setDelivery((current) => ({ ...current, telegramChatId: event.target.value }))} className="h-11 rounded-xl border px-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Telegram Chat ID"/></div><div className="mt-3 flex items-center justify-between gap-3"><p className="text-sm text-[#667085]">{deliveryNotice}</p><button type="button" onClick={() => void saveDelivery()} className="rounded-xl bg-[#229ed9] px-4 py-2.5 text-sm font-bold text-white">Lưu kênh nhận tin</button></div></section>
-    {me.user?.passwordAccount && <section id="bao-mat" className="mt-5 rounded-2xl border border-[#e3eaf2] bg-white p-5"><h2 className="text-lg font-bold text-[#0b2e59]">Đổi mật khẩu và bảo mật</h2><div className="mt-3 max-w-lg"><PasswordChange admin={me.user.isAdmin}/></div></section>}
-    <InboxPanel messages={messages} onChange={setMessages}/>
   </main>;
 }

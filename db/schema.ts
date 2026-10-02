@@ -15,6 +15,22 @@ export const posts = sqliteTable("posts", {
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
 
+export const catalogPromotions = sqliteTable("catalog_promotions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  category: text("category").notNull(),
+  position: integer("position").notNull(),
+  months: integer("months").notNull(),
+  amount: integer("amount").notNull(),
+  reference: text("reference").notNull().unique(),
+  startsAt: text("starts_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+}, table => [
+  index("idx_catalog_promotions_slot").on(table.category, table.position, table.expiresAt),
+  index("idx_catalog_promotions_post").on(table.postId, table.expiresAt),
+]);
+
 export const postComments = sqliteTable("post_comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
@@ -110,10 +126,36 @@ export const deliveryProfiles = sqliteTable("delivery_profiles", {
   internalChatId: text("internal_chat_id"),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
+
+export const catalogViews = sqliteTable("catalog_views", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  userId: text("user_id").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [uniqueIndex("idx_catalog_views_unique").on(table.targetType, table.targetId, table.userId)]);
+
+export const catalogDownloads = sqliteTable("catalog_downloads", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  userId: text("user_id").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, table => [uniqueIndex("idx_catalog_downloads_unique").on(table.targetType, table.targetId, table.userId)]);
+
+export const catalogRatings = sqliteTable("catalog_ratings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  userId: text("user_id").notNull(),
+  rating: integer("rating").notNull(),
+  updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
+}, (table) => [uniqueIndex("idx_catalog_ratings_unique").on(table.targetType, table.targetId, table.userId)]);
 export const walletTransactions = sqliteTable("wallet_transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),
   kind: text("kind").notNull(),
+  wallet: text("wallet").notNull().default("deposit"),
   amount: integer("amount").notNull(),
   orderCode: integer("order_code").notNull(),
   reference: text("reference").notNull(),
@@ -126,8 +168,53 @@ export const walletTransactions = sqliteTable("wallet_transactions", {
   uniqueIndex("wallet_transactions_order_code_unique").on(table.orderCode),
   uniqueIndex("wallet_transactions_reference_unique").on(table.reference),
   index("idx_wallet_transactions_user").on(table.userId, table.createdAt),
+  index("idx_wallet_transactions_wallet").on(table.userId, table.wallet, table.createdAt),
   index("idx_wallet_transactions_seller").on(table.sellerUserId, table.createdAt),
 ]);
+
+export const walletManualCredits = sqliteTable("wallet_manual_credits", {
+  reference: text("reference").primaryKey(),
+  userId: text("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  orderCode: integer("order_code").notNull().unique(),
+  reason: text("reason").notNull(),
+  performedBy: text("performed_by").notNull(),
+  createdAt: text("created_at").notNull(),
+}, table => [index("idx_wallet_manual_credits_created").on(table.createdAt)]);
+
+export const walletWithdrawals = sqliteTable("wallet_withdrawals", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  bankName: text("bank_name").notNull(),
+  accountNumber: text("account_number").notNull(),
+  accountName: text("account_name").notNull(),
+  status: text("status").notNull().default("pending"),
+  reviewNote: text("review_note"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: text("reviewed_at"),
+  createdAt: text("created_at").notNull(),
+}, table => [index("idx_wallet_withdrawals_user").on(table.userId, table.createdAt), index("idx_wallet_withdrawals_status").on(table.status, table.createdAt)]);
+
+export const walletSaleCredits = sqliteTable("wallet_sale_credits", {
+  purchaseId: integer("purchase_id").primaryKey(),
+  sellerUserId: text("seller_user_id").notNull(),
+  amount: integer("amount").notNull(),
+  grossAmount: integer("gross_amount"),
+  adminPercent: integer("admin_percent").notNull().default(0),
+  reviewedBy: text("reviewed_by").notNull(),
+  createdAt: text("created_at").notNull(),
+  revokedBy: text("revoked_by"),
+  revokedAt: text("revoked_at"),
+  revocationReason: text("revocation_reason"),
+});
+
+export const walletSaleSettings = sqliteTable("wallet_sale_settings", {
+  id: integer("id").primaryKey(),
+  adminPercent: integer("admin_percent").notNull().default(20),
+  updatedBy: text("updated_by"),
+  updatedAt: text("updated_at"),
+});
 
 export const walletTopupRequests = sqliteTable("wallet_topup_requests", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -148,21 +235,46 @@ export const walletTopupRequests = sqliteTable("wallet_topup_requests", {
 export const memberProfiles = sqliteTable("member_profiles", {
   userId: text("user_id").primaryKey(),
   displayName: text("display_name").notNull(),
+  avatarKey: text("avatar_key"),
+  googleAvatarUrl: text("google_avatar_url"),
   email: text("email"),
   accountType: text("account_type").notNull().default("user"),
   profession: text("profession"),
   upgradedAt: text("upgraded_at"),
+  accountStatus: text("account_status").notNull().default("active"),
+  moderationReason: text("moderation_reason").notNull().default(""),
+  moderationVersion: integer("moderation_version").notNull().default(0),
   updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => [index("idx_member_profiles_type").on(table.accountType)]);
 
+export const adminMemberModeration = sqliteTable("admin_member_moderation", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  performedBy: text("performed_by").notNull(),
+  action: text("action").notNull(),
+  reason: text("reason").notNull(),
+  version: integer("version").notNull(),
+  createdAt: text("created_at").notNull(),
+}, table => [uniqueIndex("idx_admin_member_moderation_version").on(table.userId, table.version)]);
+
 export const websiteAccounts = sqliteTable("website_accounts", {
   userId: text("user_id").primaryKey(),
-  email: text("email").notNull().unique(),
+  email: text("email").unique(),
+  username: text("username").unique(),
+  googleSub: text("google_sub").unique(),
   displayName: text("display_name").notNull(),
   passwordHash: text("password_hash").notNull(),
   isOwner: integer("is_owner", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull(),
 });
+
+export const adminMemberPasswordResets = sqliteTable("admin_member_password_resets", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => websiteAccounts.userId, { onDelete: "cascade" }),
+  performedBy: text("performed_by").notNull(),
+  verificationNote: text("verification_note").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [index("idx_admin_member_password_resets_user").on(table.userId, table.createdAt)]);
 
 export const websiteSessions = sqliteTable("website_sessions", {
   tokenHash: text("token_hash").primaryKey(),
@@ -176,6 +288,15 @@ export const authRateLimits = sqliteTable("auth_rate_limits", {
   attempts: integer("attempts").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
+
+export const authGoogleRequests = sqliteTable("auth_google_requests", {
+  stateHash: text("state_hash").primaryKey(),
+  browserHash: text("browser_hash").notNull(),
+  verifier: text("verifier").notNull(),
+  nonce: text("nonce").notNull(),
+  redirectTo: text("redirect_to").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+}, (table) => [index("idx_auth_google_requests_expiry").on(table.expiresAt)]);
 
 export const websiteContent = sqliteTable("website_content", {
   key: text("key").primaryKey(),

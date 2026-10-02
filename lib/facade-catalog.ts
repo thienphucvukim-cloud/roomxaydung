@@ -18,5 +18,5 @@ const modelAuthors = [
 
 export const facadeModels = modelItems.map((model, index) => {
   const [authorId, authorName] = modelAuthors[index];
-  return { ...model, authorId, authorName };
+  return { ...model, authorId, authorName, isDemo: true };
 });

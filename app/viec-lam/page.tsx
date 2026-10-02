@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function LegacyJobsPage() {
-  redirect("/tinh-vat-tu-tipook");
+  redirect("/tinh-vat-tu-nha-dep-chat");
 }

@@ -27,12 +27,12 @@ export function PasswordChange({ admin = false }: { admin?: boolean }) {
     finally { setBusy(false); }
   }
   return <div className="password-change">
-    <p className="email-code-help">{admin ? "Nhập mật khẩu hiện tại và xác nhận bằng ứng dụng xác thực hoặc mã khôi phục. Mật khẩu chỉ đổi sau khi xác nhận mã." : "Dùng mật khẩu từ 10 đến 128 ký tự. Đổi mật khẩu sẽ đăng xuất các phiên khác."}</p>
+    <p className="email-code-help">{admin ? "Nhập mật khẩu hiện tại và xác nhận bằng ứng dụng xác thực hoặc mã khôi phục. Mật khẩu chỉ đổi sau khi xác nhận mã." : "Dùng mật khẩu từ 6 đến 128 ký tự. Đổi mật khẩu sẽ đăng xuất các phiên khác."}</p>
     {error && <p className="auth-error" role="alert">{error}</p>}{notice && <p className="admin-alert success" role="status">{notice}</p>}
     {challenge ? ("method" in challenge && challenge.method === "totp" ? <TotpCodeForm challenge={challenge} onVerified={complete} onRestart={() => setChallenge(null)} account/> : <EmailCodeForm challenge={challenge as EmailChallengeResult} onChallenge={setChallenge} onVerified={complete} onRestart={() => setChallenge(null)} account/>) : <form onSubmit={changePassword} className="owner-edit-form mt-4" method="post" action="/api/auth/password">
       <label>Mật khẩu hiện tại<input name="password" type={visible ? "text" : "password"} required autoComplete="current-password" maxLength={128} disabled={busy}/></label>
-      <label>Mật khẩu mới<input name="newPassword" type={visible ? "text" : "password"} required minLength={10} maxLength={128} autoComplete="new-password" disabled={busy}/></label>
-      <label>Xác nhận mật khẩu mới<input name="confirmPassword" type={visible ? "text" : "password"} required minLength={10} maxLength={128} autoComplete="new-password" disabled={busy}/></label>
+      <label>Mật khẩu mới<input name="newPassword" type={visible ? "text" : "password"} required minLength={admin ? 10 : 6} maxLength={128} autoComplete="new-password" disabled={busy}/></label>
+      <label>Xác nhận mật khẩu mới<input name="confirmPassword" type={visible ? "text" : "password"} required minLength={admin ? 10 : 6} maxLength={128} autoComplete="new-password" disabled={busy}/></label>
       <button className="password-visibility" type="button" onClick={() => setVisible(!visible)} aria-pressed={visible}>{visible ? <EyeOff size={15}/> : <Eye size={15}/>} {visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}</button>
       <button className="owner-primary" disabled={busy}>{busy ? <LoaderCircle size={16} className="animate-spin"/> : admin ? <LockKeyhole size={16}/> : <Check size={16}/>} {admin ? "Tiếp tục xác thực" : "Đổi mật khẩu"}</button>
     </form>}

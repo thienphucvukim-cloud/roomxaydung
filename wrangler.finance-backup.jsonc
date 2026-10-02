@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tipook-finance-backup",
+  "account_id": "05498f1dc5c2356a95f51b36598be449",
+  "main": "./worker/finance-backup.ts",
+  "compatibility_date": "2026-05-15",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": { "DATABASE_ID": "f4387000-f900-4b21-92a1-11f094c114e8" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "roomxaydung-db",
+    "database_id": "f4387000-f900-4b21-92a1-11f094c114e8"
+  }],
+  "r2_buckets": [{ "binding": "FINANCE_BACKUPS", "bucket_name": "tipook-finance-backups" }]
+}

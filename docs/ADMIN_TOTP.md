@@ -5,7 +5,7 @@ SMS hay nhà cung cấp xác thực. QR được tạo ngay trong giao diện we
 
 ## Lần đăng nhập đầu tiên
 
-1. Mở `/dang-nhap?role=admin`, nhập email và mật khẩu quản trị.
+1. Mở `/admin`, nhập email và mật khẩu quản trị.
 2. Dùng ứng dụng hỗ trợ TOTP trên điện thoại để quét QR. Có thể nhập khóa thủ công.
 3. Nhập mã 6 chữ số hiện trên điện thoại. Chưa có quyền quản trị trước bước này.
 4. Tải/lưu 10 mã khôi phục ở nơi riêng, đánh dấu đã lưu rồi tiếp tục.
@@ -54,6 +54,16 @@ trực tiếp khi đã có seed: seed đang lưu sẽ không giải mã được
 mã hóa lại dữ liệu bằng khóa cũ hoặc xác minh và thiết lập lại thiết bị.
 
 ## Kiểm tra
+
+### Test thủ công trên localhost
+
+Để test giao diện quản trị bằng email và mật khẩu, đặt
+`TIPOOK_LOCAL_ADMIN_PASSWORD_ONLY=1` trong `.dev.vars`, rồi mở
+`http://localhost:5173/admin`. Chế độ này chỉ hoạt động trong dev server trên
+localhost/127.0.0.1/IPv6 loopback. Bản build production luôn yêu cầu TOTP, kể cả
+khi biến này được đặt thành `1`. Mật khẩu vẫn được kiểm tra theo tài khoản đã lưu.
+Đặt lại thành `0` khi muốn kiểm tra quy trình QR, TOTP và mã khôi phục.
+Chế độ này chỉ đơn giản hóa đăng nhập; đổi mật khẩu và thiết bị vẫn cần TOTP.
 
 Các fixture quản trị chỉ chạy trên state thử riêng. Trên PowerShell:
 

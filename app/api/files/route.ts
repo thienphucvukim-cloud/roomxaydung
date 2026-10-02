@@ -1,8 +1,9 @@
+import { memberAccessResponse } from "@/lib/member-access";
 import { env } from "cloudflare:workers";
 import { currentUserId } from "../../../lib/member-identity";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { postAttachments, websiteContent } from "../../../db/schema";
+import { memberProfiles, postAttachments, websiteContent } from "../../../db/schema";
 
 const MAX_PUBLIC_FILE_SIZE = 25 * 1024 * 1024;
 const MAX_PRIVATE_FILE_SIZE = 100 * 1024 * 1024;
@@ -20,6 +21,8 @@ function extension(name: string) {
 }
 
 export async function POST(request: Request) {
+  const denied = await memberAccessResponse();
+  if (denied) return denied;
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -77,6 +80,8 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = await memberAccessResponse();
+  if (denied) return denied;
   try {
     const key = new URL(request.url).searchParams.get("key") || "";
     if (!/^[0-9a-f-]{36}$/i.test(key)) return Response.json({ error: "Tệp không hợp lệ." }, { status: 400 });
@@ -85,6 +90,8 @@ export async function DELETE(request: Request) {
     if (object.customMetadata?.ownerUserId !== await currentUserId()) return Response.json({ error: "Bạn không có quyền xóa tệp này." }, { status: 403 });
     const [attached] = await getDb().select({ id: postAttachments.id }).from(postAttachments).where(eq(postAttachments.objectKey, key)).limit(1);
     if (attached) return Response.json({ error: "Tệp đang được sử dụng trong bài đăng." }, { status: 409 });
+    const [avatar] = await getDb().select({ userId: memberProfiles.userId }).from(memberProfiles).where(eq(memberProfiles.avatarKey, key)).limit(1);
+    if (avatar) return Response.json({ error: "Ảnh đang được sử dụng làm ảnh đại diện." }, { status: 409 });
     const [usedOnWebsite] = await getDb().select({ key: websiteContent.key }).from(websiteContent).where(eq(websiteContent.value, "/api/files?key=" + key)).limit(1);
     if (usedOnWebsite) return Response.json({ error: "Ảnh đang được sử dụng trên website." }, { status: 409 });
     await getBucket().delete(key);

@@ -8,7 +8,7 @@ import { createWebsiteSession } from "@/lib/auth-sessions";
 import { decryptTotpSecret, encryptTotpSecret, matchingTotpStep, newRecoveryCodes, newTotpSecret, recoveryCodeHash } from "@/lib/totp-crypto";
 
 export const TOTP_COOKIE = "tipook_totp_challenge";
-type Account = { userId: string; email: string; displayName: string; passwordHash: string; isOwner: boolean };
+type Account = { userId: string; email: string | null; displayName: string; passwordHash: string; isOwner: boolean };
 type Credential = { secret_encrypted: string; last_step: number };
 type Challenge = { id: string; user_id: string; purpose: "login" | "setup" | "password" | "rotate"; browser_hash: string; password_version: string; credential_version: string | null; pending_secret: string | null; new_password_hash: string | null; session_hash: string | null; redirect_to: string; attempts: number; expires_at: number };
 export function adminTotpReady() { return /^[a-f0-9]{64}$/.test((env as unknown as Record<string, string>).TIPOOK_MFA_KEY || ""); }
@@ -131,7 +131,7 @@ export async function beginTotpRotation(request: Request, body: Record<string, u
   const identity = await getAuthenticatedIdentity();
   if (identity?.source !== "website" || !isAdminIdentity(identity)) throw new AuthFlowError("Hãy đăng nhập quản trị trước.", 403);
   await limitAuthAttempts(`totp-rotate:${identity.userId}`, 5);
-  const account = await accountByEmail(identity.email), current = account ? await credential(account.userId) : null;
+  const account = await accountByEmail(identity.email || ""), current = account ? await credential(account.userId) : null;
   if (!account || !current || typeof body.password !== "string" || body.password.length > 128 || !await verifyPassword(body.password, account.passwordHash)) throw new AuthFlowError("Mật khẩu hiện tại không đúng.");
   await consumeFactor(account, current, body.code, body.recovery === true);
   const token = (await cookies()).get(AUTH_COOKIE)?.value || "";

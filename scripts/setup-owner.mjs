@@ -18,5 +18,5 @@ if (read("TIPOOK_ADMIN_PASSWORD")) {
   else source = source.trimEnd() + `\nTIPOOK_ADMIN_PASSWORD=${password}\n`;
   if (!configuredEmail || configuredEmail === "EMAIL_DANG_NHAP_ADMIN") source = source.replace(/^TIPOOK_ADMIN_EMAIL\s*=.*$/m, `TIPOOK_ADMIN_EMAIL=${email}`);
   writeFileSync(file, source, { mode: 0o600 });
-  console.log(`Email chủ website: ${email}\nMật khẩu khởi tạo: ${password}\nKhởi động lại server, đăng nhập tại /dang-nhap rồi đổi mật khẩu trong Cài đặt.`);
+  console.log(`Email chủ website: ${email}\nMật khẩu khởi tạo: ${password}\nKhởi động lại server, đăng nhập tại /admin rồi đổi mật khẩu trong Cài đặt.`);
 }

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getDb } from "../../../../db";
-import { postAttachments, walletTransactions } from "../../../../db/schema";
+import { catalogDownloads, postAttachments, walletTransactions } from "../../../../db/schema";
 import { getPaymentBuyerId } from "../../../../lib/payment-identity";
 import { verifyDownloadToken } from "../../../../lib/download-links";
 
@@ -32,6 +32,7 @@ export async function GET(request: Request) {
 
     const object = await bucket().get(attachment.objectKey);
     if (!object) return Response.json({ error: "File không còn tồn tại trên kho lưu trữ." }, { status: 404 });
+    await db.insert(catalogDownloads).values({ targetType: "post", targetId: purchase.targetId, userId }).onConflictDoNothing();
     const safeName = attachment.fileName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
     const responseHeaders = new Headers();
     object.writeHttpMetadata(responseHeaders);

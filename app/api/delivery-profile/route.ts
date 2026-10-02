@@ -1,3 +1,4 @@
+import { memberAccessResponse } from "@/lib/member-access";
 import { eq } from "drizzle-orm";
 import { currentUserId } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
@@ -6,6 +7,8 @@ import { deliveryProfiles } from "../../../db/schema";
 function value(input: unknown) { return typeof input === "string" ? input.trim().slice(0, 180) : ""; }
 
 export async function GET() {
+  const denied = await memberAccessResponse();
+  if (denied) return denied;
   try {
     const [profile] = await getDb().select().from(deliveryProfiles).where(eq(deliveryProfiles.userId, await currentUserId())).limit(1);
     return Response.json({ profile: profile ?? null });
@@ -13,6 +16,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const denied = await memberAccessResponse();
+  if (denied) return denied;
   try {
     const userId = await currentUserId();
     const body = await request.json() as Record<string, unknown>;

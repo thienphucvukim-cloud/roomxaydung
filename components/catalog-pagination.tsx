@@ -3,12 +3,12 @@
 import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { catalogPageHref } from "@/lib/catalog-pagination";
 
-export function CatalogPagination({ basePath, page, totalPages, total, query, label }: {
-  basePath: string; page: number; totalPages: number; total: number; query: string; label: string;
+export function CatalogPagination({ basePath, page, totalPages, total, query, label, sort = "latest" }: {
+  basePath: string; page: number; totalPages: number; total: number; query: string; label: string; sort?: string;
 }) {
   const numbers = [...new Set([1, page - 1, page, page + 1, totalPages])]
     .filter(number => number >= 1 && number <= totalPages).sort((a, b) => a - b);
-  const href = (number: number) => catalogPageHref(basePath, number, query);
+  const href = (number: number) => catalogPageHref(basePath, number, query, sort);
 
   return <nav aria-label={`Phân trang ${label}`} className="mt-6 flex flex-wrap items-center justify-center gap-2">
     {page > 1 && <ClientNavigationLink href={href(page - 1)} rel="prev" className="rounded-lg border bg-white px-3 py-2 text-sm font-semibold">Trước</ClientNavigationLink>}

@@ -4,14 +4,15 @@ import { GUEST_ID_PATTERN, MEMBER_SESSION_COOKIE as PAYMENT_SESSION_COOKIE } fro
 
 export async function getPaymentBuyerId() {
   const authenticatedId = (await getAuthenticatedIdentity())?.userId;
-  if (authenticatedId) return authenticatedId.slice(0, 180);
-  const value = (await cookies()).get(PAYMENT_SESSION_COOKIE)?.value ?? "";
-  return GUEST_ID_PATTERN.test(value) ? value : null;
+  return authenticatedId ? authenticatedId.slice(0, 180) : null;
 }
 
 export async function getOrCreatePaymentBuyerId() {
   const existing = await getPaymentBuyerId();
   if (existing) return { userId: existing, isNew: false };
+  // Anonymous IDs are only for counting visits, never account permissions.
+  const visitor = (await cookies()).get(PAYMENT_SESSION_COOKIE)?.value ?? "";
+  if (GUEST_ID_PATTERN.test(visitor)) return { userId: visitor, isNew: false };
   return { userId: "guest_" + crypto.randomUUID(), isNew: true };
 }
 

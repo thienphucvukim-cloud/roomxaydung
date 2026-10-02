@@ -1,7 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { memberAccessResponse } from "@/lib/member-access";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { currentUserId } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
-import { userActions } from "../../../db/schema";
+import { memberProfiles, userActions, virtualProfiles } from "../../../db/schema";
+import { getPaymentBuyerId } from "@/lib/payment-identity";
+import { memberAvatarUrl } from "@/lib/member-avatar";
 
 function valid(value: unknown, max = 120): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
@@ -9,16 +12,38 @@ function valid(value: unknown, max = 120): value is string {
 
 export async function GET(request: Request) {
   try {
-    const userId = await currentUserId();
+    const userId = await getPaymentBuyerId();
     const url = new URL(request.url);
     const actionType = url.searchParams.get("actionType");
     const targetType = url.searchParams.get("targetType");
     const targetId = url.searchParams.get("targetId");
-    const conditions = [eq(userActions.userId, userId)];
+    const conditions = [eq(userActions.userId, userId ?? "")];
     if (actionType) conditions.push(eq(userActions.actionType, actionType));
     if (targetType) conditions.push(eq(userActions.targetType, targetType));
     if (targetId) conditions.push(eq(userActions.targetId, targetId));
-    const actions = await getDb().select().from(userActions).where(and(...conditions)).orderBy(desc(userActions.createdAt)).limit(100);
+    const actions = userId ? await getDb().select().from(userActions).where(and(...conditions)).orderBy(desc(userActions.createdAt)).limit(100) : [];
+    if (url.searchParams.get("withCount") === "true" && valid(actionType, 50) && valid(targetType, 50) && valid(targetId, 180)) {
+      const [total] = await getDb().select({ value: count() }).from(userActions).where(and(
+        eq(userActions.actionType, actionType),
+        eq(userActions.targetType, targetType),
+        eq(userActions.targetId, targetId),
+      ));
+      return Response.json({ actions, count: total.value });
+    }
+    if (url.searchParams.get("withProfiles") === "true") {
+      const ids = [...new Set(actions.filter(action => action.targetType === "profile").map(action => action.targetId))];
+      const db = getDb();
+      const profiles = ids.length ? await db.select({ id: memberProfiles.userId, name: memberProfiles.displayName, avatarKey: memberProfiles.avatarKey, googleAvatarUrl: memberProfiles.googleAvatarUrl }).from(memberProfiles).where(inArray(memberProfiles.userId, ids)) : [];
+      const members = profiles.map(profile => ({ id: profile.id, name: profile.name, avatarUrl: memberAvatarUrl(profile) }));
+      const missing = ids.filter(id => !members.some(member => member.id === id));
+      if (missing.length) {
+        try {
+          const virtual = await db.select({ id: virtualProfiles.id, name: virtualProfiles.displayName, avatarUrl: virtualProfiles.avatar }).from(virtualProfiles).where(inArray(virtualProfiles.id, missing));
+          members.push(...virtual);
+        } catch { /* Virtual profiles may not be available on older databases. */ }
+      }
+      return Response.json({ actions, members }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     return Response.json({ actions });
   } catch {
     return Response.json({ error: "Chưa thể tải hoạt động." }, { status: 500 });
@@ -26,6 +51,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await memberAccessResponse();
+  if (denied) return denied;
   try {
     const body = await request.json() as { actionType?: string; targetType?: string; targetId?: string; payload?: unknown };
     if (!valid(body.actionType, 50) || !valid(body.targetType, 50) || !valid(body.targetId, 180)) {
@@ -55,6 +82,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = await memberAccessResponse();
+  if (denied) return denied;
   try {
     const body = await request.json() as { actionType?: string; targetType?: string; targetId?: string };
     if (!valid(body.actionType, 50) || !valid(body.targetType, 50) || !valid(body.targetId, 180)) {

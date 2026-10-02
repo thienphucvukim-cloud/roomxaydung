@@ -10,9 +10,9 @@ const metadata: Metadata = {
   title: "Tipook — Cộng đồng tư vấn và thiết kế nhà",
   description: "Hỏi đáp, chia sẻ chi phí thực tế và kinh nghiệm từ những người đã và đang xây nhà.",
   icons: {
-    icon: [{ url: "/nhadepchat-browser-icon.svg", type: "image/svg+xml" }],
-    shortcut: "/nhadepchat-browser-icon.svg",
-    apple: "/nhadepchat-symbol.png",
+    icon: [{ url: "/nhadepchat-browser-icon.png?v=4", type: "image/png" }],
+    shortcut: "/nhadepchat-browser-icon.png?v=4",
+    apple: "/nhadepchat-browser-icon.png?v=4",
   },
 };
 

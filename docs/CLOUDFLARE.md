@@ -5,7 +5,7 @@ Worker: `tipook-web`.
 
 URL production: https://nhadepchat.top
 
-Đăng nhập quản trị: https://nhadepchat.top/dang-nhap?role=admin
+Đăng nhập quản trị: https://nhadepchat.top/admin
 
 Hai Custom Domain `nhadepchat.top` và `www.nhadepchat.top` được khai báo trong
 `wrangler.jsonc` để giữ cấu hình qua các lần triển khai. Cloudflare quản lý DNS
@@ -54,7 +54,7 @@ pnpm run build:cloudflare
 pnpm run deploy:cloudflare
 ```
 
-Migration là bước riêng; mỗi push thông thường không tự sửa dữ liệu production.
+Migration là bước riêng; mỗi push thông thường không tự sửa dữ liệu production. Lệnh migration hiện sao lưu toàn bộ SQL lên R2 trước khi thay đổi schema và kiểm tra các giao dịch cũ sau nâng cấp. Deploy bị chặn nếu schema hoặc trigger bảo vệ ví chưa sẵn sàng. Xem [Lưu giữ dữ liệu và đối soát tiền](DATA_DURABILITY.md).
 Không dùng file `dist/server/wrangler.json` sinh từ `pnpm build` local để triển khai production.
 
 ## Đăng nhập và thanh toán

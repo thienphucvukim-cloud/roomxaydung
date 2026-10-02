@@ -2,11 +2,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, RefreshCw } from "lucide-react";
 import type { EmailChallengeResult } from "@/components/email-code-form";
-import { AdminPasswordRecovery } from "@/components/admin-password-recovery";
 
 type RecoveryResult = EmailChallengeResult & { message: string };
-export function PasswordRecovery({ admin = false }: { admin?: boolean }) {
-  const [adminRecovery, setAdminRecovery] = useState(admin);
+export function PasswordRecovery() {
   const [email, setEmail] = useState("");
   const [challenge, setChallenge] = useState<RecoveryResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -52,17 +50,16 @@ export function PasswordRecovery({ admin = false }: { admin?: boolean }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể kết nối. Vui lòng thử lại."); }
     finally { setBusy(false); }
   }
-  if (adminRecovery) return <AdminPasswordRecovery onBack={() => setAdminRecovery(false)}/>;
   if (complete) return <div className="password-recovery-success"><p className="email-code-notice" role="status"><Check size={20}/><span>Đã đặt mật khẩu mới và đăng xuất mọi phiên cũ. Hãy đăng nhập lại.</span></p><a className="auth-submit" href="/dang-nhap">Về đăng nhập<ArrowRight size={17}/></a></div>;
   return <div className="password-recovery">
-    <p className="email-code-help">Khôi phục qua email dành cho thành viên. Quản trị dùng mã dự phòng đã lưu.</p><button type="button" className="password-visibility mb-5" onClick={() => setAdminRecovery(true)}>Khôi phục tài khoản quản trị</button>
+    <p className="email-code-help">Khôi phục qua email dành cho thành viên đã có email. Nếu đăng ký không dùng email, hãy liên hệ người vận hành website để được hỗ trợ. Tài khoản Google có thể đăng nhập lại bằng Google.</p>
     {challenge ? <>
       <p className="email-code-notice" role="status"><Mail size={18}/><span>{challenge.message}</span></p>
       <form className="auth-form" onSubmit={reset} method="post" action="/api/auth/reset" data-ready={ready}>
         <input name="challengeId" type="hidden" value={challenge.challengeId}/>
         <label>Mã xác nhận 6 chữ số<div className="auth-input"><input className="email-code-input" name="code" inputMode="numeric" autoComplete="one-time-code" required pattern="[0-9]{6}" minLength={6} maxLength={6} placeholder="000000" autoFocus disabled={busy || expired}/></div></label>
-        <label>Mật khẩu mới<div className="auth-input"><LockKeyhole size={18}/><input name="newPassword" type={visible ? "text" : "password"} autoComplete="new-password" required minLength={10} maxLength={128} placeholder="Ít nhất 10 ký tự" disabled={busy || expired}/><button type="button" onClick={() => setVisible(!visible)} aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={visible}>{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></label>
-        <label>Xác nhận mật khẩu mới<div className="auth-input"><LockKeyhole size={18}/><input name="confirmPassword" type={visible ? "text" : "password"} autoComplete="new-password" required minLength={10} maxLength={128} disabled={busy || expired}/></div></label>
+        <label>Mật khẩu mới<div className="auth-input"><LockKeyhole size={18}/><input name="newPassword" type={visible ? "text" : "password"} autoComplete="new-password" required minLength={6} maxLength={128} placeholder="Ít nhất 6 ký tự" disabled={busy || expired}/><button type="button" onClick={() => setVisible(!visible)} aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={visible}>{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></label>
+        <label>Xác nhận mật khẩu mới<div className="auth-input"><LockKeyhole size={18}/><input name="confirmPassword" type={visible ? "text" : "password"} autoComplete="new-password" required minLength={6} maxLength={128} disabled={busy || expired}/></div></label>
         <p className="email-code-help">Mã có hiệu lực 10 phút. Mật khẩu chỉ đổi khi mã hợp lệ; mọi phiên cũ sẽ bị đăng xuất.</p>
         {(error || expired) && <p className="auth-error" role="alert">{expired ? "Mã đã hết hạn. Vui lòng quay lại để yêu cầu mã mới." : error}</p>}
         <button className="auth-submit" disabled={busy || expired || !ready}>{busy ? <LoaderCircle size={17} className="animate-spin"/> : <LockKeyhole size={17}/>}Đặt mật khẩu mới</button>

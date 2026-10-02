@@ -56,7 +56,7 @@ export async function readEmailChallenge(request: Request, id: unknown) {
   const challenge = await env.DB!.prepare("SELECT * FROM auth_email_challenges WHERE id = ? AND browser_hash = ? AND expires_at > ? AND attempts < 5")
     .bind(id, hashToken(secret), Date.now()).first<EmailChallenge>();
   if (!challenge) throw new AuthFlowError("Mã đã hết hạn, đã dùng hoặc vượt số lần thử. Vui lòng bắt đầu lại.");
-  const row = await env.DB!.prepare("SELECT user_id AS userId, email, display_name AS displayName, password_hash AS passwordHash, is_owner AS isOwner FROM website_accounts WHERE user_id = ?")
+  const row = await env.DB!.prepare("SELECT user_id AS userId, email, display_name AS displayName, password_hash AS passwordHash, is_owner AS isOwner FROM website_accounts WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM member_profiles WHERE user_id = website_accounts.user_id AND account_status != 'active')")
     .bind(challenge.user_id).first<OwnerAccount & { displayName: string; isOwner: number }>();
   const account = row ? { ...row, isOwner: row.isOwner === 1 } : null;
   if (account?.isOwner) throw new AuthFlowError("Quản trị dùng ứng dụng xác thực hoặc mã khôi phục, không dùng mã email.", 403);

@@ -1,19 +1,23 @@
 "use client";
 import { createContext, useContext, useEffect, useState, type ChangeEvent, type FormEvent, type ImgHTMLAttributes, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Check, Eye, LoaderCircle, LogOut, Pencil, RotateCcw, Save, Settings2, ShieldCheck, SlidersHorizontal, Upload, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { OwnerManagement } from "@/components/owner-management";
 import type { ContentValue, SiteContent } from "@/lib/site-content";
+import { optimizeImageForUpload } from "@/lib/image-upload";
+import { MyPostControls } from "@/components/my-posts";
+import { AdminPostControls } from "@/components/admin-post-controls";
 
 type Selection = { key: string; kind: ContentValue["kind"]; fallback: string; label: string };
-type EditorContext = { content: SiteContent; editing: boolean; isOwner: boolean; select: (selection: Selection) => void; manage: (tab: string, id?: number) => void };
-const Editor = createContext<EditorContext>({ content: {}, editing: false, isOwner: false, select: () => {}, manage: () => {} });
+type EditorContext = { content: SiteContent; editing: boolean; isOwner: boolean; accountSwitchBlocked: boolean; memberId?: string; select: (selection: Selection) => void; manage: (tab: string, id?: number) => void; saveContent: (changes: Record<string, ContentValue>) => Promise<void> };
+const Editor = createContext<EditorContext>({ content: {}, editing: false, isOwner: false, accountSwitchBlocked: false, select: () => {}, manage: () => {}, saveContent: async () => { throw new Error("Chưa thể lưu nội dung."); } });
 export function useSiteEditor() { return useContext(Editor); }
-export function OwnerPostControls({ postId }: { postId: number }) {
+export function OwnerPostControls({ postId, authorId }: { postId: number; authorId?: string }) {
   const editor = useSiteEditor();
-  if (!editor.isOwner) return null;
-  return <button type="button" className="owner-post-control" onClick={() => editor.manage("noi-dung", postId)}><Pencil size={13}/>Sửa bài đăng</button>;
+  if (editor.isOwner) return <AdminPostControls postId={postId} onEdit={() => editor.manage("noi-dung", postId)}/>;
+  if (authorId && editor.memberId === authorId) return <MyPostControls postId={postId} iconOnly/>;
+  return null;
 }
 export function EditableText({ contentKey, children, label = "Chỉnh sửa nội dung" }: { contentKey: string; children: string; label?: string }) {
   const { content, editing, select } = useSiteEditor();
@@ -26,10 +30,12 @@ export function EditableImage({ contentKey, src = "", alt = "", ...props }: ImgH
 }
 export function OwnerWorkspace({ initialContent, children }: { initialContent: SiteContent; children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [saved, setSaved] = useState(initialContent);
   const [drafts, setDrafts] = useState<Record<string, ContentValue | null>>({});
   const [editing, setEditing] = useState(false);
   const [owner, setOwner] = useState<{ name: string; isAdmin?: boolean } | null>(null);
+  const [memberId, setMemberId] = useState<string>();
   const [selection, setSelection] = useState<Selection | null>(null);
   const [input, setInput] = useState("");
   const [tab, setTab] = useState("");
@@ -42,11 +48,17 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
   const content = { ...saved };
   for (const [key, value] of Object.entries(drafts)) { if (value === null) delete content[key]; else content[key] = value; }
   const count = Object.keys(drafts).length;
-  const authPage = ["/dang-nhap", "/dang-ky", "/quen-mat-khau"].includes(pathname);
+  const authPage = ["/admin", "/dang-nhap", "/dang-ky", "/quen-mat-khau"].includes(pathname);
+  useEffect(() => {
+    const refresh = () => router.refresh();
+    window.addEventListener("tipook-content-changed", refresh);
+    return () => window.removeEventListener("tipook-content-changed", refresh);
+  }, [router]);
   useEffect(() => {
     if (authPage) return;
     const controller = new AbortController();
-    fetch("/api/me", { cache: "no-store", signal: controller.signal }).then(response => response.json() as Promise<{ user?: { name: string; isAdmin?: boolean } }>).then(data => {
+    fetch("/api/me", { cache: "no-store", signal: controller.signal }).then(response => response.json() as Promise<{ user?: { id: string; name: string; isAdmin?: boolean } }>).then(data => {
+      if (!controller.signal.aborted) setMemberId(data.user?.id);
       setOwner(data.user || null);
       if (data.user?.isAdmin) {
         const requested = new URLSearchParams(window.location.search).get("quan-ly");
@@ -69,7 +81,7 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 25 * 1024 * 1024) { setModalError("Chọn ảnh JPG, PNG, WebP hoặc GIF, tối đa 25 MB."); return; }
     setUploading(true); setModalError("");
     try {
-      const body = new FormData(); body.append("file", file); body.append("purpose", "drawing-preview");
+      const body = new FormData(); body.append("file", await optimizeImageForUpload(file)); body.append("purpose", "drawing-preview");
       const response = await fetch("/api/files", { method: "POST", body });
       const result = await response.json() as { error?: string; attachment?: { url?: string } };
       if (!response.ok || !result.attachment?.url) throw new Error(result.error || "Chưa thể tải ảnh.");
@@ -86,8 +98,16 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
     } catch (cause) { setStatusError(true); setNotice(cause instanceof Error ? cause.message : "Chưa thể lưu."); } finally { setSaving(false); }
   }
   const manage = (next: string, id?: number) => { setTab(next); setSelectedPost(id); };
+  async function saveContent(changes: Record<string, ContentValue>) {
+    const response = await fetch("/api/site-content", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes: Object.entries(changes).map(([key, value]) => ({ key, content: value })) }) });
+    const result = await response.json() as { error?: string; content?: SiteContent };
+    if (!response.ok || !result.content) throw new Error(result.error || "Chưa thể lưu bài demo.");
+    setSaved(result.content);
+    setDrafts(current => Object.fromEntries(Object.entries(current).filter(([key]) => !Object.hasOwn(changes, key))));
+    window.dispatchEvent(new Event("tipook-content-changed"));
+  }
   const isOwner = Boolean(owner?.isAdmin);
-  return <Editor.Provider value={{ content, editing: editing && isOwner && !authPage, isOwner, select, manage }}><div className={`owner-site ${isOwner && !authPage ? "has-owner-toolbar" : ""}`} style={{ "--site-accent": content["global.accent"]?.value || "#229ed9" } as React.CSSProperties}>
+  return <Editor.Provider value={{ content, editing: editing && isOwner && !authPage, isOwner, accountSwitchBlocked: saving || count > 0, memberId: authPage ? undefined : memberId, select, manage, saveContent }}><div className={`owner-site ${isOwner && !authPage ? "has-owner-toolbar" : ""}`} style={{ "--site-accent": content["global.accent"]?.value || "#229ed9" } as React.CSSProperties}>
     {isOwner && !authPage && <div className="owner-toolbar" role="region" aria-label="Công cụ chủ website"><div className="owner-toolbar-inner"><span className="owner-identity"><ShieldCheck size={17}/><strong>Website của bạn</strong></span><span className="owner-toolbar-divider"/>
       <button type="button" className={editing ? "owner-tool active" : "owner-tool"} onClick={() => setEditing(!editing)} disabled={saving}>{editing ? <Eye size={16}/> : <Pencil size={16}/>}<span>{editing ? "Xem trước" : "Chỉnh sửa"}</span></button>
       <button type="button" className="owner-tool" onClick={() => manage("noi-dung")} disabled={saving}><SlidersHorizontal size={16}/><span>Quản lý</span></button>
