@@ -36,7 +36,7 @@ export function PurchaseActionButton({ targetType, targetId, title, price, class
         body: JSON.stringify({ targetType, targetId, purchaseId: crypto.randomUUID() }),
       });
       const data = await response.json() as PurchaseResult;
-      if (!response.ok) { setRequiresTopup(response.status === 402); throw new Error(data.error || "Chưa thể thanh toán bằng Ví Tipook."); }
+      if (!response.ok) { setRequiresTopup(response.status === 402); throw new Error(data.error || "Chưa thể thanh toán bằng Ví NhàĐẹpChất."); }
       setResult(data);
       window.dispatchEvent(new Event("tipook-wallet-changed"));
       window.dispatchEvent(new Event("tipook-messages-changed"));
@@ -44,7 +44,7 @@ export function PurchaseActionButton({ targetType, targetId, title, price, class
       const wallet = await walletResponse.json() as { balance?: number };
       setBalance(Number(wallet.balance ?? 0));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Chưa thể thanh toán bằng Ví Tipook.");
+      setError(cause instanceof Error ? cause.message : "Chưa thể thanh toán bằng Ví NhàĐẹpChất.");
     } finally {
       setBusy(false);
     }
@@ -59,7 +59,7 @@ export function PurchaseActionButton({ targetType, targetId, title, price, class
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) { setError(""); setResult(null); } }}>
       <DialogContent showCloseButton={false} className="w-[calc(100vw-1.5rem)] max-w-[460px] gap-0 overflow-hidden rounded-2xl border-0 bg-white p-0 shadow-2xl">
         <DialogHeader className="relative border-b border-[#e4e6eb] px-14 py-5 text-center sm:text-center">
-          <DialogTitle className="text-xl font-extrabold text-[#0b2e59]">Thanh toán bằng Ví Tipook</DialogTitle>
+          <DialogTitle className="text-xl font-extrabold text-[#0b2e59]">Thanh toán bằng Ví NhàĐẹpChất</DialogTitle>
           <DialogClose className="absolute right-4 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-[#e4e6eb] text-[#606770]" aria-label="Đóng"><X size={21}/></DialogClose>
         </DialogHeader>
         <div className="p-5">
@@ -69,8 +69,8 @@ export function PurchaseActionButton({ targetType, targetId, title, price, class
             <div className="rounded-xl bg-[#f4f9fc] px-4 py-3"><span className="block text-xs font-semibold text-[#667085]">Giá bản vẽ</span><strong className="mt-1 block text-lg text-[#168ac0]">{displayPrice}</strong></div>
             <div className="rounded-xl bg-[#f4f9fc] px-4 py-3"><span className="block text-xs font-semibold text-[#667085]">Số dư ví nạp</span><strong className="mt-1 block text-lg text-[#0b2e59]">{balance === null ? "Đang tải..." : `${balance.toLocaleString("vi-VN")}đ`}</strong></div>
           </div>
-          <div className="mt-4 flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-800"><ShieldCheck size={20} className="mt-0.5 shrink-0"/><p>Tiền được trừ trực tiếp từ Ví Tipook. Giao dịch lưu lại tên bản vẽ và tác giả để admin đối soát.</p></div>
-          {error && <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"><p>{error}</p>{requiresTopup && <a href="/tai-khoan?wallet=topup#vi-tipook" className="mt-2 inline-flex items-center gap-1.5 text-[#168ac0] hover:underline"><WalletCards size={16}/>Nạp tiền vào ví</a>}</div>}
+          <div className="mt-4 flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-800"><ShieldCheck size={20} className="mt-0.5 shrink-0"/><p>Tiền được trừ trực tiếp từ Ví NhàĐẹpChất. Giao dịch lưu lại tên bản vẽ và tác giả để admin đối soát.</p></div>
+          {error && <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"><p>{error}</p>{requiresTopup && <a href="/tai-khoan?wallet=topup#vi-nhadepchat" className="mt-2 inline-flex items-center gap-1.5 text-[#168ac0] hover:underline"><WalletCards size={16}/>Nạp tiền vào ví</a>}</div>}
           {result && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"><p className="font-semibold">{result.message}</p>{result.downloadLinks?.map((item) => <a key={item.url} href={item.url} className="mt-2 flex items-center gap-2 rounded-lg bg-white px-3 py-2 font-bold text-[#168ac0]"><Download size={17}/>{item.name}</a>)}</div>}
           {!result && <button type="button" onClick={checkout} disabled={busy} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#229ed9] font-extrabold text-white transition hover:bg-[#168ac0] disabled:opacity-60">{busy ? <LoaderCircle size={19} className="animate-spin"/> : <WalletCards size={19}/>}Xác nhận mua</button>}
         </div>

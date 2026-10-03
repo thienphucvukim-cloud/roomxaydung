@@ -23,6 +23,6 @@ export async function GET() {
     const salesLocked = Number(locked?.amount ?? 0);
     return Response.json({ userId, balance: depositBalance, depositBalance, salesBalance, salesAvailable: Math.max(0, salesBalance - salesLocked), salesLocked, salesHeld: Number(held?.amount ?? 0), saleCredits: saleCredits.map(credit => ({ ...credit, ready: !credit.revokedAt && credit.createdAt <= cutoff, availableAt: new Date(Date.parse(credit.createdAt) + SALES_HOLD_MS).toISOString() })), transactions, withdrawals }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
-    return Response.json({ error: "Chưa thể tải Ví Tipook." }, { status: 500 });
+    return Response.json({ error: "Chưa thể tải Ví NhàĐẹpChất." }, { status: 500 });
   }
 }

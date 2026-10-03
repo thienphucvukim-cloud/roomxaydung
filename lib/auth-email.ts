@@ -16,7 +16,7 @@ export function authEmailReady(request?: Request) {
 export async function sendAuthEmail(request: Request, email: string, code: string, purpose: "login" | "password" | "reset", challengeId: string) {
   if (!authEmailReady(request)) throw new AuthFlowError("Chưa cấu hình dịch vụ gửi mã xác nhận. Vui lòng liên hệ chủ website.", 503);
   const operation = purpose === "login" ? "đăng nhập quản lý" : purpose === "reset" ? "khôi phục mật khẩu" : "đổi mật khẩu";
-  const subject = `Tipook: mã xác nhận ${operation}`;
+  const subject = `NhàĐẹpChất: mã xác nhận ${operation}`;
   const text = `Mã xác nhận ${operation} của bạn: ${code}\n\nMã có hiệu lực 10 phút, chỉ dùng một lần. Không chia sẻ mã này với bất kỳ ai.\nNếu bạn không yêu cầu thao tác này, hãy bỏ qua email và kiểm tra bảo mật tài khoản.`;
   // An explicit developer-only outbox lets integration tests inspect delivery.
   // This branch is removed from production builds and never exposes codes via HTTP.

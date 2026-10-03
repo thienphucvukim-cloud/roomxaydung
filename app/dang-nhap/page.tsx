@@ -4,7 +4,7 @@ import { AuthScreen } from "@/components/auth-screen";
 import { getAuthenticatedIdentity, safeAuthReturn } from "@/lib/website-auth";
 import "../auth.css";
 
-export const metadata: Metadata = { title: "Đăng nhập | Tipook", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Đăng nhập | NhàĐẹpChất", robots: { index: false, follow: false } };
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ role?: string; return_to?: string; auth_error?: string; add_account?: string }> }) {
   const params = await searchParams;
   const admin = params.role === "admin" || params.return_to?.startsWith("/quan-tri") || false;

@@ -1,6 +1,6 @@
 # Ví nạp, ví bán file và thanh toán thủ công
 
-Tipook không dùng payOS. Người dùng chuyển khoản trực tiếp vào tài khoản ngân hàng của admin; admin kiểm tra sao kê và duyệt thủ công trước khi hệ thống cộng số dư.
+NhàĐẹpChất không dùng payOS. Người dùng chuyển khoản trực tiếp vào tài khoản ngân hàng của admin; admin kiểm tra sao kê và duyệt thủ công trước khi hệ thống cộng số dư.
 
 Sổ ví và nhật ký tài chính được bảo vệ bởi migration `0028_financial_audit.sql`, với Worker sao lưu riêng sang R2 mỗi phút. Xem [Lưu giữ dữ liệu và đối soát tiền](DATA_DURABILITY.md) về nâng cấp, sao lưu local/Cloudflare và phục hồi đối soát.
 

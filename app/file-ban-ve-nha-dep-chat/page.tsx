@@ -3,7 +3,7 @@ import { parseFileCatalogSort } from "@/lib/file-catalog-sort";
 import { DrawingFilesPage } from "@/components/drawing-files-page";
 
 export const metadata: Metadata = {
-  title: "Kho bản vẽ kiến trúc & xây dựng | Tipook",
+  title: "Kho bản vẽ kiến trúc & xây dựng | NhàĐẹpChất",
   description: "Thư viện file bản vẽ CAD, hồ sơ thiết kế và mẫu nhà do kiến trúc sư, kỹ sư đăng bán.",
 };
 

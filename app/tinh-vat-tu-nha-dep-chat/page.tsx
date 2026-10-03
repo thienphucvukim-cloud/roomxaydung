@@ -3,7 +3,7 @@ import {MaterialCalculator} from "./material-calculator";
 import { MemberOnly } from "@/components/member-access";
 
 export const metadata:Metadata={
-  title:"Tính vật tư xây nhà | Tipook",
+  title:"Tính vật tư xây nhà | NhàĐẹpChất",
   description:"Tính bê tông, xây tường, trát, lát gạch và sơn nước."
 };
 

@@ -52,7 +52,7 @@ export function AccountSwitcher({ returnTo, blocked = false }: { returnTo: strin
         {accounts.map(account => <div key={account.userId} className="flex items-center rounded-lg bg-white">
           <button type="button" disabled={account.active || blocked || Boolean(busy)} onClick={() => void select(account, "switch")} className="flex min-w-0 flex-1 items-center gap-2 rounded-lg p-2 text-left hover:bg-sky-50 disabled:cursor-default">
             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sky-100 text-[#073b74]"><UserRound size={17}/></span>
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{account.name}</span><span className="block truncate text-xs text-[#667085]">{account.active ? "Đang sử dụng" : account.label || "Thành viên Tipook"}</span></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{account.name}</span><span className="block truncate text-xs text-[#667085]">{account.active ? "Đang sử dụng" : account.label || "Thành viên NhàĐẹpChất"}</span></span>
             {busy === account.userId ? <LoaderCircle size={16} className="shrink-0 animate-spin"/> : account.active ? <Check size={16} className="shrink-0 text-[#168ac0]"/> : null}
           </button>
           {!account.active && <button type="button" disabled={blocked || Boolean(busy)} onClick={() => void select(account, "remove")} aria-label={`Gỡ tài khoản ${account.name} khỏi trình duyệt`} title="Gỡ tài khoản khỏi trình duyệt" className="mr-1 grid size-8 shrink-0 place-items-center rounded-full text-[#667085] hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><X size={15}/></button>}

@@ -38,11 +38,11 @@ export async function POST(request: Request) {
     const member = await currentMember();
     const bank = getAdminBankConfig();
     const requestCode = crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase();
-    const transferContent = `TIPOOK ${requestCode}`;
+    const transferContent = `NHADEPCHAT ${requestCode}`;
     const now = new Date().toISOString();
     await getDb().insert(walletTopupRequests).values({ requestCode, userId: member.userId, amount, transferContent, status: "pending", createdAt: now, updatedAt: now });
 
-    const telegram = await notifyAdminTelegram(`[Tipook] Yêu cầu nạp tiền\nMã yêu cầu: ${requestCode}\nSố tiền: ${amount.toLocaleString("vi-VN")}đ\nNội dung chuyển khoản: ${transferContent}\nTrạng thái: Chờ kiểm tra chuyển khoản và duyệt, chưa cộng vào ví.`, member.userId);
+    const telegram = await notifyAdminTelegram(`[NhàĐẹpChất] Yêu cầu nạp tiền\nMã yêu cầu: ${requestCode}\nSố tiền: ${amount.toLocaleString("vi-VN")}đ\nNội dung chuyển khoản: ${transferContent}\nTrạng thái: Chờ kiểm tra chuyển khoản và duyệt, chưa cộng vào ví.`, member.userId);
 
     const response = Response.json({
       request: { requestCode, amount, transferContent, status: "pending" },

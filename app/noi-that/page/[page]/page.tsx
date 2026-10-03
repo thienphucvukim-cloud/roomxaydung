@@ -10,7 +10,7 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { page } = await params;
-  return { title: `Nội thất — Trang ${page} | Tipook` };
+  return { title: `Nội thất — Trang ${page} | NhàĐẹpChất` };
 }
 
 export default async function Page({ params, searchParams }: PageProps) {

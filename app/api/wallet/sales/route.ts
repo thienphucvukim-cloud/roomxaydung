@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const accountName = typeof body.accountName === "string" ? body.accountName.trim() : "";
     if (!bankName || bankName.length > 100 || !/^[a-zA-Z0-9]{4,40}$/.test(accountNumber) || !accountName || accountName.length > 120) return Response.json({ error: "Nhập tên ngân hàng, số tài khoản (4–40 chữ hoặc số) và tên chủ tài khoản." }, { status: 400 });
     const result = await requestWithdrawal(database, userId, body.requestId, body.amount, { bankName, accountNumber, accountName });
-    if (!result.replayed) await notifyAdminTelegram(`[Tipook] Yêu cầu rút tiền bán file\nMã: ${result.withdrawal.id}\nSố tiền: ${body.amount.toLocaleString("vi-VN")}đ\nNgân hàng: ${bankName}\nSố tài khoản: ${accountNumber}\nChủ tài khoản: ${accountName}\nTiền đã được giữ trong ví bán file, chờ admin thanh toán.`, userId);
+    if (!result.replayed) await notifyAdminTelegram(`[NhàĐẹpChất] Yêu cầu rút tiền bán file\nMã: ${result.withdrawal.id}\nSố tiền: ${body.amount.toLocaleString("vi-VN")}đ\nNgân hàng: ${bankName}\nSố tài khoản: ${accountNumber}\nChủ tài khoản: ${accountName}\nTiền đã được giữ trong ví bán file, chờ admin thanh toán.`, userId);
     return Response.json(result, { status: result.replayed ? 200 : 201 });
   } catch (cause) {
     return Response.json({ error: cause instanceof WalletError ? cause.message : "Chưa xác định được kết quả. Gửi lại cùng mã yêu cầu hoặc tải lại lịch sử để kiểm tra." }, { status: cause instanceof WalletError ? cause.status : 500 });

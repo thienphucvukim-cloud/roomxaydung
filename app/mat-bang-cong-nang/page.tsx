@@ -5,7 +5,7 @@ import { EditorialContent } from "@/components/editorial-content";
 import { DetailActionButton, FilterChips, RequestActionButton } from "@/components/interactive-actions";
 
 export const metadata: Metadata = {
-  title: "Mặt bằng công năng nhà ở theo kích thước đất | Tipook",
+  title: "Mặt bằng công năng nhà ở theo kích thước đất | NhàĐẹpChất",
   description: "Tham khảo mặt bằng công năng nhà phố 4x20m, 5x20m và nhiều kích thước phổ biến. Nhận tư vấn bố trí từ kiến trúc sư.",
 };
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SectionPage } from "@/components/section-page";
 
 export const metadata: Metadata = {
-  title: "Nhật ký xây nhà thực tế | Tipook",
+  title: "Nhật ký xây nhà thực tế | NhàĐẹpChất",
   description: "Theo dõi tiến độ, chi phí, vật liệu và kinh nghiệm thực tế từ các công trình nhà ở.",
 };
 

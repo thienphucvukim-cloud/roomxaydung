@@ -19,6 +19,7 @@ export function ProjectGallery({ model, trigger = "text", engagementTarget }: { 
   const carouselRef = useRef<HTMLDivElement>(null);
   const thumbnailsRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(0);
+  const touchStartRef = useRef<{ x: number; y: number; atStart: boolean; atEnd: boolean } | null>(null);
   const choose = (index: number) => {
     const carousel = carouselRef.current;
     if (!carousel) return;
@@ -29,8 +30,8 @@ export function ProjectGallery({ model, trigger = "text", engagementTarget }: { 
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
     });
   };
-  const previous = () => choose(Math.max(0, selectedRef.current - 1));
-  const next = () => choose(Math.min(photos.length - 1, selectedRef.current + 1));
+  const previous = () => choose((selectedRef.current - 1 + photos.length) % photos.length);
+  const next = () => choose((selectedRef.current + 1) % photos.length);
   const openGallery = () => { selectedRef.current = 0; setSelected(0); setOpen(true); if (engagementTarget) void recordCatalogView(engagementTarget); };
 
   useEffect(() => {
@@ -67,6 +68,29 @@ export function ProjectGallery({ model, trigger = "text", engagementTarget }: { 
             <div className="relative h-[clamp(12rem,calc(100dvh-21rem),36rem)] bg-[#e5e4df] sm:aspect-[16/10] sm:h-auto">
               <div ref={attachCarousel} role="region" aria-roledescription="carousel" aria-label={`Bộ ảnh ${model.title}`} tabIndex={0}
                 className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar-none motion-reduce:scroll-auto"
+                onTouchStart={event => {
+                  touchStartRef.current = null;
+                  if (event.touches.length !== 1 || photos.length < 2) return;
+                  const carousel = event.currentTarget;
+                  const touch = event.touches[0];
+                  touchStartRef.current = {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                    atStart: carousel.scrollLeft <= 1,
+                    atEnd: carousel.scrollWidth - carousel.clientWidth - carousel.scrollLeft <= 1,
+                  };
+                }}
+                onTouchEnd={event => {
+                  const start = touchStartRef.current;
+                  touchStartRef.current = null;
+                  const touch = event.changedTouches[0];
+                  if (!start || !touch || event.touches.length) return;
+                  const distance = touch.clientX - start.x;
+                  if (Math.abs(distance) < 50 || Math.abs(distance) <= Math.abs(touch.clientY - start.y)) return;
+                  if (start.atEnd && distance < 0) choose(0);
+                  if (start.atStart && distance > 0) choose(photos.length - 1);
+                }}
+                onTouchCancel={() => { touchStartRef.current = null; }}
                 onScroll={event => {
                   const carousel = event.currentTarget;
                   if (!carousel.clientWidth) return;
@@ -86,8 +110,8 @@ export function ProjectGallery({ model, trigger = "text", engagementTarget }: { 
                 </div>)}
               </div>
               <span aria-live="polite" aria-atomic="true" className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white">{selected + 1} / {photos.length}</span>
-              <button onClick={previous} disabled={selected === 0} aria-label="Ảnh trước" className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#0b2e59] shadow-md hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronLeft size={21}/></button>
-              <button onClick={next} disabled={selected === photos.length - 1} aria-label="Ảnh tiếp theo" className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#0b2e59] shadow-md hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronRight size={21}/></button>
+              <button onClick={previous} disabled={photos.length < 2} aria-label="Ảnh trước" className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#0b2e59] shadow-md hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronLeft size={21}/></button>
+              <button onClick={next} disabled={photos.length < 2} aria-label="Ảnh tiếp theo" className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#0b2e59] shadow-md hover:bg-white disabled:pointer-events-none disabled:opacity-30"><ChevronRight size={21}/></button>
             </div>
             <div ref={thumbnailsRef} className="relative flex gap-2 overflow-x-auto bg-[#0b2e59] p-2 scrollbar-none sm:p-3">
               {photos.map((photo, index) => <button key={index} onClick={() => choose(index)} className={`h-11 w-16 shrink-0 overflow-hidden rounded-md border-2 sm:h-14 sm:w-20 ${selected === index ? "border-[#229ed9]" : "border-transparent opacity-75 hover:opacity-100"}`} aria-label={`Chọn ảnh ${index + 1}`} aria-current={selected === index ? "true" : undefined}><img src={photo} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover"/></button>)}
@@ -102,7 +126,7 @@ export function ProjectGallery({ model, trigger = "text", engagementTarget }: { 
             </div>
           </section>
         </div>
-        <div className="flex items-center justify-between border-t border-[#e5ebe6] bg-white px-3 py-3 text-sm font-bold text-[#3f5064] sm:px-8 sm:py-4"><button onClick={previous} disabled={selected === 0} className="flex items-center gap-1 hover:text-[#229ed9] disabled:opacity-30"><ChevronLeft size={16}/>Ảnh trước</button><span className="hidden text-[#147aa8] sm:inline">Bộ ảnh công trình</span><button onClick={next} disabled={selected === photos.length - 1} className="flex items-center gap-1 hover:text-[#229ed9] disabled:opacity-30">Ảnh tiếp theo<ChevronRight size={16}/></button></div>
+        <div className="flex items-center justify-between border-t border-[#e5ebe6] bg-white px-3 py-3 text-sm font-bold text-[#3f5064] sm:px-8 sm:py-4"><button onClick={previous} disabled={photos.length < 2} className="flex items-center gap-1 hover:text-[#229ed9] disabled:opacity-30"><ChevronLeft size={16}/>Ảnh trước</button><span className="hidden text-[#147aa8] sm:inline">Bộ ảnh công trình</span><button onClick={next} disabled={photos.length < 2} className="flex items-center gap-1 hover:text-[#229ed9] disabled:opacity-30">Ảnh tiếp theo<ChevronRight size={16}/></button></div>
       </DialogContent>
     </Dialog>
   </>;

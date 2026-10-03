@@ -1,32 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { AnchorHTMLAttributes, MouseEvent, ReactNode } from "react";
-import { startTransition } from "react";
+import type { ComponentProps } from "react";
 
-type ClientNavigationLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
+type ClientNavigationLinkProps = Omit<ComponentProps<typeof Link>, "href"> & {
   href: string;
-  children: ReactNode;
 };
 
-export function ClientNavigationLink({ href, onClick, target, children, ...props }: ClientNavigationLinkProps) {
+export function ClientNavigationLink({ prefetch = false, onNavigate, ...props }: ClientNavigationLinkProps) {
   const router = useRouter();
-
-  const navigate = (event: MouseEvent<HTMLAnchorElement>) => {
-    onClick?.(event);
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey ||
-      target === "_blank"
-    ) return;
-
+  return <Link {...props} prefetch={prefetch} onNavigate={event => {
+    let cancelled = false;
+    onNavigate?.({ preventDefault: () => { cancelled = true; event.preventDefault(); } });
+    if (cancelled) return;
     event.preventDefault();
-    startTransition(() => router.push(href));
-  };
-
-  return <a {...props} href={href} target={target} onClick={navigate}>{children}</a>;
+    // Programmatic transitions safely supersede an ongoing content refresh.
+    if (props.replace) router.replace(props.href, { scroll: props.scroll });
+    else router.push(props.href, { scroll: props.scroll });
+  }} />;
 }

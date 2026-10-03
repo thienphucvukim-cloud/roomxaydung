@@ -29,10 +29,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   }
   if (!member && !virtual && !authoredPosts.length) notFound();
 
-  const displayName = member?.displayName ?? virtual?.displayName ?? authoredPosts[0]?.authorName ?? "Thành viên Tipook";
+  const displayName = member?.displayName ?? virtual?.displayName ?? authoredPosts[0]?.authorName ?? "Thành viên NhàĐẹpChất";
   const avatarUrl = member ? memberAvatarUrl(member) : virtual?.avatar;
-  const profession = member?.profession ?? virtual?.profession ?? "Thành viên Tipook";
-  const bio = virtual?.bio ?? (profession === "Kỹ sư" ? "Chia sẻ hồ sơ kỹ thuật và bản vẽ thi công trên Tipook." : profession === "Kiến trúc sư" ? "Chia sẻ thiết kế kiến trúc và ý tưởng nhà đẹp trên Tipook." : "Thành viên cộng đồng Tipook.");
+  const profession = member?.profession ?? virtual?.profession ?? "Thành viên NhàĐẹpChất";
+  const bio = virtual?.bio ?? (profession === "Kỹ sư" ? "Chia sẻ hồ sơ kỹ thuật và bản vẽ thi công trên NhàĐẹpChất." : profession === "Kiến trúc sư" ? "Chia sẻ thiết kế kiến trúc và ý tưởng nhà đẹp trên NhàĐẹpChất." : "Thành viên cộng đồng NhàĐẹpChất.");
   const location = virtual?.location ?? null;
   const postIds = authoredPosts.map((post) => post.id);
   const attachments = postIds.length ? await db.select().from(postAttachments).where(and(inArray(postAttachments.postId, postIds), eq(postAttachments.accessType, "public"))) : [];

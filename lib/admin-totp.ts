@@ -43,7 +43,7 @@ export async function issueTotpChallenge(request: Request, account: Account, pur
       .bind(id, account.userId, actualPurpose, hashToken(browser), hashToken(account.passwordHash), current?.secret_encrypted || null, seed ? encryptTotpSecret(seed, key, account.userId) : null, newPasswordHash, sessionHash, safeAuthReturn(redirectTo), expires),
   ]);
   return Response.json({ requiresCode: true, method: "totp", challengeId: id, expiresAt: expires, setupRequired: setup,
-    ...(seed ? { setupSecret: seed, setupUri: `otpauth://totp/${encodeURIComponent(`Tipook:${account.email}`)}?secret=${seed}&issuer=Tipook&algorithm=SHA1&digits=6&period=30` } : {}) },
+    ...(seed ? { setupSecret: seed, setupUri: `otpauth://totp/${encodeURIComponent(`NhàĐẹpChất:${account.email}`)}?secret=${seed}&issuer=${encodeURIComponent("NhàĐẹpChất")}&algorithm=SHA1&digits=6&period=30` } : {}) },
   { headers: { "Cache-Control": "private, no-store", "Set-Cookie": totpCookie(browser, request) } });
 }
 async function consumeFactor(account: Account, current: Credential, value: unknown, recovery: boolean) {

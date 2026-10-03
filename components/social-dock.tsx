@@ -1,14 +1,16 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { FileText, Images, House, Sofa } from "lucide-react";
+import { DraftingCompass, House, Sofa, Handshake } from "lucide-react";
+import { HouseGalleryIcon } from "@/components/house-gallery-icon";
 import { AnimatedTabNavigation } from "@/components/animated-tab-navigation";
 
 const items = [
   ["Bảng tin", "/", House],
-  ["Mặt tiền", "/kho-mau-nha-dep-chat", Images],
-  ["Kho bản vẽ", "/file-ban-ve-nha-dep-chat", FileText],
+  ["Mẫu nhà đẹp", "/kho-mau-nha-dep-chat", HouseGalleryIcon],
+  ["Kho bản vẽ", "/file-ban-ve-nha-dep-chat", DraftingCompass],
   ["Nội thất", "/noi-that", Sofa],
+  ["Thuê thiết kế", "/thue-thiet-ke", Handshake],
 ] as const;
 
 export function SocialDock() {
@@ -19,6 +21,6 @@ export function SocialDock() {
     activeIndex={items.findIndex(([, href]) => href === "/" ? pathname === "/" : pathname.startsWith(href) || (href === "/kho-mau-nha-dep-chat" && pathname.startsWith("/mat-bang-cong-nang")))}
     mobile
     label="Điều hướng nhanh"
-    className="mobile-social-nav fixed inset-x-0 bottom-0 z-50 grid h-[calc(66px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-[#dce4eb] bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-5px_22px_rgba(16,36,58,.08)] backdrop-blur-xl lg:hidden"
+    className="mobile-social-nav fixed z-50 grid grid-cols-5 border border-white/20 bg-white/20 px-1 shadow-[0_3px_16px_rgba(16,36,58,.12)] backdrop-blur-xl lg:hidden"
   />;
 }

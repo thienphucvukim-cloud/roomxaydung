@@ -47,7 +47,10 @@ try {
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
     const nativeFetch = window.fetch.bind(window);
     const post = ${JSON.stringify(fixture)};
+    window.reviewErrors = [];
+    window.addEventListener('error', event => { if (event.message) window.reviewErrors.push(event.message); });
     window.review = { comments: [{ id: 1, userId: 'review-reader', authorName: 'Người đọc', content: 'Bình luận có ảnh', imageUrl: '/community-house.png', createdAt: '2026-10-03T08:01:00.000Z' }], liked: false, uploads: [], failSend: false, failMore: true };
+    window.review.feedRequests = [];
     window.fetch = async (input, init = {}) => {
       const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
       const method = init.method || 'GET';
@@ -60,6 +63,7 @@ try {
         const second = { ...post, id: 900002, title: 'Bài viết tiếp theo', content: 'Nội dung bài đăng tiếp theo', category: 'Bảng tin', sourceLabel: 'Bảng tin', sourceHref: '/bai-viet/900002', images: [], comments: 0, createdAt: '2026-10-02T08:00:00.000Z' };
         const items = [original, second].filter(item => (!url.searchParams.get('category') || item.category === url.searchParams.get('category')) && (!url.searchParams.get('postId') || item.id === Number(url.searchParams.get('postId'))) && (!url.searchParams.get('q') || (item.title + item.content).includes(url.searchParams.get('q'))));
         const page = Number(url.searchParams.get('page') || 1);
+        window.review.feedRequests.push(page);
         if (page === 2 && window.review.failMore) { window.review.failMore = false; return json({ error: 'Lỗi tải thêm thử nghiệm.' }, 503); }
         return json({ posts: items.slice(page - 1, page), total: items.length, page, totalPages: Math.max(1, items.length) });
       }
@@ -89,6 +93,13 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('article').length`), 1);
   await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent === 'Thử tải thêm bài đăng').click()`);
   await waitFor(`document.querySelectorAll('article').length === 2`, 'infinite scroll retry preserves the first page and appends the second');
+  assert.deepEqual(await evaluate('window.review.feedRequests'), [1, 2, 2], 'Loading/retrying page two must not reload page one');
+  await evaluate(`window.dispatchEvent(new Event('focus'))`);
+  await pause(250);
+  assert.deepEqual(await evaluate('window.review.feedRequests'), [1, 2, 2], 'Returning to a scrolled feed must not refetch every loaded page');
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Làm mới')).click()`);
+  await waitFor(`window.review.feedRequests.length === 5 && !Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('Làm mới')).disabled`, 'manual refresh updates loaded pages');
+  assert.deepEqual(await evaluate('window.review.feedRequests'), [1, 2, 2, 1, 2]);
   await evaluate(`document.querySelector('button[aria-label="Xem ảnh 5 của bài viết Nhà phố 5 × 20m"]').click()`);
   await waitFor(`document.querySelector('[role="dialog"] [role="status"]')?.textContent.includes('5 / 7')`, 'clicked fifth photo');
   assert.equal(await evaluate('location.pathname'), '/');
@@ -131,9 +142,35 @@ try {
   assert.equal(await evaluate(`document.activeElement.getAttribute('aria-label')`), 'Xem ảnh bình luận của Người đọc');
   await evaluate(`window.scrollTo(0,0)`);
   writeFileSync(path.join(dir, 'desktop.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  for (const width of [320, 375, 390, 430, 768, 1023]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    await pause(100);
+    const layout = await evaluate(`(() => {
+      const bounds = element => { const rect = element.getBoundingClientRect(); return { left: rect.left, right: rect.right, width: rect.width }; };
+      const filters = document.querySelector('[aria-label="Lọc bảng tin"]');
+      return {
+        viewport: innerWidth,
+        elements: [filters.parentElement, document.querySelector('section[aria-label="Bài đăng mới"]'), ...document.querySelectorAll('article')].map(bounds),
+        filterWidth: filters.clientWidth,
+        filterScrollWidth: filters.scrollWidth,
+        featuredHidden: getComputedStyle(document.querySelector('[aria-labelledby="featured-news-heading"]')).display === 'none',
+      };
+    })()`);
+    if (width === 390) writeFileSync(path.join(dir, 'mobile-feed.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+    assert.equal(layout.viewport, width, 'Mobile content must not expand the layout viewport');
+    assert.ok(layout.elements.every(rect => rect.left >= 0 && rect.right <= width + 1), `Feed cards and filters must fit the ${width}px viewport: ${JSON.stringify(layout)}`);
+    assert.equal(layout.featuredHidden, true);
+    if (width <= 430) {
+      assert.ok(layout.filterScrollWidth > layout.filterWidth, `Categories must scroll within their own row at ${width}px`);
+      await evaluate(`document.querySelector('[aria-label="Lọc bảng tin"]').scrollLeft = 10000`);
+      assert.ok(await evaluate(`document.querySelector('[aria-label="Lọc bảng tin"]').scrollLeft > 0 && document.querySelector('article').getBoundingClientRect().right <= innerWidth + 1`), 'Scrolling categories must keep posts within the viewport');
+    }
+  }
+  assert.deepEqual(await evaluate('window.reviewErrors'), [], 'Resizing the feed with comments open must not trigger script or ResizeObserver errors');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await evaluate(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]').click()`);
   await waitFor(`document.querySelector('[role="dialog"]')`, 'mobile viewer');
+  await pause(350);
   assert.equal(await evaluate(`document.querySelector('[role="dialog"]').getBoundingClientRect().width`), 390);
   assert.ok(await evaluate(`document.querySelector('[role="dialog"] aside').getBoundingClientRect().height > 200`));
   assert.ok(await evaluate(`document.documentElement.scrollWidth <= innerWidth`));
@@ -152,6 +189,7 @@ try {
     await send('Page.navigate', { url: origin });
     await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed for source navigation');
     await evaluate(`window.review.sourceCategory = ${JSON.stringify(category)}; window.dispatchEvent(new Event('tipook-content-changed'))`);
+    await pause(350);
     await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify(sourcePath + '?postId=900001#post-900001')})`, 'original source link');
     await evaluate(`Array.from(document.querySelector('article').querySelectorAll('a')).find(link => link.textContent.includes('Xem bài viết')).click()`);
     await waitFor(`location.pathname === ${JSON.stringify(sourcePath)} && new URLSearchParams(location.search).get('postId') === '900001' && document.getElementById('post-900001')`, 'opens original post in ' + sourcePath);
@@ -160,6 +198,6 @@ try {
     assert.ok(await evaluate(`document.getElementById('post-900001').textContent.includes('Nhà phố 5 × 20m')`));
   }
   assert.deepEqual(exceptions, []);
-  console.log('PASS: desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in Facades, Drawings and Interiors.');
+  console.log('PASS: feed fits 320–1023px with scrollable categories; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in Facades, Drawings and Interiors.');
   console.log('Screenshots: ' + dir);
 } finally { socket?.close(); chrome.kill(); }

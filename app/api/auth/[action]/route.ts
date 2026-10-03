@@ -96,7 +96,7 @@ export async function POST(request: Request, context: { params: Promise<{ action
           env.DB!.prepare("DELETE FROM website_sessions WHERE user_id = ?").bind(account.userId),
         ]);
       } else {
-        const values = { userId: "member_" + crypto.randomUUID(), email: login, displayName: "Quản trị Tipook", passwordHash, isOwner: true, createdAt: new Date().toISOString() };
+        const values = { userId: "member_" + crypto.randomUUID(), email: login, displayName: "Quản trị NhàĐẹpChất", passwordHash, isOwner: true, createdAt: new Date().toISOString() };
         await db.insert(websiteAccounts).values(values).onConflictDoNothing();
       }
       [account] = await db.select().from(websiteAccounts).where(eq(websiteAccounts.email, login)).limit(1);

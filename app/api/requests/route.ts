@@ -105,7 +105,7 @@ export async function POST(request: Request) {
       const postLink = fileRequest ? requestTargetLink(new URL(request.url).origin, targetType, targetId, targetPost?.category) : "";
       const context = fileRequest ? `\nMã yêu cầu: #${saved.id}\nFile: ${targetId}\nLink bài viết: ${postLink}${member.email ? `\nEmail: ${member.email}` : ""}` : adminHelp ? `\nMã yêu cầu: #${saved.id}\nTrang: ${targetId}\nID: ${member.userId}${member.email ? `\nEmail: ${member.email}` : ""}` : "";
       const attachmentLink = adminHelp && attachmentKey ? `\nTệp: ${attachmentName}\n${new URL("/api/files?key=" + encodeURIComponent(attachmentKey) + "&download=1", request.url).href}` : "";
-      Object.assign(delivery, await deliverExternalMessages(external, deliveryProfile, `[Tipook] ${member.authorName}: ${subject}${context}\n${content}${contact ? `\nLiên hệ: ${contact}` : ""}${attachmentLink}`, telegramFile ? { file: telegramFile, caption: `Yêu cầu #${saved.id} · ${member.authorName}: ${subject}` } : undefined));
+      Object.assign(delivery, await deliverExternalMessages(external, deliveryProfile, `[NhàĐẹpChất] ${member.authorName}: ${subject}${context}\n${content}${contact ? `\nLiên hệ: ${contact}` : ""}${attachmentLink}`, telegramFile ? { file: telegramFile, caption: `Yêu cầu #${saved.id} · ${member.authorName}: ${subject}` } : undefined));
     }
     await db.update(userRequests).set({ deliveryStatus: JSON.stringify(delivery) }).where(eq(userRequests.id, saved.id));
     return Response.json({ request: { ...saved, deliveryStatus: JSON.stringify(delivery) }, delivery }, { status: 201 });

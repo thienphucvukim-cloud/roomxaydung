@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, LoaderCircle, Paperclip, Send, X } from "lucide-react";
 import { optimizeImageForUpload } from "@/lib/image-upload";
+import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
 
 export type ChatMessage = { id: number; senderUserId: string; senderName: string; recipientUserId: string; subject: string; content: string; attachmentKey?: string | null; readAt?: string | null; createdAt: string };
 type ThreadData = { messages?: ChatMessage[]; currentUserId?: string; peerId?: string; peerName?: string; hasMore?: boolean; error?: string };
@@ -120,7 +121,7 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
         const own = message.senderUserId === identity.userId;
         return <div key={message.id} className={`flex ${own ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${own ? "rounded-br-sm bg-[#229ed9] text-white" : "rounded-bl-sm bg-white text-[#344054]"}`}>
           {message.subject !== "Tin nhắn" && <p className={`mb-1 text-xs font-semibold ${own ? "text-white/80" : "text-[#168ac0]"}`}>{message.subject}</p>}
-          <p className="whitespace-pre-wrap break-words leading-6">{message.content.split(/(https?:\/\/[^\s]+)/g).map((part, index) => /^https?:\/\//.test(part) ? <a key={index} href={part} target="_blank" rel="noreferrer" className="break-all underline">{part}</a> : part)}</p>
+          <p className="whitespace-pre-wrap break-words leading-6">{message.content.split(/(https?:\/\/[^\s]+|\/thue-thiet-ke\/[0-9a-f-]{36})/gi).map((part, index) => /^(https?:\/\/|\/thue-thiet-ke\/)/i.test(part) ? <a key={index} href={part} target="_blank" rel="noreferrer" className="break-all underline">{part}</a> : part)}</p>
           {message.attachmentKey && <a href={`/api/files?key=${encodeURIComponent(message.attachmentKey)}&download=1`} className="mt-2 inline-flex items-center gap-1 underline"><Download size={14}/>Tệp đính kèm</a>}
           <p className={`mt-1 text-right text-[10px] ${own ? "text-white/75" : "text-[#98a2b3]"}`}>{new Date(message.createdAt).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}{own ? message.readAt ? " · Đã đọc" : " · Đã gửi" : ""}</p>
         </div></div>;
@@ -129,9 +130,9 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
     {error && <p role="alert" className="px-4 py-2 text-sm text-rose-700">{error}</p>}
     {attachment && <p className="flex items-center gap-2 px-4 py-2 text-xs text-[#168ac0]"><Paperclip size={14}/><span className="truncate">{attachment.name}</span><button type="button" onClick={() => setAttachment(null)} disabled={sending} aria-label="Bỏ tệp đính kèm"><X size={14}/></button></p>}
     {readOnly ? <p className="p-4 text-sm text-[#667085]">Thông báo hệ thống không nhận trả lời.</p> : <form data-requires-account onSubmit={event => { event.preventDefault(); void send(); }} className="border-t border-[#e3eaf2] bg-white p-3">
-      <div className="flex min-w-0 items-center rounded-full bg-[#eef1f4] pl-3 pr-1 focus-within:ring-1 focus-within:ring-[#229ed9]">
-        <textarea aria-label="Tin nhắn" placeholder="Nhập tin nhắn…" value={content} disabled={sending} onChange={event => setContent(event.target.value)} maxLength={2000} rows={1} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="h-9 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 outline-none"/>
-        <div className="flex shrink-0 items-center">
+      <div className="flex min-w-0 items-end rounded-2xl bg-[#eef1f4] pl-3 pr-1 focus-within:ring-1 focus-within:ring-[#229ed9]">
+        <AutoResizeTextarea aria-label="Tin nhắn" placeholder="Nhập tin nhắn…" value={content} disabled={sending} onChange={event => setContent(event.target.value)} maxLength={2000} rows={1} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="min-h-9 min-w-0 flex-1 bg-transparent py-1.5 text-sm leading-6 outline-none"/>
+        <div className="flex shrink-0 items-center pb-0.5">
           {allowFile && <label className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-[#229ed9] hover:bg-[#e4e6eb]">{uploading ? <LoaderCircle size={17} className="animate-spin"/> : <Paperclip size={17}/>}<input type="file" aria-label="Đính kèm tệp" className="sr-only" disabled={sending || uploading || loading} onChange={event => { void upload(event.target.files?.[0]); event.target.value = ""; }}/></label>}
           <button type="submit" disabled={sending || uploading || loading || !content.trim() || !identity.peerId} aria-label="Gửi tin nhắn" className="grid size-8 shrink-0 place-items-center rounded-full text-[#229ed9] hover:bg-[#e4e6eb] disabled:text-[#bcc0c4]">{sending ? <LoaderCircle size={16} className="animate-spin"/> : <Send size={16}/>}</button>
         </div>

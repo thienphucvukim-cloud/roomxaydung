@@ -85,7 +85,7 @@
 .admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #e7eef4; padding: 15px 17px; color: #9bafbf; font-size: 11px; } .admin-pagination-controls { display: flex; gap: 8px; }
 .admin-detail-content { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.8; color: #66859c; }
 @media (max-width: 1023px) {
-  body:has(.has-owner-toolbar) { padding-top: 108px; }
+  body:has(.has-owner-toolbar) { padding-top: 97px; }
   body:has(.auth-page) { padding-top: 0; padding-bottom: 0; }
   .has-owner-toolbar .owner-toolbar { position: fixed; inset: 0 0 auto; }
 }

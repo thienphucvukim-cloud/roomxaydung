@@ -7,7 +7,7 @@ import "./account-security.css";
 export const dynamic = "force-dynamic";
 
 const metadata: Metadata = {
-  title: "Tipook — Cộng đồng tư vấn và thiết kế nhà",
+  title: "NhàĐẹpChất — Cộng đồng tư vấn và thiết kế nhà",
   description: "Hỏi đáp, chia sẻ chi phí thực tế và kinh nghiệm từ những người đã và đang xây nhà.",
   icons: {
     icon: [{ url: "/nhadepchat-browser-icon.png?v=4", type: "image/png" }],
@@ -18,7 +18,7 @@ const metadata: Metadata = {
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getSiteContent();
-  const name = content["global.name"]?.value || "Tipook";
+  const name = content["global.name"]?.value || "NhàĐẹpChất";
   return { ...metadata, title: `${name} — Cộng đồng tư vấn và thiết kế nhà` };
 }
 

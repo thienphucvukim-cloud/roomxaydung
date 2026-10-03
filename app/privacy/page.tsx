@@ -4,7 +4,7 @@ import { ClientNavigationLink as Link } from "@/components/client-navigation-lin
 import { RequestActionButton } from "@/components/interactive-actions";
 
 export const metadata: Metadata = {
-  title: "Chính sách bảo mật | NhàĐẹpChất – Tipook",
+  title: "Chính sách bảo mật | NhàĐẹpChất",
   description: "Thông tin về dữ liệu tài khoản, đăng nhập Google, cookie và cách gửi yêu cầu về quyền riêng tư trên nhadepchat.top.",
   alternates: { canonical: "https://nhadepchat.top/privacy" },
 };
@@ -42,7 +42,7 @@ const sections = [
     "Bạn có thể gửi yêu cầu xem, sửa hoặc xóa thông tin cá nhân, xóa tài khoản hoặc hỏi về cách sử dụng dữ liệu. Hãy nêu tên đăng nhập hoặc thông tin giúp nhận diện tài khoản và cách liên hệ để phản hồi. Người vận hành có thể cần xác minh quyền sở hữu tài khoản trước khi xử lý. Không gửi mật khẩu hoặc mã xác thực trong yêu cầu.",
   ] },
   { id: "cap-nhat", title: "8. Cập nhật chính sách", paragraphs: [
-    "Chính sách này áp dụng cho website NhàĐẹpChất (Tipook) tại nhadepchat.top và các tính năng được mô tả trên trang này. Khi cách xử lý dữ liệu thay đổi, nội dung chính sách và ngày cập nhật trên trang sẽ được điều chỉnh để người dùng có thể theo dõi.",
+    "Chính sách này áp dụng cho website NhàĐẹpChất tại nhadepchat.top và các tính năng được mô tả trên trang này. Khi cách xử lý dữ liệu thay đổi, nội dung chính sách và ngày cập nhật trên trang sẽ được điều chỉnh để người dùng có thể theo dõi.",
   ] },
 ];
 
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
     <Link href="/" className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-[#667085] hover:text-[#168ac0]"><ArrowLeft size={16}/>Về trang chủ</Link>
     <header className="rounded-3xl border border-[#dce8ef] bg-[#edf6fa] p-6 sm:p-9">
       <span className="mb-5 grid size-12 place-items-center rounded-2xl bg-white text-[#168ac0]"><ShieldCheck size={26}/></span>
-      <p className="text-xs font-bold tracking-widest text-[#168ac0]">NHÀĐẸPCHẤT · TIPOOK</p>
+      <p className="text-xs font-bold tracking-widest text-[#168ac0]">NhàĐẹpChất</p>
       <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-[#0b2e59] sm:text-4xl">Chính sách bảo mật</h1>
       <p className="mt-4 max-w-2xl text-sm leading-7 text-[#536273]">Trang này giải thích thông tin website thu thập, cách sử dụng và chia sẻ dữ liệu, cùng các lựa chọn của bạn khi tham gia cộng đồng hoặc đăng nhập bằng Google.</p>
       <p className="mt-5 text-xs font-medium text-[#667085]">Cập nhật ngày <time dateTime="2026-10-02">02/10/2026</time></p>

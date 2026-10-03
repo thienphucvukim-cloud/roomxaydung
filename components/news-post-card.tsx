@@ -8,6 +8,7 @@ import { CurrentMemberAvatar, MemberAvatar } from "@/components/member-avatar";
 import { OwnerPostControls } from "@/components/site-editor";
 import { ShareActionButton, ToggleActionButton } from "@/components/interactive-actions";
 import { NewsPhotoViewer } from "@/components/news-photo-viewer";
+import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
 import { optimizeImageForUpload } from "@/lib/image-upload";
 import { formatFeedPrice, formatPriceDescription } from "@/lib/price-description";
 import type { NewsPost } from "@/lib/news-feed";
@@ -186,7 +187,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
       <div className="min-w-0 flex-1">
         {commentImage && <div className="relative mb-2 w-fit"><Image src={commentImage.url} alt="Ảnh chuẩn bị gửi" width={160} height={120} unoptimized className="max-h-28 w-auto rounded-lg object-contain" /><button type="button" disabled={sending || uploading} onClick={() => setCommentImage(undefined)} className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-[#344054] text-white disabled:opacity-50" aria-label="Bỏ ảnh bình luận"><X size={14} /></button></div>}
         <div className="flex min-w-0 items-end rounded-2xl bg-[#f0f2f5] pl-3 pr-1">
-          <textarea ref={commentInput} aria-label="Nội dung bình luận" placeholder="Viết bình luận..." value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendComment(); } }} maxLength={600} rows={1} disabled={sending} className="max-h-36 min-h-10 min-w-0 flex-1 resize-y bg-transparent py-2 text-sm outline-none" />
+          <AutoResizeTextarea ref={commentInput} aria-label="Nội dung bình luận" placeholder="Viết bình luận..." value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendComment(); } }} maxLength={600} rows={1} disabled={sending} className="min-h-10 min-w-0 flex-1 bg-transparent py-2 text-sm leading-6 outline-none" />
           <label className={`grid size-9 shrink-0 place-items-center rounded-full text-[#1877f2] ${sending || uploading ? "opacity-40" : "cursor-pointer hover:bg-[#e4e6eb]"}`} title="Thêm ảnh bình luận">{uploading ? <LoaderCircle size={18} className="animate-spin" /> : <ImagePlus size={18} />}<input type="file" aria-label="Thêm ảnh bình luận" accept="image/jpeg,image/png,image/webp,image/gif" disabled={sending || uploading} onChange={event => void chooseCommentImage(event)} className="sr-only" /></label>
           <button type="submit" aria-label="Gửi bình luận" disabled={sending || uploading || (!draft.trim() && !commentImage)} className="grid size-9 shrink-0 place-items-center rounded-full text-[#1877f2] hover:bg-[#e4e6eb] disabled:opacity-40">{sending ? <LoaderCircle size={17} className="animate-spin" /> : <Send size={17} />}</button>
         </div>

@@ -3,7 +3,7 @@ import { parseFileCatalogSort } from "@/lib/file-catalog-sort";
 import { InteriorPage } from "@/components/interior-page";
 
 export const metadata: Metadata = {
-  title: "Nội thất — Kho hồ sơ thiết kế | Tipook",
+  title: "Nội thất — Kho hồ sơ thiết kế | NhàĐẹpChất",
   description: "Khám phá, đăng bán và mua hồ sơ thiết kế nội thất, bản vẽ CAD và file 3D từ cộng đồng kỹ sư, kiến trúc sư.",
 };
 

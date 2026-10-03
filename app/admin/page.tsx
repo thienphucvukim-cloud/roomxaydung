@@ -4,7 +4,7 @@ import { AuthScreen } from "@/components/auth-screen";
 import { getAuthenticatedIdentity, isAdminIdentity, safeAuthReturn } from "@/lib/website-auth";
 import "../auth.css";
 
-export const metadata: Metadata = { title: "Đăng nhập quản trị | Tipook", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Đăng nhập quản trị | NhàĐẹpChất", robots: { index: false, follow: false } };
 export default async function AdminLoginPage({ searchParams }: { searchParams: Promise<{ return_to?: string; auth_error?: string; recovery?: string; add_account?: string }> }) {
   const params = await searchParams;
   const returnTo = safeAuthReturn(params.return_to, "/kho-mau-nha-dep-chat");

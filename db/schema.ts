@@ -1,5 +1,21 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const freelanceProfiles = sqliteTable('freelance_profiles', {
+  userId: text('user_id').primaryKey(), displayName: text('display_name').notNull(), title: text('title').notNull(), specialty: text('specialty').notNull(), location: text('location').notNull().default(''), bio: text('bio').notNull().default(''), skills: text('skills').notNull().default('[]'), experience: integer('experience').notNull().default(0), rate: integer('rate').notNull().default(0), rateUnit: text('rate_unit').notNull().default('project'), available: integer('available', {mode:'boolean'}).notNull().default(true), cover: text('cover').notNull().default(''), portfolio: text('portfolio').notNull().default('[]'), updatedAt: text('updated_at').notNull(),
+}, table => [index('freelance_profiles_specialty').on(table.specialty,table.available,table.updatedAt)]);
+export const freelanceProjects = sqliteTable('freelance_projects', {
+  id: text('id').primaryKey(), ownerId: text('owner_id').notNull(), ownerName: text('owner_name').notNull(), freelancerId: text('freelancer_id').references(() => freelanceProfiles.userId), title: text('title').notNull(), specialty: text('specialty').notNull(), description: text('description').notNull().default(''), location: text('location').notNull().default(''), budget: integer('budget').notNull().default(0), days: integer('days').notNull().default(0), status: text('status').notNull().default('open'), agreedPrice: integer('agreed_price').notNull().default(0), agreedDays: integer('agreed_days').notNull().default(0), createdAt: text('created_at').notNull(), updatedAt: text('updated_at').notNull(),
+}, table => [index('freelance_projects_market').on(table.status,table.specialty,table.createdAt),index('freelance_projects_owner').on(table.ownerId,table.updatedAt),index('freelance_projects_freelancer').on(table.freelancerId,table.updatedAt)]);
+export const freelanceProposals = sqliteTable('freelance_proposals', {
+  id: text('id').primaryKey(), projectId: text('project_id').notNull().references(() => freelanceProjects.id), freelancerId: text('freelancer_id').notNull().references(() => freelanceProfiles.userId), price: integer('price').notNull(), days: integer('days').notNull(), content: text('content').notNull(), createdAt: text('created_at').notNull(),
+}, table => [uniqueIndex('freelance_proposals_project_member').on(table.projectId,table.freelancerId)]);
+export const freelanceMessages = sqliteTable('freelance_messages', {
+  id: text('id').primaryKey(), projectId: text('project_id').notNull().references(() => freelanceProjects.id), authorId: text('author_id').notNull(), authorName: text('author_name').notNull(), content: text('content').notNull(), createdAt: text('created_at').notNull(),
+}, table => [index('freelance_messages_project').on(table.projectId,table.createdAt)]);
+export const freelanceFiles = sqliteTable('freelance_files', {
+  id: text('id').primaryKey(), projectId: text('project_id').notNull().references(() => freelanceProjects.id), uploaderId: text('uploader_id').notNull(), purpose: text('purpose').notNull(), objectKey: text('object_key').notNull().unique(), name: text('name').notNull(), size: integer('size').notNull(), createdAt: text('created_at').notNull(),
+}, table => [index('freelance_files_project').on(table.projectId,table.createdAt)]);
+
 export const posts = sqliteTable("posts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),

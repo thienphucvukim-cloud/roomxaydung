@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { FileText, Images, LoaderCircle, House, RefreshCw, Sofa } from "lucide-react";
+import Image from "next/image";
+import { DraftingCompass, Flame, LoaderCircle, House, MessageCircle, RefreshCw, Sofa } from "lucide-react";
+import { HouseGalleryIcon } from "@/components/house-gallery-icon";
 import { NEWS_SOURCES, type NewsFeedResponse } from "@/lib/news-feed";
 import { CatalogToolbar } from "@/components/catalog-toolbar";
 import { NewsPostComposer } from "@/components/news-post-composer";
 import { NewsPostCard } from "@/components/news-post-card";
 import { ClientNavigationLink } from "@/components/client-navigation-link";
+import { formatPriceDescription } from "@/lib/price-description";
 
-const sourceIcons = [House, Images, FileText, Sofa];
+const sourceIcons = [House, HouseGalleryIcon, DraftingCompass, Sofa];
 
 export function NewsFeed({ postId }: { postId?: number }) {
   const [composerOpen, setComposerOpen] = useState(false);
@@ -23,31 +26,46 @@ export function NewsFeed({ postId }: { postId?: number }) {
   const [result, setResult] = useState<{ selection: string; scope: string; data?: NewsFeedResponse; error?: string }>({ selection: "", scope: "" });
   const [refreshing, setRefreshing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const loadedPages = useRef<{ scope: string; batches: NewsFeedResponse[] } | null>(null);
   const current = result.selection === selection;
   const data = result.scope === scope ? result.data : undefined;
   const error = current ? result.error : undefined;
   const loading = !current && !data;
+  const featuredPosts = [...(data?.posts ?? [])]
+    .sort((a, b) => b.comments - a.comments || b.createdAt.localeCompare(a.createdAt) || b.id - a.id)
+    .slice(0, 5);
 
   useEffect(() => {
     const controller = new AbortController();
     let pending = false;
-    const refresh = async () => {
+    const refresh = async (force = false) => {
       if (pending || controller.signal.aborted) return;
       pending = true;
       setRefreshing(true);
       try {
-        // Refresh every loaded page so edits, moderation and new posts remain in order.
-        const batches = await Promise.all(Array.from({ length: page }, async (_, index) => {
-          const params = new URLSearchParams({ page: String(index + 1), category, q: search });
+        const readPage = async (number: number) => {
+          const params = new URLSearchParams({ page: String(number), category, q: search });
           if (postId) params.set("postId", String(postId));
           const response = await fetch(`/api/news-feed?${params}`, { signal: controller.signal, cache: "no-store" });
           const payload = await response.json() as NewsFeedResponse & { error?: string };
           if (!response.ok) throw new Error(payload.error || "Chưa thể tải bảng tin.");
           return payload;
-        }));
-        const payload = batches[0];
+        };
+        const previous = loadedPages.current;
+        const append = !force && previous?.scope === scope && previous.batches.length === page - 1 && page > 1;
+        const batches = append ? [...previous.batches, await readPage(page)] : [];
+        if (!append) {
+          // Explicit refreshes update loaded posts with at most two concurrent requests.
+          for (let number = 1; number <= page; number += 2) {
+            if (controller.signal.aborted) return;
+            batches.push(...await Promise.all([readPage(number), ...(number < page ? [readPage(number + 1)] : [])]));
+            if (page > batches[0].totalPages) break;
+          }
+        }
+        const payload = batches[batches.length - 1];
         if (controller.signal.aborted) return;
-        if (page > payload.totalPages) { setPage(payload.totalPages); return; }
+        if (page > payload.totalPages) { loadedPages.current = null; setPage(payload.totalPages); return; }
+        loadedPages.current = { scope, batches };
         const posts = [...new Map(batches.flatMap(batch => batch.posts).map(post => [post.id, post])).values()]
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
         setResult({ selection, scope, data: { ...payload, posts, page } });
@@ -63,21 +81,23 @@ export function NewsFeed({ postId }: { postId?: number }) {
         if (!controller.signal.aborted) setRefreshing(false);
       }
     };
-    const update = () => { if (document.visibilityState === "visible") void refresh(); };
+    // Deep scrolling must not trigger an ever-growing background request burst.
+    const update = () => { if (document.visibilityState === "visible" && page === 1) void refresh(true); };
+    const updateContent = () => { if (document.visibilityState === "visible") void refresh(true); };
     // Queue the initial request; subsequent refreshes keep the current cards visible.
-    void Promise.resolve().then(refresh);
+    void Promise.resolve().then(() => refresh());
     const timer = window.setInterval(update, 30_000);
     window.addEventListener("focus", update);
     document.addEventListener("visibilitychange", update);
-    window.addEventListener("tipook-content-changed", update);
-    window.addEventListener("tipook-avatar-changed", update);
+    window.addEventListener("tipook-content-changed", updateContent);
+    window.addEventListener("tipook-avatar-changed", updateContent);
     return () => {
       controller.abort();
       window.clearInterval(timer);
       window.removeEventListener("focus", update);
       document.removeEventListener("visibilitychange", update);
-      window.removeEventListener("tipook-content-changed", update);
-      window.removeEventListener("tipook-avatar-changed", update);
+      window.removeEventListener("tipook-content-changed", updateContent);
+      window.removeEventListener("tipook-avatar-changed", updateContent);
     };
   }, [category, search, page, selection, scope, revision, postId]);
 
@@ -96,8 +116,8 @@ export function NewsFeed({ postId }: { postId?: number }) {
   return <div className="min-h-screen bg-[#f0f2f5] text-[#1c1e21]">
     <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
       <h1 className="sr-only">Bảng tin</h1>
-      <div className={`grid items-start gap-6 ${postId ? "grid-cols-1" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
-        {!postId && <aside className="rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24">
+      <div className={`grid grid-cols-1 items-start gap-6 ${postId ? "" : "lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[240px_minmax(0,1fr)_240px]"}`}>
+        {!postId && <aside className="min-w-0 rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24">
           <h2 className="px-2 text-sm font-extrabold">Khám phá bảng tin</h2>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:flex-col" role="group" aria-label="Lọc bảng tin">
             {[{ category: "", label: "Tất cả", Icon: House }, ...NEWS_SOURCES.map((source, index) => ({ ...source, Icon: sourceIcons[index] }))].map(item =>
@@ -124,6 +144,27 @@ export function NewsFeed({ postId }: { postId?: number }) {
             {data.page < data.totalPages ? <button type="button" disabled={refreshing || !current} onClick={() => { if (error || page > data.page) setRevision(value => value + 1); else setPage(value => value + 1); }} className="rounded-xl border bg-white px-5 py-2 text-sm font-semibold disabled:opacity-40">{error ? "Thử tải thêm bài đăng" : "Xem thêm bài đăng"}</button> : data.posts.length > 0 && <p className="text-xs text-[#667085]">Bạn đã xem hết bài đăng{search || category ? " phù hợp" : " hiện tại"}.</p>}
           </div>}
         </section>
+        {!postId && <aside aria-labelledby="featured-news-heading" className="hidden rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
+          <h2 id="featured-news-heading" className="flex items-center gap-2 px-2 text-sm font-extrabold"><Flame size={18} className="shrink-0 text-[#168ac0]" aria-hidden="true" />Tin nổi bật</h2>
+          <p className="mt-2 px-2 text-xs leading-5 text-[#667085]">Những bài đăng được thảo luận nhiều trên bảng tin.</p>
+          {loading && <p role="status" className="mt-4 flex items-center gap-2 px-2 text-xs text-[#667085]"><LoaderCircle size={16} className="animate-spin" />Đang tải tin nổi bật...</p>}
+          {!loading && featuredPosts.length === 0 && <p className="mt-4 px-2 text-xs leading-5 text-[#667085]">{error ? "Chưa thể tải tin nổi bật. Hãy thử làm mới bảng tin." : "Chưa có tin nổi bật."}</p>}
+          {featuredPosts.length > 0 && <div className="mt-3 space-y-2">
+            {featuredPosts.map(post => <ClientNavigationLink key={post.id} href={post.sourceHref} className="block rounded-xl p-2 transition hover:bg-[#f4f7fb] focus-visible:outline-2 focus-visible:outline-[#229ed9]">
+              <div className="flex items-start gap-3">
+                {post.images[0] && <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-[#f0f2f5]"><Image src={post.images[0].url} alt="" fill sizes="56px" className="object-cover" /></div>}
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-[#168ac0]">{post.sourceLabel}</span>
+                  <h3 className="mt-1 line-clamp-3 break-words text-xs font-bold leading-5">{formatPriceDescription(post.title || post.content) || "Bài đăng của " + post.authorName}</h3>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[#667085]">
+                <span className="truncate">{post.authorName}</span>
+                <span className="flex shrink-0 items-center gap-1"><MessageCircle size={12} aria-hidden="true" />{post.comments} bình luận</span>
+              </div>
+            </ClientNavigationLink>)}
+          </div>}
+        </aside>}
       </div>
       <NewsPostComposer open={composerOpen} onOpenChange={setComposerOpen} onPublished={() => { setQuery(""); setSearch(""); setCategory(""); setPage(1); setRevision(value => value + 1); setNotice("Bài viết đã được đăng lên bảng tin."); }} />
     </main>

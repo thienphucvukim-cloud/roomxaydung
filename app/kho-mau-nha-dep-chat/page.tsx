@@ -3,7 +3,7 @@ import { FacadePage } from "@/components/facade-page";
 import { parseFacadeSort } from "@/lib/facade-feed";
 
 export const metadata: Metadata = {
-  title: "Mặt tiền đẹp hiện đại, dễ xây | Tipook",
+  title: "Mặt tiền đẹp hiện đại, dễ xây | NhàĐẹpChất",
   description: "Tham khảo mẫu mặt tiền nhà phố, nhà vườn và nhà hiện đại theo kích thước đất.",
 };
 

@@ -50,7 +50,7 @@ try {
     uploadKeys.push({key:data.attachment.key,cookie:a.cookie});
     return data.attachment;
   };
-  const contents = "%PDF-1.4\nTipook functional fixture\n%%EOF";
+  const contents = "%PDF-1.4\nNhàĐẹpChất functional fixture\n%%EOF";
   const file = await upload("fixture.pdf","drawing-file", contents, "application/pdf");
   const preview = await upload("preview.png","drawing-preview",readFileSync("public/community-house.png"),"image/png");
   const paid = (await a.send("/api/posts", "POST", {category:"Bản vẽ cộng đồng",title:marker,content:"Functional fixture",pollQuestion:"20.000đ",paidFiles:[file],attachments:[preview]},201)).post;

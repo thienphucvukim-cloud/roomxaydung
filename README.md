@@ -1,4 +1,4 @@
-# Tipook
+# NhàĐẹpChất
 
 Website tham khảo mẫu nhà, bản vẽ xây dựng, tính vật tư và gửi yêu cầu tư vấn.
 
@@ -45,6 +45,8 @@ cập nhật mỗi 30 giây và dẫn đến đúng bài ở trang gốc; bài b
 không xuất hiện.
 
 ## Lệnh phát triển
+
+Menu **Thuê thiết kế** tại `/thue-thiet-ke` là sàn freelancer thiết kế xây dựng được xây mới: hồ sơ chuyên môn, công trình tiêu biểu, tìm freelancer, đăng dự án, gửi đề xuất, chọn cộng sự, trao đổi và bàn giao. Dùng dữ liệu riêng trong các bảng `freelance_*`, không nhập dữ liệu thuê thiết kế cũ. Hướng dẫn: [docs/FREELANCE_MARKETPLACE.md](docs/FREELANCE_MARKETPLACE.md).
 
 ```bash
 corepack pnpm install

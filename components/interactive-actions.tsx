@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Bookmark, Check, CircleHelp, FileDown, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, X } from "lucide-react";
+import { Bookmark, Check, CircleHelp, FileDown, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, UserRound, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { optimizeImageForUpload } from "@/lib/image-upload";
 import { ChatThread } from "@/components/chat-thread";
+import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
 
 type IconName = "heart" | "bookmark" | "star" | "follow" | "check";
 const iconMap = { heart: Heart, bookmark: Bookmark, star: Star, follow: UserPlus, check: Check };
@@ -179,7 +180,7 @@ export function RequestActionButton({
   description?: string;
   className?: string;
   allowFile?: boolean;
-  iconOnly?: "comment" | "expert" | "file" | "help";
+  iconOnly?: "comment" | "expert" | "file" | "help" | "admin";
   iconCount?: number;
   onSuccess?: () => void;
   recipientUserId?: string;
@@ -250,7 +251,7 @@ export function RequestActionButton({
   };
 
   return <>
-    <button type="button" data-requires-account onClick={() => setOpen(true)} className={`group/request relative ${className}`} aria-label={iconOnly && iconCount !== undefined ? `${label} (${iconCount})` : label} title={iconOnly ? undefined : label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <ExpertIcon/> : iconOnly === "file" ? <FileDown size={19}/> : iconOnly === "help" ? <CircleHelp size={20}/> : label}{iconOnly && iconCount !== undefined && <span className="text-[11px] leading-4 tabular-nums">{iconCount}</span>}{iconOnly && <span role="tooltip" className={`pointer-events-none absolute z-30 hidden whitespace-nowrap rounded-md bg-[#182230] px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg group-hover/request:block group-focus-visible/request:block ${iconOnly === "help" ? "right-0 top-full mt-2 group-focus/request:block group-active/request:block" : `bottom-full mb-2 ${iconOnly === "expert" ? "right-0" : "left-1/2 -translate-x-1/2"}`}`}>{label}</span>}</button>
+    <button type="button" data-requires-account onClick={() => setOpen(true)} className={`group/request relative ${className}`} aria-label={iconOnly && iconCount !== undefined ? `${label} (${iconCount})` : label} title={iconOnly ? undefined : label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <ExpertIcon/> : iconOnly === "file" ? <FileDown size={19}/> : iconOnly === "help" ? <CircleHelp size={20}/> : iconOnly === "admin" ? <span aria-hidden="true" className="flex flex-col items-center gap-0.5"><UserRound size={20} strokeWidth={1.9}/><span className="text-[9px] font-semibold leading-none">admin</span></span> : label}{iconOnly && iconCount !== undefined && <span className="text-[11px] leading-4 tabular-nums">{iconCount}</span>}{iconOnly && <span role="tooltip" className={`pointer-events-none absolute z-30 hidden whitespace-nowrap rounded-md bg-[#182230] px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg group-hover/request:block group-focus-visible/request:block ${iconOnly === "help" || iconOnly === "admin" ? "right-0 top-full mt-2 group-focus/request:block group-active/request:block" : `bottom-full mb-2 ${iconOnly === "expert" ? "right-0" : "left-1/2 -translate-x-1/2"}`}`}>{label}</span>}</button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent showCloseButton={false} className="max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-[520px] gap-0 overflow-y-auto rounded-2xl border-0 bg-white p-0 shadow-2xl">
         <DialogHeader className="relative border-b border-[#e4e6eb] px-14 py-5 text-center sm:text-center">
@@ -262,7 +263,7 @@ export function RequestActionButton({
           <label className="block text-sm font-semibold text-[#182230]" htmlFor={fieldId + "-subject"}>Tiêu đề</label>
           <input id={fieldId + "-subject"} value={subject} onChange={(event) => setSubject(event.target.value)} className="h-11 w-full rounded-xl border border-[#d0d5dd] px-3 text-sm outline-none focus:border-[#229ed9]"/>
           <label className="block text-sm font-semibold text-[#182230]" htmlFor={fieldId + "-content"}>Nội dung chi tiết</label>
-          <textarea id={fieldId + "-content"} value={content} onChange={(event) => setContent(event.target.value)} className="min-h-32 w-full resize-y rounded-xl border border-[#d0d5dd] p-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Mô tả nhu cầu, kinh nghiệm hoặc thông tin cần trao đổi..." maxLength={2000}/>
+          <AutoResizeTextarea id={fieldId + "-content"} value={content} onChange={(event) => setContent(event.target.value)} className="min-h-32 w-full rounded-xl border border-[#d0d5dd] p-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Mô tả nhu cầu, kinh nghiệm hoặc thông tin cần trao đổi..." maxLength={2000}/>
           {allowFile && <div className="space-y-2"><label className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#98a2b3] bg-[#f8fafc] p-3 text-sm font-semibold text-[#344054] hover:border-[#229ed9] ${busy ? "pointer-events-none opacity-50" : ""}`}><Upload size={19}/><span className="min-w-0 flex-1 truncate">{attachmentName || "Đính kèm file hoặc ảnh"}</span><input type="file" disabled={busy} className="sr-only" aria-label="Đính kèm file hoặc ảnh" onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; void upload(file); }}/></label><p className="text-xs text-[#667085]">Một tệp tối đa 25 MB. Ảnh được tối ưu trước khi gửi.</p>{attachmentKey && <div className="flex items-start gap-3 rounded-xl border border-[#e3eaf2] p-3">{attachmentPreview && <img src={attachmentPreview} alt="Ảnh đính kèm" className="size-16 rounded-lg object-cover"/>}<span className="min-w-0 flex-1 break-words text-sm text-[#344054]">{attachmentName}</span><button type="button" disabled={busy} onClick={() => { setAttachmentKey(""); setAttachmentName(""); setAttachmentPreview(""); }} aria-label="Bỏ tệp đính kèm" className="grid size-7 shrink-0 place-items-center rounded-full text-[#667085] hover:bg-[#eef3f7] disabled:opacity-50"><X size={16}/></button></div>}</div>}
           <label className="block text-sm font-semibold text-[#182230]" htmlFor={fieldId + "-contact"}>Thông tin liên hệ</label>
           <input id={fieldId + "-contact"} value={contact} onChange={(event) => setContact(event.target.value)} className="h-11 w-full rounded-xl border border-[#d0d5dd] px-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Email hoặc số điện thoại"/>
