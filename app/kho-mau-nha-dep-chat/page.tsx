@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "Tham khảo mẫu mặt tiền nhà phố, nhà vườn và nhà hiện đại theo kích thước đất.",
 };
 
-export default async function BeautifulHouseModels({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string }> }) {
-  const { q, sort } = await searchParams;
-  return <FacadePage query={q?.trim().slice(0, 120) ?? ""} sort={parseFacadeSort(sort)} />;
+export default async function BeautifulHouseModels({ searchParams }: { searchParams: Promise<{ q?: string | string[]; sort?: string | string[]; postId?: string | string[] }> }) {
+  const { q, sort, postId } = await searchParams;
+  return <FacadePage query={typeof q === "string" ? q.trim().slice(0, 120) : ""} sort={parseFacadeSort(sort)} targetPostId={typeof postId === "string" ? postId : undefined} />;
 }

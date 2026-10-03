@@ -128,10 +128,14 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
     </div>
     {error && <p role="alert" className="px-4 py-2 text-sm text-rose-700">{error}</p>}
     {attachment && <p className="flex items-center gap-2 px-4 py-2 text-xs text-[#168ac0]"><Paperclip size={14}/><span className="truncate">{attachment.name}</span><button type="button" onClick={() => setAttachment(null)} disabled={sending} aria-label="Bỏ tệp đính kèm"><X size={14}/></button></p>}
-    {readOnly ? <p className="p-4 text-sm text-[#667085]">Thông báo hệ thống không nhận trả lời.</p> : <form data-requires-account onSubmit={event => { event.preventDefault(); void send(); }} className="flex items-end gap-2 border-t border-[#e3eaf2] bg-white p-3">
-      {allowFile && <label className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-[#168ac0] hover:bg-sky-50">{uploading ? <LoaderCircle size={19} className="animate-spin"/> : <Paperclip size={19}/>}<input type="file" aria-label="Đính kèm tệp" className="sr-only" disabled={sending || uploading || loading} onChange={event => { void upload(event.target.files?.[0]); event.target.value = ""; }}/></label>}
-      <textarea aria-label="Tin nhắn" placeholder="Nhập tin nhắn…" value={content} disabled={sending} onChange={event => setContent(event.target.value)} maxLength={2000} rows={2} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="min-w-0 flex-1 resize-none rounded-xl border border-[#d0d5dd] px-3 py-2 text-sm outline-none focus:border-[#229ed9]"/>
-      <button type="submit" disabled={sending || uploading || loading || !content.trim() || !identity.peerId} aria-label="Gửi tin nhắn" className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#229ed9] text-white disabled:opacity-50">{sending ? <LoaderCircle size={19} className="animate-spin"/> : <Send size={19}/>}</button>
+    {readOnly ? <p className="p-4 text-sm text-[#667085]">Thông báo hệ thống không nhận trả lời.</p> : <form data-requires-account onSubmit={event => { event.preventDefault(); void send(); }} className="border-t border-[#e3eaf2] bg-white p-3">
+      <div className="flex min-w-0 items-center rounded-full bg-[#eef1f4] pl-3 pr-1 focus-within:ring-1 focus-within:ring-[#229ed9]">
+        <textarea aria-label="Tin nhắn" placeholder="Nhập tin nhắn…" value={content} disabled={sending} onChange={event => setContent(event.target.value)} maxLength={2000} rows={1} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} className="h-9 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 outline-none"/>
+        <div className="flex shrink-0 items-center">
+          {allowFile && <label className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-[#229ed9] hover:bg-[#e4e6eb]">{uploading ? <LoaderCircle size={17} className="animate-spin"/> : <Paperclip size={17}/>}<input type="file" aria-label="Đính kèm tệp" className="sr-only" disabled={sending || uploading || loading} onChange={event => { void upload(event.target.files?.[0]); event.target.value = ""; }}/></label>}
+          <button type="submit" disabled={sending || uploading || loading || !content.trim() || !identity.peerId} aria-label="Gửi tin nhắn" className="grid size-8 shrink-0 place-items-center rounded-full text-[#229ed9] hover:bg-[#e4e6eb] disabled:text-[#bcc0c4]">{sending ? <LoaderCircle size={16} className="animate-spin"/> : <Send size={16}/>}</button>
+        </div>
+      </div>
     </form>}
   </div>;
 }

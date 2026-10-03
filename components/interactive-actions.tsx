@@ -9,6 +9,8 @@ import { ChatThread } from "@/components/chat-thread";
 
 type IconName = "heart" | "bookmark" | "star" | "follow" | "check";
 const iconMap = { heart: Heart, bookmark: Bookmark, star: Star, follow: UserPlus, check: Check };
+const actionChangedEvent = "tipook-action-changed";
+type ActionChange = { actionType: string; targetType: string; targetId: string; active: boolean; count?: number };
 
 function ExpertIcon() {
   return <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -33,6 +35,7 @@ export function ToggleActionButton({
   icon = "bookmark",
   className = "",
   showCount = false,
+  showLabelWithCount = false,
 }: {
   actionType: string;
   targetType: string;
@@ -42,6 +45,7 @@ export function ToggleActionButton({
   icon?: IconName;
   className?: string;
   showCount?: boolean;
+  showLabelWithCount?: boolean;
 }) {
   const [active, setActive] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,12 +53,23 @@ export function ToggleActionButton({
   const Icon = iconMap[icon];
 
   useEffect(() => {
+    const controller = new AbortController();
     const query = new URLSearchParams({ actionType, targetType, targetId });
     if (showCount) query.set("withCount", "true");
-    fetch("/api/actions?" + query).then((response) => response.ok ? response.json() as Promise<{ actions?: unknown[]; count?: number }> : Promise.reject()).then((data) => {
+    fetch("/api/actions?" + query, { signal: controller.signal, cache: "no-store" }).then((response) => response.ok ? response.json() as Promise<{ actions?: unknown[]; count?: number }> : Promise.reject()).then((data) => {
+      if (controller.signal.aborted) return;
       setActive(Boolean(data.actions?.length));
       if (showCount) setActionCount(data.count ?? null);
     }).catch(() => {});
+    const update = (event: Event) => {
+      const change = (event as CustomEvent<ActionChange>).detail;
+      if (change.actionType !== actionType || change.targetType !== targetType || change.targetId !== targetId) return;
+      controller.abort();
+      setActive(change.active);
+      if (typeof change.count === "number") setActionCount(change.count);
+    };
+    window.addEventListener(actionChangedEvent, update);
+    return () => { controller.abort(); window.removeEventListener(actionChangedEvent, update); };
   }, [actionType, targetType, targetId, showCount]);
 
   const toggle = async () => {
@@ -69,6 +84,7 @@ export function ToggleActionButton({
         body: JSON.stringify({ actionType, targetType, targetId }),
       });
       if (!response.ok) throw new Error();
+      window.dispatchEvent(new CustomEvent<ActionChange>(actionChangedEvent, { detail: { actionType, targetType, targetId, active: next } }));
       if (showCount) {
         const query = new URLSearchParams({ actionType, targetType, targetId, withCount: "true" });
         try {
@@ -76,6 +92,7 @@ export function ToggleActionButton({
           if (countsResponse.ok) {
             const data = await countsResponse.json() as { count: number };
             setActionCount(data.count);
+            window.dispatchEvent(new CustomEvent<ActionChange>(actionChangedEvent, { detail: { actionType, targetType, targetId, active: next, count: data.count } }));
           }
         } catch { /* The action was saved even if its count cannot be refreshed. */ }
       }
@@ -86,9 +103,12 @@ export function ToggleActionButton({
     }
   };
 
-  return <button type="button" data-requires-account onClick={toggle} disabled={busy} className={className} aria-pressed={active} aria-label={showCount ? `${active ? activeLabel ?? label : label} (${actionCount ?? "—"})` : undefined} title={showCount ? active ? activeLabel ?? label : label : undefined}>
+  const actionLabel = active ? activeLabel ?? label : label;
+  const countLabel = actionCount === null ? "—" : actionCount.toLocaleString("vi-VN");
+  const visibleLabel = showCount ? showLabelWithCount ? `${actionLabel} (${countLabel})` : countLabel : active ? activeLabel ?? "Đã lưu" : label;
+  return <button type="button" data-requires-account onClick={toggle} disabled={busy} className={className} aria-pressed={active} aria-label={showCount ? `${actionLabel} (${countLabel})` : undefined} title={showCount ? actionLabel : undefined}>
     {busy ? <LoaderCircle size={17} className="animate-spin"/> : <Icon size={17} className={active ? (icon === "heart" ? "fill-red-500 text-red-500" : "fill-current") : ""}/>}
-    <span className={showCount ? "tabular-nums" : undefined}>{showCount ? actionCount === null ? "—" : actionCount.toLocaleString("vi-VN") : active ? activeLabel ?? "Đã lưu" : label}</span>
+    <span className={showCount ? "tabular-nums" : undefined}>{visibleLabel}</span>
   </button>;
 }
 
@@ -243,9 +263,9 @@ export function RequestActionButton({
           <input id={fieldId + "-subject"} value={subject} onChange={(event) => setSubject(event.target.value)} className="h-11 w-full rounded-xl border border-[#d0d5dd] px-3 text-sm outline-none focus:border-[#229ed9]"/>
           <label className="block text-sm font-semibold text-[#182230]" htmlFor={fieldId + "-content"}>Nội dung chi tiết</label>
           <textarea id={fieldId + "-content"} value={content} onChange={(event) => setContent(event.target.value)} className="min-h-32 w-full resize-y rounded-xl border border-[#d0d5dd] p-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Mô tả nhu cầu, kinh nghiệm hoặc thông tin cần trao đổi..." maxLength={2000}/>
+          {allowFile && <div className="space-y-2"><label className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#98a2b3] bg-[#f8fafc] p-3 text-sm font-semibold text-[#344054] hover:border-[#229ed9] ${busy ? "pointer-events-none opacity-50" : ""}`}><Upload size={19}/><span className="min-w-0 flex-1 truncate">{attachmentName || "Đính kèm file hoặc ảnh"}</span><input type="file" disabled={busy} className="sr-only" aria-label="Đính kèm file hoặc ảnh" onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; void upload(file); }}/></label><p className="text-xs text-[#667085]">Một tệp tối đa 25 MB. Ảnh được tối ưu trước khi gửi.</p>{attachmentKey && <div className="flex items-start gap-3 rounded-xl border border-[#e3eaf2] p-3">{attachmentPreview && <img src={attachmentPreview} alt="Ảnh đính kèm" className="size-16 rounded-lg object-cover"/>}<span className="min-w-0 flex-1 break-words text-sm text-[#344054]">{attachmentName}</span><button type="button" disabled={busy} onClick={() => { setAttachmentKey(""); setAttachmentName(""); setAttachmentPreview(""); }} aria-label="Bỏ tệp đính kèm" className="grid size-7 shrink-0 place-items-center rounded-full text-[#667085] hover:bg-[#eef3f7] disabled:opacity-50"><X size={16}/></button></div>}</div>}
           <label className="block text-sm font-semibold text-[#182230]" htmlFor={fieldId + "-contact"}>Thông tin liên hệ</label>
           <input id={fieldId + "-contact"} value={contact} onChange={(event) => setContact(event.target.value)} className="h-11 w-full rounded-xl border border-[#d0d5dd] px-3 text-sm outline-none focus:border-[#229ed9]" placeholder="Email hoặc số điện thoại"/>
-          {allowFile && <div className="space-y-2"><label className={`flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#98a2b3] bg-[#f8fafc] p-3 text-sm font-semibold text-[#344054] hover:border-[#229ed9] ${busy ? "pointer-events-none opacity-50" : ""}`}><Upload size={19}/><span className="min-w-0 flex-1 truncate">{attachmentName || "Đính kèm file hoặc ảnh"}</span><input type="file" disabled={busy} className="sr-only" aria-label="Đính kèm file hoặc ảnh" onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; void upload(file); }}/></label><p className="text-xs text-[#667085]">Một tệp tối đa 25 MB. Ảnh được tối ưu trước khi gửi.</p>{attachmentKey && <div className="flex items-start gap-3 rounded-xl border border-[#e3eaf2] p-3">{attachmentPreview && <img src={attachmentPreview} alt="Ảnh đính kèm" className="size-16 rounded-lg object-cover"/>}<span className="min-w-0 flex-1 break-words text-sm text-[#344054]">{attachmentName}</span><button type="button" disabled={busy} onClick={() => { setAttachmentKey(""); setAttachmentName(""); setAttachmentPreview(""); }} aria-label="Bỏ tệp đính kèm" className="grid size-7 shrink-0 place-items-center rounded-full text-[#667085] hover:bg-[#eef3f7] disabled:opacity-50"><X size={16}/></button></div>}</div>}
           {message && <p role="status" aria-live="polite" className={"rounded-lg px-3 py-2 text-sm " + (message.startsWith("Đã gửi") ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-[#147aa8]")}>{message}</p>}
           <Button type="button" onClick={submit} disabled={busy || (!content.trim() && !(adminHelp && attachmentKey))} className="h-11 w-full rounded-xl bg-[#229ed9] font-bold hover:bg-[#168ac0]">{busy ? <LoaderCircle size={18} className="animate-spin"/> : <Send size={17}/>}Gửi yêu cầu</Button>
         </div>}

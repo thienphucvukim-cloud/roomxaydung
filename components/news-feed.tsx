@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FileText, Images, LoaderCircle, House, RefreshCw, Sofa } from "lucide-react";
 import { NEWS_SOURCES, type NewsFeedResponse } from "@/lib/news-feed";
 import { CatalogToolbar } from "@/components/catalog-toolbar";
@@ -18,13 +18,15 @@ export function NewsFeed({ postId }: { postId?: number }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
-  const selection = `${postId ?? ""}:${category}:${search}:${page}`;
-  const [result, setResult] = useState<{ selection: string; data?: NewsFeedResponse; error?: string }>({ selection: "" });
+  const scope = JSON.stringify([postId ?? null, category, search]);
+  const selection = `${scope}:${page}`;
+  const [result, setResult] = useState<{ selection: string; scope: string; data?: NewsFeedResponse; error?: string }>({ selection: "", scope: "" });
   const [refreshing, setRefreshing] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const current = result.selection === selection;
-  const data = current ? result.data : undefined;
+  const data = result.scope === scope ? result.data : undefined;
   const error = current ? result.error : undefined;
-  const loading = !current;
+  const loading = !current && !data;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -34,18 +36,26 @@ export function NewsFeed({ postId }: { postId?: number }) {
       pending = true;
       setRefreshing(true);
       try {
-        const params = new URLSearchParams({ page: String(page), category, q: search });
-        if (postId) params.set("postId", String(postId));
-        const response = await fetch(`/api/news-feed?${params}`, { signal: controller.signal, cache: "no-store" });
-        const payload = await response.json() as NewsFeedResponse & { error?: string };
-        if (!response.ok) throw new Error(payload.error || "Chưa thể tải bảng tin.");
+        // Refresh every loaded page so edits, moderation and new posts remain in order.
+        const batches = await Promise.all(Array.from({ length: page }, async (_, index) => {
+          const params = new URLSearchParams({ page: String(index + 1), category, q: search });
+          if (postId) params.set("postId", String(postId));
+          const response = await fetch(`/api/news-feed?${params}`, { signal: controller.signal, cache: "no-store" });
+          const payload = await response.json() as NewsFeedResponse & { error?: string };
+          if (!response.ok) throw new Error(payload.error || "Chưa thể tải bảng tin.");
+          return payload;
+        }));
+        const payload = batches[0];
         if (controller.signal.aborted) return;
         if (page > payload.totalPages) { setPage(payload.totalPages); return; }
-        setResult({ selection, data: payload });
+        const posts = [...new Map(batches.flatMap(batch => batch.posts).map(post => [post.id, post])).values()]
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
+        setResult({ selection, scope, data: { ...payload, posts, page } });
       } catch (cause) {
         if (!controller.signal.aborted) setResult(previous => ({
           selection,
-          data: previous.selection === selection ? previous.data : undefined,
+          scope,
+          data: previous.scope === scope ? previous.data : undefined,
           error: cause instanceof Error ? cause.message : "Chưa thể tải bảng tin. Vui lòng thử lại.",
         }));
       } finally {
@@ -69,16 +79,24 @@ export function NewsFeed({ postId }: { postId?: number }) {
       window.removeEventListener("tipook-content-changed", update);
       window.removeEventListener("tipook-avatar-changed", update);
     };
-  }, [category, search, page, selection, revision, postId]);
+  }, [category, search, page, selection, scope, revision, postId]);
+
+  useEffect(() => {
+    if (!current || refreshing || error || !data || page >= data.totalPages || !loadMoreRef.current || !window.IntersectionObserver) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); setPage(value => value + 1); }
+    }, { rootMargin: "400px" });
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [current, refreshing, error, data, page]);
 
   const filter = (value: string) => { setCategory(value); setPage(1); };
   const submitSearch = (event: FormEvent) => { event.preventDefault(); setSearch(query.trim()); setPage(1); };
-  const changePage = (value: number) => { setPage(value); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   return <div className="min-h-screen bg-[#f0f2f5] text-[#1c1e21]">
-    <main className="mx-auto max-w-[1060px] px-4 py-7 sm:py-10 lg:px-8">
+    <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
       <h1 className="sr-only">Bảng tin</h1>
-      <div className={`grid items-start gap-6 ${postId ? "mx-auto max-w-[680px]" : "lg:grid-cols-[240px_minmax(0,680px)]"}`}>
+      <div className={`grid items-start gap-6 ${postId ? "grid-cols-1" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
         {!postId && <aside className="rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24">
           <h2 className="px-2 text-sm font-extrabold">Khám phá bảng tin</h2>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:flex-col" role="group" aria-label="Lọc bảng tin">
@@ -100,8 +118,11 @@ export function NewsFeed({ postId }: { postId?: number }) {
           {error && <div role="alert" className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}<button type="button" onClick={() => setRevision(value => value + 1)} className="ml-2 font-bold underline">Thử lại</button></div>}
           {loading && <p role="status" className="flex justify-center gap-2 py-12 text-sm text-[#667085]"><LoaderCircle size={18} className="animate-spin" />Đang tải bảng tin...</p>}
           {data?.posts.length === 0 && <div className="rounded-2xl border border-dashed border-[#cfdeea] bg-white p-9 text-center"><House className="mx-auto text-[#8aa0b5]" size={36} /><h3 className="mt-4 font-extrabold">{search ? "Không tìm thấy bài đăng" : "Chưa có bài đăng"}</h3><p className="mt-2 text-sm leading-6 text-[#667085]">{search ? "Thử từ khóa khác hoặc xem tất cả danh mục." : "Khi có bài công khai mới, nội dung sẽ xuất hiện trên bảng tin."}</p>{(search || category) && <button type="button" onClick={() => { setQuery(""); setSearch(""); filter(""); }} className="mt-4 text-sm font-bold text-[#168ac0]">Xem tất cả</button>}</div>}
-          <div className="space-y-4">{data?.posts.map(post => <NewsPostCard key={post.id} post={post} onFilter={postId ? undefined : filter} />)}</div>
-          {data && data.totalPages > 1 && <nav aria-label="Phân trang bảng tin" className="mt-6 flex items-center justify-center gap-4"><button type="button" disabled={page === 1} onClick={() => changePage(page - 1)} className="rounded-xl border bg-white px-4 py-2 text-sm font-bold disabled:opacity-40">Trước</button><span className="text-xs text-[#667085]">Trang {page} / {data.totalPages}</span><button type="button" disabled={page >= data.totalPages} onClick={() => changePage(page + 1)} className="rounded-xl border bg-white px-4 py-2 text-sm font-bold disabled:opacity-40">Sau</button></nav>}
+          <div className="space-y-4">{data?.posts.map(post => <NewsPostCard key={post.id} post={post} detail={Boolean(postId)} onFilter={postId ? undefined : filter} />)}</div>
+          {data && !postId && <div ref={loadMoreRef} className="mt-6 flex flex-col items-center gap-3 py-4">
+            {refreshing && !current && <p role="status" className="flex items-center gap-2 text-sm text-[#667085]"><LoaderCircle size={18} className="animate-spin" />Đang tải thêm bài đăng...</p>}
+            {data.page < data.totalPages ? <button type="button" disabled={refreshing || !current} onClick={() => { if (error || page > data.page) setRevision(value => value + 1); else setPage(value => value + 1); }} className="rounded-xl border bg-white px-5 py-2 text-sm font-semibold disabled:opacity-40">{error ? "Thử tải thêm bài đăng" : "Xem thêm bài đăng"}</button> : data.posts.length > 0 && <p className="text-xs text-[#667085]">Bạn đã xem hết bài đăng{search || category ? " phù hợp" : " hiện tại"}.</p>}
+          </div>}
         </section>
       </div>
       <NewsPostComposer open={composerOpen} onOpenChange={setComposerOpen} onPublished={() => { setQuery(""); setSearch(""); setCategory(""); setPage(1); setRevision(value => value + 1); setNotice("Bài viết đã được đăng lên bảng tin."); }} />

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, getTableColumns, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { memberProfiles, postAttachments, posts } from "@/db/schema";
 import { NEWS_PAGE_SIZE, NEWS_SOURCES, newsSourceLink } from "@/lib/news-feed";
@@ -20,25 +20,19 @@ export async function GET(request: Request) {
 
   try {
     const db = getDb();
-    // Rank before filtering so each link opens the correct page in its source catalog.
-    const ranked = db.$with("news_posts").as(db.select({
-      ...getTableColumns(posts),
-      position: sql<number>`row_number() over (partition by ${posts.category} order by ${posts.createdAt} desc, ${posts.id} desc)`.as("source_position"),
-    }).from(posts).where(and(
+    const condition = and(
       eq(posts.audience, "Công khai"),
       inArray(posts.category, NEWS_SOURCES.map(source => source.category)),
-    )));
-    const condition = and(
-      postId ? eq(ranked.id, Number(postId)) : undefined,
-      category ? eq(ranked.category, category) : undefined,
-      query ? or(...[ranked.title, ranked.content, ranked.authorName, ranked.location, ranked.feeling].map(column =>
+      postId ? eq(posts.id, Number(postId)) : undefined,
+      category ? eq(posts.category, category) : undefined,
+      query ? or(...[posts.title, posts.content, posts.authorName, posts.location, posts.feeling].map(column =>
         sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`,
       )) : undefined,
     );
     const [totals, rows] = await Promise.all([
-      db.with(ranked).select({ value: count() }).from(ranked).where(condition),
-      db.with(ranked).select().from(ranked).where(condition)
-        .orderBy(desc(ranked.createdAt), desc(ranked.id)).limit(NEWS_PAGE_SIZE).offset((page - 1) * NEWS_PAGE_SIZE),
+      db.select({ value: count() }).from(posts).where(condition),
+      db.select().from(posts).where(condition)
+        .orderBy(desc(posts.createdAt), desc(posts.id)).limit(NEWS_PAGE_SIZE).offset((page - 1) * NEWS_PAGE_SIZE),
     ]);
     const images = rows.length ? await db.select({
       postId: postAttachments.postId,
@@ -62,8 +56,8 @@ export async function GET(request: Request) {
       posts: rows.map(post => ({
         id: post.id, userId: post.userId, authorName: post.authorName, avatarUrl: avatars.get(post.userId) ?? null, category: post.category,
         title: post.title, content: post.content, location: post.location, feeling: post.feeling,
-        pollQuestion: post.pollQuestion, createdAt: post.createdAt,
-        ...newsSourceLink(post.category, post.id, post.position),
+        pollQuestion: post.pollQuestion, createdAt: post.createdAt, comments: post.comments,
+        ...newsSourceLink(post.category, post.id),
         images: imagesByPost.get(post.id) ?? [],
       })),
       total: totals[0].value,

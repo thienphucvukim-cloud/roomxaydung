@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { currentUserId } from "../../../lib/member-identity";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { memberProfiles, postAttachments, websiteContent } from "../../../db/schema";
+import { memberProfiles, postAttachments, postComments, websiteContent } from "../../../db/schema";
 
 const MAX_PUBLIC_FILE_SIZE = 25 * 1024 * 1024;
 const MAX_PRIVATE_FILE_SIZE = 100 * 1024 * 1024;
@@ -90,6 +90,8 @@ export async function DELETE(request: Request) {
     if (object.customMetadata?.ownerUserId !== await currentUserId()) return Response.json({ error: "Bạn không có quyền xóa tệp này." }, { status: 403 });
     const [attached] = await getDb().select({ id: postAttachments.id }).from(postAttachments).where(eq(postAttachments.objectKey, key)).limit(1);
     if (attached) return Response.json({ error: "Tệp đang được sử dụng trong bài đăng." }, { status: 409 });
+    const [commentImage] = await getDb().select({ id: postComments.id }).from(postComments).where(eq(postComments.imageKey, key)).limit(1);
+    if (commentImage) return Response.json({ error: "Ảnh đang được sử dụng trong bình luận." }, { status: 409 });
     const [avatar] = await getDb().select({ userId: memberProfiles.userId }).from(memberProfiles).where(eq(memberProfiles.avatarKey, key)).limit(1);
     if (avatar) return Response.json({ error: "Ảnh đang được sử dụng làm ảnh đại diện." }, { status: 409 });
     const [usedOnWebsite] = await getDb().select({ key: websiteContent.key }).from(websiteContent).where(eq(websiteContent.value, "/api/files?key=" + key)).limit(1);

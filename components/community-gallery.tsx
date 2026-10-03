@@ -23,11 +23,11 @@ type Picked={file:File;preview:string};
 type Comment={id:number;authorName:string;content:string;imageKey?:string|null;imageUrl?:string|null};
 const category="Bộ sưu tập ảnh";
 type ModelCard = { key: string; search: string; card: ReactNode; contentPrefix?: string };
-export function CommunityGallery({ searchQuery = "", modelCards = [], sort = "random" }: { searchQuery?: string; modelCards?: ModelCard[]; sort?: FacadeSort }){
+export function CommunityGallery({ searchQuery = "", modelCards = [], sort = "random", targetPostId }: { searchQuery?: string; modelCards?: ModelCard[]; sort?: FacadeSort; targetPostId?: string }){
  const router = useRouter();
  const editor = useSiteEditor();
  const seedRef = useRef(0);
- const modelKeys = useRef(modelCards.map(model => `model:${model.key}`));
+ const modelKeys = useRef(targetPostId ? [] : modelCards.map(model => `model:${model.key}`));
  const [cardOrder, setCardOrder] = useState<string[]>([]);
  const [modelScores, setModelScores] = useState<Record<string, number>>({});
  const [requestCursor, setRequestCursor] = useState("");
@@ -53,6 +53,7 @@ export function CommunityGallery({ searchQuery = "", modelCards = [], sort = "ra
   setLoading(true);
   setLoadError(false);
   const params = new URLSearchParams({ category, seed: String(seedRef.current), q: searchQuery, sort });
+  if (targetPostId) params.set("postId", targetPostId);
   if (requestCursor) params.set("cursor", requestCursor);
   fetch("/api/posts?" + params, { signal: controller.signal })
    .then(response => response.ok ? response.json() as Promise<{ posts?: Post[]; nextCursor?: string | null; modelScores?: Record<string, number> }> : Promise.reject())
@@ -68,7 +69,7 @@ export function CommunityGallery({ searchQuery = "", modelCards = [], sort = "ra
    .catch(() => { if (!controller.signal.aborted) setLoadError(true); })
    .finally(() => { if (!controller.signal.aborted) setLoading(false); });
   return () => controller.abort();
- }, [requestCursor, searchQuery, refresh, sort]);
+ }, [requestCursor, searchQuery, refresh, sort, targetPostId]);
  useEffect(() => {
   if (loading || loadError || !nextCursor || !loadMoreRef.current || !window.IntersectionObserver) return;
   const anchor = window.location.hash.match(/^#post-(\d+)$/);
@@ -84,7 +85,7 @@ export function CommunityGallery({ searchQuery = "", modelCards = [], sort = "ra
  }, [loading, loadError, nextCursor]);
  const refreshGallery = () => { setRequestCursor(""); setRefresh(current => current + 1); };
  const normalized = searchQuery.toLocaleLowerCase("vi");
- const filteredModels = modelCards.filter(model => demoPostVisible(editor.content, model.contentPrefix, editor.isOwner) && (!normalized || [model.search, ...Object.entries(editor.content).filter(([key]) => model.contentPrefix && key.startsWith(model.contentPrefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized)));
+ const filteredModels = targetPostId ? [] : modelCards.filter(model => demoPostVisible(editor.content, model.contentPrefix, editor.isOwner) && (!normalized || [model.search, ...Object.entries(editor.content).filter(([key]) => model.contentPrefix && key.startsWith(model.contentPrefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized)));
  const modelsByKey = new Map(filteredModels.map(model => [`model:${model.key}`, model]));
  const postsByKey = new Map(posts.map(post => [`post:${post.id}`, post]));
  const submitSearch = (event: FormEvent) => { event.preventDefault(); router.push(facadePageHref(1, query, sort)); };
@@ -151,7 +152,7 @@ export function CommunityGallery({ searchQuery = "", modelCards = [], sort = "ra
       <div className="mt-auto"><ModelCardFooter title={post.title} meta={post.location||"Chưa cập nhật kích thước"} targetType="post" targetId={String(post.id)} recipientUserId={post.userId} comments={post.comments??0} expertQuestions={post.expertQuestions??0} commentOpen={Boolean(commentOpen[post.id])} onToggleComments={()=>void toggleComments(post)} onQuestionSent={refreshGallery}/></div>
      </div><PostCommentPanel open={Boolean(commentOpen[post.id])} onOpenChange={next=>setCommentOpen(current=>({...current,[post.id]:next}))} title={post.title} image={cover?.url} meta={`Đăng bởi ${post.authorName} · ${post.location||"Chưa cập nhật kích thước"}`} content={post.content}>{commentErrors[post.id]&&<p role="alert" className="text-xs font-semibold text-rose-600">{commentErrors[post.id]}</p>}{threads[post.id]?.map(comment=><div key={comment.id} className="rounded-2xl bg-[#eef1f4] px-3 py-2"><b className="block text-xs text-[#182230]">{comment.authorName}</b>{comment.content&&<p className="mt-0.5 whitespace-pre-wrap text-sm text-[#344054]">{comment.content}</p>}{comment.imageUrl&&<img src={comment.imageUrl} onError={(event) => { event.currentTarget.hidden = true; }} alt="Ảnh trong bình luận" className="mt-2 max-h-64 max-w-full rounded-xl object-contain"/>}</div>)}{threads[post.id]===undefined&&<p className="text-center text-xs text-[#667085]">Đang tải bình luận...</p>}{threads[post.id]?.length===0&&<p className="text-center text-xs text-[#667085]">Chưa có bình luận.</p>}<div data-requires-account className="flex items-start gap-2"><CurrentMemberAvatar className="size-8"/><div className="min-w-0 flex-1">{commentImages[post.id]&&<div className="relative mb-2 w-fit"><img src={commentImages[post.id]?.url} alt="Ảnh chuẩn bị gửi" className="max-h-28 rounded-xl object-contain"/><button type="button" onClick={()=>setCommentImages(current=>({...current,[post.id]:undefined}))} className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-[#344054] text-white" aria-label="Bỏ ảnh"><X size={14}/></button></div>}<div className="flex items-center rounded-full bg-[#eef1f4] pl-3 pr-1"><input value={drafts[post.id]??""} onChange={event=>setDrafts(current=>({...current,[post.id]:event.target.value}))} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void sendComment(post);}}} maxLength={600} className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Viết bình luận..."/><label className="grid size-8 shrink-0 cursor-pointer place-items-center text-[#229ed9]" aria-label="Thêm ảnh" title="Thêm ảnh">{commentUploading[post.id]?<LoaderCircle size={17} className="animate-spin"/>:<ImageIcon size={17}/>}<input type="file" accept="image/*" className="sr-only" disabled={commentBusy[post.id]||commentUploading[post.id]} onChange={event=>void chooseCommentImage(post.id,event)}/></label><button type="button" onClick={()=>void sendComment(post)} disabled={commentBusy[post.id]||commentUploading[post.id]||(!(drafts[post.id]??"").trim()&&!commentImages[post.id])} className="grid size-8 shrink-0 place-items-center text-[#229ed9] disabled:text-[#bcc0c4]" aria-label="Gửi bình luận"><Send size={16}/></button></div></div></div></PostCommentPanel></article>})}
   </section>
-  {!loading && !loadError && posts.length === 0 && filteredModels.length === 0 && <p className="mt-5 rounded-2xl border border-dashed bg-white p-8 text-center text-sm text-[#667085]">{searchQuery ? "Không tìm thấy mặt tiền phù hợp." : "Chưa có mẫu mặt tiền."}</p>}
+  {!loading && !loadError && posts.length === 0 && filteredModels.length === 0 && <p className="mt-5 rounded-2xl border border-dashed bg-white p-8 text-center text-sm text-[#667085]">{targetPostId ? "Bài viết không còn hiển thị." : searchQuery ? "Không tìm thấy mặt tiền phù hợp." : "Chưa có mẫu mặt tiền."}</p>}
   <div ref={loadMoreRef} className="mt-6 flex min-h-12 items-center justify-center">
    {loading ? <p role="status" className="flex items-center gap-2 text-sm text-[#667085]"><LoaderCircle size={18} className="animate-spin"/>Đang tải mặt tiền...</p> : loadError ? <div role="alert" className="text-center text-sm text-rose-600"><p>Chưa thể tải bộ sưu tập cộng đồng.</p><button type="button" onClick={()=>setRefresh(current=>current+1)} className="mt-2 rounded-lg border bg-white px-4 py-2 font-semibold">Thử lại</button></div> : nextCursor && <button type="button" onClick={()=>setRequestCursor(nextCursor)} className="rounded-lg border bg-white px-4 py-2 text-sm font-semibold text-[#0b2e59]">Xem thêm mẫu</button>}
   </div>

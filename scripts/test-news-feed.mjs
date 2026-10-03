@@ -25,8 +25,9 @@ async function load(specifier, referencing) {
   if (cache.has(path)) return cache.get(path);
   const namespace = path === "@/db" ? { getDb: () => db } : path === "@/db/schema" ? schema
     : path === "@/lib/member-access" ? { memberAccessResponse: async () => signedIn ? null : Response.json({ error: "Login required" }, { status: 401 }) }
-    : path === "@/lib/member-identity" ? { currentMember: async () => ({ userId: "member", authorName: "Member", email: "member@example.test" }) }
-    : path === "cloudflare:workers" ? { env: { BUCKET: { head: async key => objects.get(key) ?? null } } }
+    : path === "@/lib/member-identity" ? { currentMember: async () => ({ userId: "member", authorName: "Member", email: "member@example.test" }), currentUserId: async () => "member" }
+    : path === "@/lib/payment-identity" ? { getPaymentBuyerId: async () => signedIn ? "member" : null }
+    : path === "cloudflare:workers" ? { env: { BUCKET: { head: async key => objects.get(key) ?? null, delete: async key => objects.delete(key) } } }
     : !path.startsWith("@/") ? await import(path) : null;
   const vmModule = namespace ? new SyntheticModule(Object.keys(namespace), function () {
     for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
@@ -42,6 +43,25 @@ await route.evaluate();
 const publishing = await load("@/app/api/posts/route");
 await publishing.link(load);
 await publishing.evaluate();
+const commenting = await load("@/app/api/comments/route");
+await commenting.link(load);
+await commenting.evaluate();
+const files = await load("@/app/api/files/route");
+await files.link(load);
+await files.evaluate();
+async function comment(body, status = 201) {
+  const response = await commenting.namespace.POST(new Request("http://localhost/api/comments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+  const payload = await response.json();
+  assert.equal(response.status, status, JSON.stringify(payload));
+  return payload;
+}
+async function readComments(params, status = 200) {
+  const response = await commenting.namespace.GET(new Request("http://localhost/api/comments?" + new URLSearchParams(params)));
+  const payload = await response.json();
+  assert.equal(response.status, status, JSON.stringify(payload));
+  if (status === 200) assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+  return payload;
+}
 async function publish(body, status = 201) {
   const response = await publishing.namespace.POST(new Request("http://localhost/api/posts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
   const payload = await response.json();
@@ -93,10 +113,21 @@ try {
   assert.equal(new Set([...first.posts, ...second.posts].map(post => post.id)).size, 24);
   const filtered = await read({ category: "Bộ sưu tập ảnh", q: "Mặt tiền cũ" });
   assert.equal(filtered.total, 1);
-  assert.equal(filtered.posts[0].sourceHref, `/kho-mau-nha-dep-chat/page/2#post-${oldest}`, "Search must not change source page rank.");
+  assert.equal(filtered.posts[0].sourceHref, `/kho-mau-nha-dep-chat?postId=${oldest}#post-${oldest}`, "Source links address the original post independently of pagination and search.");
   assert.equal((await read({ q: "Người chia sẻ" })).total, 24);
-  assert.equal((await read({ category: "Bản vẽ cộng đồng" })).posts[0].sourceHref, `/file-ban-ve-nha-dep-chat/page/1#post-${drawing}`);
-  assert.equal(first.posts[0].sourceHref, `/noi-that/page/1#post-${interior}`);
+  assert.equal((await read({ category: "Bản vẽ cộng đồng" })).posts[0].sourceHref, `/file-ban-ve-nha-dep-chat?postId=${drawing}#post-${drawing}`);
+  assert.equal(first.posts[0].sourceHref, `/noi-that?postId=${interior}#post-${interior}`);
+  for (const item of [filtered.posts[0], first.posts[1], first.posts[0]]) {
+    const sourceUrl = new URL(item.sourceHref, "http://localhost");
+    const params = new URLSearchParams({ category: item.category, postId: sourceUrl.searchParams.get("postId") });
+    if (item.category === "Bộ sưu tập ảnh") params.set("seed", "4321");
+    else params.set("page", "1");
+    const sourceResponse = await publishing.namespace.GET(new Request("http://localhost/api/posts?" + params));
+    assert.equal(sourceResponse.status, 200);
+    const sourcePayload = await sourceResponse.json();
+    assert.deepEqual(sourcePayload.posts.map(post => post.id), [item.id], "The source catalog must return exactly the original post, including older posts outside its first page.");
+    assert.equal(sourceUrl.hash, `#post-${item.id}`);
+  }
   assert.equal((await read({ q: "không có" })).total, 0);
   for (const page of ["0", "-1", "1.5", "NaN", "1000001"]) await read({ page }, 400);
   await read({ category: "Không hợp lệ" }, 400);
@@ -129,5 +160,56 @@ try {
   objects.set(image.key, { size: 100, customMetadata: { ownerUserId: "member", accessType: "public" }, httpMetadata: { contentType: "image/png" } });
   const photoPost = await publish({ category: "Bảng tin", attachments: [image] });
   assert.equal((await read({ postId: String(photoPost.post.id) })).posts[0].images[0].name, "photo.png");
-  console.log("PASS: direct text/photo publishing, authentication, validation, aggregation, privacy, filters, pagination and source links.");
+  const target = photoPost.post.id;
+  await comment({ postId: target, content: "" }, 400);
+  await comment({ postId: target, content: "x".repeat(601) }, 400);
+  await comment({ postId: target, content: 123 }, 400);
+  await comment({ postId: target, imageKey: "invalid" }, 400);
+  const missing = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  await comment({ postId: target, imageKey: missing }, 400);
+  objects.set(missing, { httpMetadata: { contentType: "application/pdf" }, customMetadata: { ownerUserId: "member" } });
+  await comment({ postId: target, imageKey: missing }, 400);
+  objects.set(missing, { httpMetadata: { contentType: "image/png" }, customMetadata: { ownerUserId: "other" } });
+  await comment({ postId: target, imageKey: missing }, 403);
+  objects.set(missing, { httpMetadata: { contentType: "image/png" }, customMetadata: { ownerUserId: "member", accessType: "private" } });
+  await comment({ postId: target, imageKey: missing }, 400);
+  signedIn = false; await comment({ postId: target, imageKey: image.key }, 401); signedIn = true;
+  sqlite.prepare("INSERT INTO member_profiles (user_id, display_name, avatar_key, updated_at) VALUES ('member', 'Member', 'member-avatar', 'now') ON CONFLICT(user_id) DO UPDATE SET avatar_key = 'member-avatar'").run();
+  const imageOnly = (await comment({ postId: target, imageKey: image.key })).comment;
+  assert.equal(imageOnly.content, "");
+  assert.equal(imageOnly.imageUrl, `/api/files?key=${image.key}`);
+  assert.equal(imageOnly.avatarUrl, "/api/files?key=member-avatar");
+  const commentOnlyImage = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+  objects.set(commentOnlyImage, { httpMetadata: { contentType: "image/png" }, customMetadata: { ownerUserId: "member", accessType: "public" } });
+  const withProtectedImage = await comment({ postId: target, content: "Có ảnh", imageKey: commentOnlyImage });
+  assert.equal(withProtectedImage.total, 2);
+  assert.equal((await files.namespace.DELETE(new Request(`http://localhost/api/files?key=${commentOnlyImage}`, { method: "DELETE" }))).status, 409);
+  assert.ok(objects.has(commentOnlyImage), "Images in saved comments must not be deleted by the upload cleanup endpoint.");
+  const combined = (await comment({ postId: target, content: "Có ảnh", imageKey: image.key })).comment;
+  assert.equal(combined.content, "Có ảnh");
+  assert.equal((await read({ postId: String(target) })).posts[0].comments, 3);
+  const addComment = sqlite.prepare("INSERT INTO post_comments (post_id, user_id, author_name, content, created_at) VALUES (?, 'member', 'Member', ?, '2026-10-03')");
+  for (let i = 0; i < 105; i++) addComment.run(target, `Bình luận ${i}`);
+  const newest = await readComments({ postId: target, limit: 20 });
+  assert.equal(newest.total, 108);
+  assert.equal(newest.comments.length, 20);
+  assert.equal(newest.comments.at(-1).content, "Bình luận 104");
+  assert.ok(newest.nextCursor);
+  const ids = new Set(newest.comments.map(item => item.id));
+  let cursor = newest.nextCursor;
+  while (cursor) {
+    const older = await readComments({ postId: target, limit: 20, beforeId: cursor });
+    assert.ok(older.comments.every(item => item.id < cursor));
+    for (const item of older.comments) { assert.ok(!ids.has(item.id)); ids.add(item.id); }
+    cursor = older.nextCursor;
+  }
+  assert.equal(ids.size, 108, "All comments remain accessible beyond the old 100-comment limit.");
+  assert.equal((await readComments({ postId: target })).comments.length, 100, "Existing catalog consumers keep their default ordering and limit.");
+  for (const params of [{ postId: 0 }, { postId: target, limit: 0 }, { postId: target, limit: 101 }, { postId: target, limit: 20, beforeId: -1 }, { postId: target, beforeId: 1 }]) await readComments(params, 400);
+  sqlite.prepare("UPDATE posts SET audience = 'Chỉ mình tôi' WHERE id = ?").run(target);
+  signedIn = false;
+  await readComments({ postId: target, limit: 20 }, 404);
+  signedIn = true;
+  await comment({ postId: target, content: "Ẩn" }, 404);
+  console.log("PASS: publishing, feed aggregation/privacy, source links, text/image comments, upload ownership, avatars, counts and complete comment pagination.");
 } finally { sqlite.close(); }
