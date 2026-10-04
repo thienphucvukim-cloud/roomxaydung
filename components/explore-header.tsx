@@ -14,6 +14,7 @@ import { EditableImage, useSiteEditor } from "@/components/site-editor";
 import { AccountSwitcher } from "@/components/account-switcher";
 import { RequestActionButton } from "@/components/interactive-actions";
 import { CurrentMemberAvatar } from "@/components/member-avatar";
+import { useNavigationFeedback, useNavigationMenuPathname } from "@/components/navigation-feedback";
 
 const nav = [
   [SITE_SECTIONS.news.label, SITE_SECTIONS.news.path, House],
@@ -35,6 +36,8 @@ function isActive(pathname: string, href: string) {
 export function ExploreHeader() {
   const siteEditor = useSiteEditor();
   const pathname = usePathname();
+  const menuPathname = useNavigationMenuPathname();
+  const navigationFeedback = useNavigationFeedback();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -57,7 +60,9 @@ export function ExploreHeader() {
     event.preventDefault();
     if (query.trim()) {
       setMobileSearchExpanded(false);
-      router.push("/tim-kiem?q=" + encodeURIComponent(query.trim()));
+      const href = "/tim-kiem?q=" + encodeURIComponent(query.trim());
+      navigationFeedback?.begin(href);
+      router.push(href);
     }
   };
 
@@ -77,7 +82,7 @@ export function ExploreHeader() {
 
       <AnimatedTabNavigation
         items={nav}
-        activeIndex={nav.findIndex(([, href]) => isActive(pathname, href))}
+        activeIndex={nav.findIndex(([, href]) => isActive(menuPathname, href))}
         label="Điều hướng chính"
         className="hidden h-full w-full grid-cols-6 lg:grid"
       />
@@ -95,9 +100,9 @@ export function ExploreHeader() {
           <PopoverContent align="end" className="max-h-[var(--radix-popover-content-available-height)] w-72 overflow-y-auto rounded-2xl border-[#dde5ed] p-2 shadow-xl">
             <ClientNavigationLink href="/tai-khoan" className="flex items-center gap-3 rounded-xl bg-[#f3f7fa] p-3"><CurrentMemberAvatar className="size-11"/><span><b className="block text-sm">{member?.name || "Thành viên NhàĐẹpChất"}</b><small className="text-[#667085]">Xem trang cá nhân</small></span></ClientNavigationLink>
             <ClientNavigationLink href="/tai-khoan" className="mt-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><UserRound size={18}/>Hoạt động của tôi</ClientNavigationLink>
-            <a href="/tai-khoan#vi-nhadepchat" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#168ac0] hover:bg-[#f3f7fa]"><WalletCards size={18}/>Nạp tiền vào ví</a>
+            <ClientNavigationLink href="/tai-khoan#vi-nhadepchat" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#168ac0] hover:bg-[#f3f7fa]"><WalletCards size={18}/>Nạp tiền vào ví</ClientNavigationLink>
             <ClientNavigationLink href="/thue-thiet-ke" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><Handshake size={18}/>Dự án thuê thiết kế</ClientNavigationLink>
-            <a href="/tai-khoan#mau-ua-thich" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><Heart size={18}/>Mẫu ưa thích</a>
+            <ClientNavigationLink href="/tai-khoan#mau-ua-thich" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><Heart size={18}/>Mẫu ưa thích</ClientNavigationLink>
             {member?.isAdmin && <button type="button" onClick={() => siteEditor.manage("noi-dung")} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><ShieldCheck size={18}/>Quản lý website</button>}
             <AccountSwitcher returnTo={pathname} blocked={siteEditor.accountSwitchBlocked}/>
             {member?.authenticated ? <form action="/api/auth/logout" method="post"><button disabled={siteEditor.accountSwitchBlocked} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa] disabled:opacity-50"><LogOut size={18}/>Đăng xuất</button></form> : <ClientNavigationLink href={"/dang-nhap?return_to=" + encodeURIComponent(pathname)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-[#f3f7fa]"><LogIn size={18}/>Đăng nhập</ClientNavigationLink>}

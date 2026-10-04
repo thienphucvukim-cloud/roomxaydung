@@ -26,6 +26,7 @@ try {
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
   let seq = 0;
   const pending = new Map(), exceptions = [], apiRequests = [];
+  let delayRscUntil = 0, delayedRscRequests = 0;
   socket.addEventListener('message', event => {
     const message = JSON.parse(event.data);
     if (message.id) {
@@ -34,6 +35,13 @@ try {
     }
     if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
     if (message.method === 'Network.requestWillBeSent' && message.params.request.url.includes('/api/')) apiRequests.push(message.params.request.url);
+    if (message.method === 'Fetch.requestPaused') {
+      const request = message.params.request;
+      const rsc = Object.entries(request.headers).some(([name, value]) => name.toLowerCase() === 'rsc' && value === '1');
+      const delay = rsc && Date.now() < delayRscUntil ? 2200 : 0;
+      if (delay) delayedRscRequests++;
+      setTimeout(() => void send('Fetch.continueRequest', { requestId: message.params.requestId }).catch(() => {}), delay);
+    }
   });
   const send = (method, params = {}) => new Promise((resolve, reject) => {
     const id = ++seq;
@@ -64,17 +72,34 @@ try {
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 120 });
   };
   await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable');
+  await send('Network.setCacheDisabled', { cacheDisabled: true });
+  await send('Fetch.enable', { patterns: [{ urlPattern: origin + '/*', requestStage: 'Request' }] });
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: origin });
   await waitFor(`window.next?.router && document.querySelector('.desktop-tab-link') && document.querySelector('main')`);
   // Allow effects and hydration to settle before the first interaction.
   await pause(1000);
   await evaluate(`void (window.menuReview = { header:document.querySelector('.social-header'), desktop:document.querySelector('.animated-tab-nav:not(.mobile-social-nav)'), mobile:document.querySelector('.mobile-social-nav') })`);
-  const route = async (href, mobile = false) => {
+  const route = async (href, mobile = false, delayed = false) => {
     const selector = `${mobile ? '.mobile-dock-link' : '.desktop-tab-link'}[href="${href}"]`;
     const started = Date.now();
+    const oldPath = await evaluate('location.pathname');
+    const beforeDelayed = delayedRscRequests;
+    if (delayed) delayRscUntil = Date.now() + 3000;
     await click(selector, mobile);
+    if (delayed) {
+      await waitFor(`document.querySelector(${JSON.stringify(selector)})?.getAttribute('aria-current') === 'page' && document.querySelector('[data-navigation-loading]')`);
+      const feedbackMs = Date.now() - started;
+      assert.ok(feedbackMs < 750, 'Menu must react before the intentionally delayed RSC request');
+      assert.equal(await evaluate('location.pathname'), oldPath, 'Feedback must appear before the route response commits');
+      const oldPage = await evaluate('(() => {const page=document.querySelector("[data-navigation-content] > div"); return {inert:page.inert,opacity:getComputedStyle(page).opacity,ariaHidden:page.getAttribute("aria-hidden")};})()');
+      assert.ok(oldPage.inert && Number(oldPage.opacity) < .01 && oldPage.ariaHidden === 'true', 'Old page must be hidden and inactive during navigation: ' + JSON.stringify(oldPage));
+      console.log(`PASS immediate ${mobile ? 'mobile' : 'desktop'} menu/loading feedback (${feedbackMs}ms while RSC delayed 2200ms)`);
+    }
     await waitFor(`location.pathname === ${JSON.stringify(href)} && document.querySelector(${JSON.stringify(selector)})?.getAttribute('aria-current') === 'page'`);
+    await waitFor(`!document.querySelector('[data-navigation-loading]')`);
+    if (delayed) assert.ok(delayedRscRequests > beforeDelayed, 'The test must actually delay a route request');
+    delayRscUntil = 0;
     await pause(350);
     assert.equal(await evaluate(`window.menuReview?.header === document.querySelector('.social-header')`), true, 'Header must stay mounted across navigation');
     assert.equal(await evaluate(`window.menuReview.${mobile ? 'mobile' : 'desktop'} === document.querySelector(${JSON.stringify(mobile ? '.mobile-social-nav' : '.animated-tab-nav:not(.mobile-social-nav)')})`), true, 'Menu must stay mounted');
@@ -83,7 +108,23 @@ try {
     assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
     console.log(`PASS ${mobile ? 'mobile' : 'desktop'} ${href} (${Date.now() - started}ms incl. settle)`);
   };
-  for (const href of ['/kho-mau-nha-dep-chat', '/file-ban-ve-nha-dep-chat', '/noi-that', '/tinh-vat-tu-nha-dep-chat', '/thue-thiet-ke', '/']) await route(href);
+  await evaluate('window.scrollTo({top:900,behavior:"instant"})');
+  await route('/kho-mau-nha-dep-chat', false, true);
+  await evaluate('history.back()');
+  await waitFor(`location.pathname === '/' && scrollY > 500`);
+  await evaluate('history.forward()');
+  await waitFor(`location.pathname === '/kho-mau-nha-dep-chat' && scrollY < 5`);
+  console.log('PASS: loading keeps page geometry stable; Back restores the previous feed scroll position.');
+  delayRscUntil = Date.now() + 4000;
+  await click('.desktop-tab-link[href="/file-ban-ve-nha-dep-chat"]');
+  await click('.desktop-tab-link[href="/noi-that"]');
+  await waitFor(`document.querySelector('.desktop-tab-link[aria-current="page"]')?.getAttribute('href') === '/noi-that' && document.querySelector('[data-navigation-loading]')`);
+  await waitFor(`location.pathname === '/noi-that' && !document.querySelector('[data-navigation-loading]')`);
+  delayRscUntil = 0;
+  await pause(2500);
+  assert.equal(await evaluate('location.pathname'), '/noi-that', 'A late response must not override the latest menu click');
+  console.log('PASS: rapid menu clicks select the latest target and supersede the previous request.');
+  for (const href of ['/file-ban-ve-nha-dep-chat', '/noi-that', '/tinh-vat-tu-nha-dep-chat', '/thue-thiet-ke', '/']) await route(href);
   await evaluate('history.back()');
   await waitFor(`location.pathname === '/thue-thiet-ke' && document.querySelector('.desktop-tab-link[aria-current="page"]')?.getAttribute('href') === '/thue-thiet-ke'`);
   await pause(350);
@@ -99,7 +140,12 @@ try {
 
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
-  for (const href of ['/', '/kho-mau-nha-dep-chat', '/file-ban-ve-nha-dep-chat', '/noi-that', '/thue-thiet-ke']) await route(href, true);
+  await send('Page.navigate', { url: origin + '/noi-that' });
+  await waitFor(`location.pathname === '/noi-that' && window.next?.router && document.querySelector('.mobile-dock-link')`);
+  await pause(1000);
+  await evaluate(`void (window.menuReview = { header:document.querySelector('.social-header'), desktop:document.querySelector('.animated-tab-nav:not(.mobile-social-nav)'), mobile:document.querySelector('.mobile-social-nav') })`);
+  await route('/', true, true);
+  for (const href of ['/kho-mau-nha-dep-chat', '/file-ban-ve-nha-dep-chat', '/noi-that', '/thue-thiet-ke']) await route(href, true);
   await click('button[aria-label="Mở menu"]', true);
   await waitFor(`document.querySelector('[data-slot="sheet-content"][data-state="open"]')`);
   await pause(550);

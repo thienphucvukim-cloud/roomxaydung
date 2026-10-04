@@ -1,7 +1,7 @@
 "use client";
 
 import { SITE_SECTIONS } from "@/lib/site-sections";
-import { usePathname } from "next/navigation";
+import { useNavigationMenuPathname } from "@/components/navigation-feedback";
 import { DraftingCompass, House, Sofa, Handshake } from "lucide-react";
 import { HouseGalleryIcon } from "@/components/house-gallery-icon";
 import { AnimatedTabNavigation } from "@/components/animated-tab-navigation";
@@ -15,7 +15,7 @@ const items = [
 ] as const;
 
 export function SocialDock() {
-  const pathname = usePathname();
+  const pathname = useNavigationMenuPathname();
 
   return <AnimatedTabNavigation
     items={items}

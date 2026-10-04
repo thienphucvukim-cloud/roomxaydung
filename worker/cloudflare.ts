@@ -104,7 +104,9 @@ const worker = {
       }
       return dispatchApi(sanitized);
     }
-    if (readOnly && env.API_RUNTIME && (isPublicSeoPage(pathname) || isSitemapPath(pathname))) {
+    if (readOnly && env.API_RUNTIME && ((isPublicSeoPage(pathname) && request.headers.get("rsc") !== "1") || isSitemapPath(pathname))) {
+      // Direct visits keep live SEO HTML. Client navigation uses the existing
+      // prebuilt RSC shells below and fetches page data after the route switches.
       // A dedicated named shard isolates public page rendering from auth and
       // uploads without adding a binding, migration or paid resource.
       const headers = new Headers(request.headers);

@@ -5,11 +5,15 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 const origin = process.env.TIPOOK_TEST_ORIGIN || "http://127.0.0.1:8790";
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(origin).hostname));
-const baseline = process.argv.includes("--baseline"), dir = path.resolve(".sites-runtime/seo-ui-review");
+const baseline = process.argv.includes("--baseline"), dir = path.resolve(process.env.TIPOOK_TEST_UI_DIR || ".sites-runtime/seo-ui-review");
 mkdirSync(dir, { recursive: true });
 const data = await (await fetch(origin + "/api/news-feed")).json();
 assert.ok(data.posts.length, "Seed the local review database first");
-const post = data.posts[0];
+const previousViews = baseline ? [] : JSON.parse(readFileSync(path.join(dir, "before.json"), "utf8"));
+const previousPostId = previousViews.find(item => item.route.startsWith("/bai-viet/"))?.route.split("/").at(-1);
+// Compare the same post/profile even when newer local fixtures are added.
+const post = baseline ? data.posts[0] : data.posts.find(post => String(post.id) === previousPostId);
+assert.ok(post, "The original baseline post must remain in the local review data");
 const routes = ["/", "/bai-viet/" + post.id, "/kho-mau-nha-dep-chat", "/file-ban-ve-nha-dep-chat", "/noi-that", "/nguoi-dung/" + post.userId];
 const chrome = spawn("C:/Program Files/Google/Chrome/Application/chrome.exe", ["--headless=new", "--no-sandbox", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=9237", `--user-data-dir=${path.join(dir, "chrome")}`, "about:blank"], { windowsHide: true, stdio: "ignore" });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
