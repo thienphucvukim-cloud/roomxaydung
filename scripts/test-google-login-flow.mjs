@@ -27,11 +27,14 @@ const db = drizzle(async (sql, params, method) => {
 });
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const signingKey = { ...publicKey.export({ format: "jwk" }), kid: "fixture", alg: "RS256", use: "sig" };
-let cookieJar = {}, pendingAuthorization, loginClaims = {}, tamper = false, exchanges = 0;
+let cookieJar = {}, pendingAuthorization, loginClaims = {}, tamper = false, exchanges = 0, keyRequests = 0;
 const base = "http://localhost:5173";
 const digest = value => createHash("sha256").update(value).digest("hex");
 async function googleFetch(url, options) {
-  if (url === "https://www.googleapis.com/oauth2/v3/certs") return Response.json({ keys: [signingKey] });
+  if (url === "https://www.googleapis.com/oauth2/v3/certs") {
+    keyRequests++;
+    return Response.json({ keys: [signingKey] }, { headers: { "Cache-Control": "public, max-age=3600" } });
+  }
   assert.equal(url, "https://oauth2.googleapis.com/token");
   const body = options.body;
   assert.equal(body.get("redirect_uri"), base + "/api/auth/google/callback");
@@ -112,6 +115,7 @@ assert.equal(sqlite.prepare("SELECT count(*) AS count FROM website_accounts WHER
 const avatar = sqlite.prepare("SELECT avatar_key, google_avatar_url FROM member_profiles WHERE user_id = ?").get(member.user_id);
 assert.equal(avatar.avatar_key, "custom-avatar", "Google login must preserve the user's custom avatar");
 assert.equal(avatar.google_avatar_url, "https://lh3.googleusercontent.com/updated-avatar");
+assert.equal(keyRequests, 1, "Repeat Google logins should reuse the public keys without another network request");
 
 // Google leaves the website for consent, but the callback must still land on
 // the exact post/model with the original catalog filters and hash intact.

@@ -3,13 +3,14 @@ import { cookies } from "next/headers";
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { memberProfiles, websiteAccounts } from "@/db/schema";
+import { websiteAccounts } from "@/db/schema";
 import { assertActiveMember } from "@/lib/member-account-status";
 import { hashToken } from "@/lib/password";
 import { AuthFlowError, limitAuthAttempts, requestIp } from "@/lib/auth-security";
 import { createWebsiteSession } from "@/lib/auth-sessions";
 import { safeAuthReturn, validOrigin } from "@/lib/website-auth";
-import { googleAuthorizationUrl, GOOGLE_KEYS_URL, GOOGLE_TOKEN_URL, verifyGoogleIdToken } from "@/lib/google-oauth";
+import { googleAuthorizationUrl, GOOGLE_TOKEN_URL, verifyGoogleIdToken } from "@/lib/google-oauth";
+import { googleKeyCache } from "@/lib/google-key-cache";
 
 const GOOGLE_COOKIE = "tipook_google_login";
 const TEN_MINUTES = 600_000;
@@ -70,15 +71,15 @@ export async function completeGoogleLogin(request: Request) {
     if (params.has("error")) throw new AuthFlowError("Bạn đã hủy hoặc chưa cho phép đăng nhập Google.");
     const code = params.get("code") || "";
     if (!code || code.length > 4096) throw new AuthFlowError("Không nhận được mã đăng nhập Google. Vui lòng thử lại.");
-    const tokenResponse = await fetch(GOOGLE_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirectUri, grant_type: "authorization_code", code_verifier: pending.verifier }), signal: AbortSignal.timeout(10000) });
+    const [tokenResponse, initialKeys] = await Promise.all([
+      fetch(GOOGLE_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirectUri, grant_type: "authorization_code", code_verifier: pending.verifier }), signal: AbortSignal.timeout(10000) }),
+      googleKeyCache.get(),
+    ]);
     if (!tokenResponse.ok) throw new AuthFlowError("Google chưa thể xác nhận đăng nhập. Vui lòng thử lại.");
     const tokens = await tokenResponse.json() as { id_token?: unknown };
     if (typeof tokens.id_token !== "string") throw new AuthFlowError("Google chưa thể xác nhận đăng nhập. Vui lòng thử lại.");
-    const keyResponse = await fetch(GOOGLE_KEYS_URL, { signal: AbortSignal.timeout(10000) });
-    if (!keyResponse.ok) throw new AuthFlowError("Chưa thể xác minh tài khoản Google. Vui lòng thử lại.");
-    const keySet = await keyResponse.json() as { keys: (JsonWebKey & { kid?: string })[] };
-    const profile = await verifyGoogleIdToken(tokens.id_token, config.clientId, pending.nonce, keySet.keys);
+    const profile = await verifyGoogleIdToken(tokens.id_token, config.clientId, pending.nonce, await googleKeyCache.forToken(tokens.id_token, initialKeys));
     const db = getDb();
     let [account] = await db.select().from(websiteAccounts).where(eq(websiteAccounts.googleSub, profile.sub)).limit(1);
     const ownerEmail = (env as unknown as Record<string, string | undefined>).TIPOOK_ADMIN_EMAIL?.trim().toLowerCase();
@@ -94,11 +95,7 @@ export async function completeGoogleLogin(request: Request) {
       if (!account) throw new AuthFlowError("Email này đã có tài khoản. Vui lòng đăng nhập bằng email và mật khẩu đã đăng ký.", 409);
     }
     await assertActiveMember(account.userId);
-    if (profile.picture) {
-      await db.insert(memberProfiles).values({ userId: account.userId, displayName: account.displayName, email: account.email, googleAvatarUrl: profile.picture })
-        .onConflictDoUpdate({ target: memberProfiles.userId, set: { googleAvatarUrl: profile.picture, updatedAt: new Date().toISOString() } });
-    }
-    const session = await createWebsiteSession(request, account, returnTo);
+    const session = await createWebsiteSession(request, account, returnTo, false, null, profile.picture);
     const result = await session.json() as { redirectTo: string };
     const response = new Response(null, { status: 303, headers: session.headers });
     response.headers.set("Location", result.redirectTo);

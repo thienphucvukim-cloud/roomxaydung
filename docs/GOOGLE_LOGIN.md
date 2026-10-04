@@ -57,6 +57,14 @@ OAuth dùng authorization code, PKCE, state gắn với cookie trình duyệt v�
 Máy chủ xác minh chữ ký RS256, issuer, audience, thời hạn và email đã xác minh
 trước khi tạo phiên HttpOnly. Không lưu access token hoặc refresh token.
 
+Khóa công khai của Google được dùng lại theo `Cache-Control` và `Age`, tối đa
+6 giờ, tự tải mới khi xuất hiện `kid` chưa có. Khi chưa có khóa trong bộ nhớ,
+việc đổi mã và tải khóa chạy đồng thời. Token, nonce và chữ ký vẫn được kiểm
+tra cho từng lần đăng nhập. Hồ sơ, ảnh đại diện Google và phiên được ghi trong
+một batch D1. Durable Object dọn các phiên và giới hạn đăng nhập đã hết hạn
+bằng `waitUntil`, tối đa một lần mỗi 15 phút trên mỗi shard, sau khi có phản hồi.
+Mọi lần đọc phiên vẫn kiểm tra hạn và trạng thái tài khoản.
+
 Nếu email Google trùng một tài khoản đã đăng ký bằng mật khẩu, website yêu cầu
 đăng nhập bằng mật khẩu của tài khoản đó; không tự ghép hai tài khoản theo email.
 Google không cấp phiên quản trị. Email quản trị cần dùng mật khẩu và TOTP.
@@ -71,6 +79,8 @@ khôi phục và các yêu cầu TOTP hiện có khi chuyển email sang trườ
 ```bash
 node scripts/test-member-auth-migration.mjs
 node scripts/test-google-oauth.mjs
+node scripts/test-google-key-cache.mjs
+node --experimental-vm-modules scripts/test-auth-session-cleanup.mjs
 node --experimental-vm-modules scripts/test-google-login-flow.mjs
 ```
 

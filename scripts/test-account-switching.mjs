@@ -16,7 +16,11 @@ function prepare(sql, args = []) {
   return { bind: (...values) => prepare(sql, values), first: async () => sqlite.prepare(sql).get(...args) || null,
     all: async () => ({ results: sqlite.prepare(sql).all(...args) }) };
 }
-const env = { TIPOOK_ADMIN_EMAIL: "owner@example.test", DB: { prepare } };
+const env = { TIPOOK_ADMIN_EMAIL: "owner@example.test", DB: { prepare, batch: async statements => {
+  sqlite.exec("BEGIN");
+  try { const result = await Promise.all(statements.map(statement => statement.all())); sqlite.exec("COMMIT"); return result; }
+  catch (error) { sqlite.exec("ROLLBACK"); throw error; }
+} } };
 const db = drizzle(async (sql, params, method) => {
   const statement = sqlite.prepare(sql);
   if (method === "run") return { rows: [], ...statement.run(...params) };

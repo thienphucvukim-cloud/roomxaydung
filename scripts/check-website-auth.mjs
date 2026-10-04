@@ -67,7 +67,8 @@ try {
   assert.equal(loggedIn.data.redirectTo, "/tai-khoan");
   const secondCookie = loggedIn.cookie;
   await send("/api/auth/password", "POST", { password, newPassword: "Another-password-456" }, memberCookie);
-  assert.equal((await send("/api/me", "GET", undefined, secondCookie)).data.user.authenticated, false);
+  const revoked = (await send("/api/me", "GET", undefined, secondCookie)).data.user;
+  assert.ok(revoked === null || revoked.authenticated === false);
   await send("/api/auth/login", "POST", { email: fixtureEmail, password }, undefined, 401);
   await send("/api/auth/login", "POST", { email: fixtureEmail, password: "Another-password-456" });
   console.log("PASS: registration, scrypt password storage, sessions, CSRF, safe return URLs and password change.");
@@ -89,7 +90,8 @@ try {
   assert.ok(!(await send("/api/site-content")).data.content[contentKey]);
   console.log("PASS: owner access, spoof rejection, safe image URLs, persistent website edits and restore default.");
   await send("/api/auth/logout", "POST", undefined, memberCookie, 303);
-  assert.equal((await send("/api/me", "GET", undefined, memberCookie)).data.user.authenticated, false);
+  const loggedOut = (await send("/api/me", "GET", undefined, memberCookie)).data.user;
+  assert.ok(loggedOut === null || loggedOut.authenticated === false);
   const unknown = `unknown_${crypto.randomUUID()}@example.test`;
   for (let i = 0; i < 10; i++) await send("/api/auth/login", "POST", { email: unknown, password }, undefined, 401);
   await send("/api/auth/login", "POST", { email: unknown, password }, undefined, 429);
