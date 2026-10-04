@@ -16,6 +16,9 @@ async function load(id) {
 }
 const entry=await load(new URL('../lib/seo-sitemap.ts',import.meta.url).href);await entry.evaluate();
 const response=entry.namespace.sitemapResponse;
+const staticXml=await(await response('/sitemaps/static.xml')).text();
+assert.ok(staticXml.includes('https://nhadepchat.top/gioi-thieu</loc>'));
+assert.ok(staticXml.includes('https://nhadepchat.top/nha-dep-chat-kien-truc.webp</image:loc>'));
 const addPost=sqlite.prepare("INSERT INTO posts(user_id,author_name,title,content,category,audience,created_at) VALUES(?,?,?,?,?,?,'2026-10-04T00:00:00Z')");
 const addMember=sqlite.prepare('INSERT INTO member_profiles(user_id,display_name,account_status) VALUES(?,?,?)');
 for(const [id,status] of [['public_member','active'],['empty_member','active'],['disabled_member','disabled']])addMember.run(id,id,status);

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { canonicalUrl, pageMetadata, postStructuredData, serializeStructuredData, seoCatalogPage } from '../lib/seo.ts';
+import { canonicalUrl, pageMetadata, postStructuredData, serializeStructuredData, seoCatalogPage, SITE_IMAGE, sitePageStructuredData, isPublicSeoPage } from '../lib/seo.ts';
 import { robotsResponse } from '../lib/seo-robots.ts';
 assert.equal(canonicalUrl('/bai-viet/12?return_to=x#post-12'), 'https://nhadepchat.top/bai-viet/12');
 assert.equal(canonicalUrl('/noi-that?page=2&q=abc'), 'https://nhadepchat.top/noi-that?page=2');
@@ -24,6 +24,11 @@ assert.equal(schema.comment, undefined, 'Do not mark up comments that are not in
 const metadata = pageMetadata('Post title', 'Line one\nLine two', '/bai-viet/12');
 assert.equal(metadata.alternates.canonical, 'https://nhadepchat.top/bai-viet/12');
 assert.equal(metadata.description, 'Line one Line two');
+assert.equal(metadata.openGraph.images[0], 'https://nhadepchat.top' + SITE_IMAGE);
+assert.equal(pageMetadata('With image', 'Description', '/bai-viet/12', ['/photo.webp']).openGraph.images[0], 'https://nhadepchat.top/photo.webp');
+assert.ok(isPublicSeoPage('/gioi-thieu'));
+assert.equal(sitePageStructuredData('/gioi-thieu')['@graph'][1]['@type'], 'AboutPage');
+assert.equal(sitePageStructuredData('/')['@graph'][1].primaryImageOfPage.url, 'https://nhadepchat.top' + SITE_IMAGE);
 const robots = robotsResponse();
 assert.equal(robots.headers.get('content-type'), 'text/plain; charset=utf-8');
 const directives = await robots.text();

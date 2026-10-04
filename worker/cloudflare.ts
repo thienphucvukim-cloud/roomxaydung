@@ -6,6 +6,7 @@ import { shellAssetPath, STATIC_SHELL_PATHS, STATIC_SHELL_TEMPLATES } from "../l
 import { handleConfiguredImageOptimization, isImageOptimizationPath } from "vinext/server/image-optimization";
 import { canonicalUrl, isPublicSeoPage, isSitemapPath } from "../lib/seo";
 import { robotsResponse } from "../lib/seo-robots";
+import { replaceRscShellTemplate } from "../lib/rsc-shell-template";
 export { ApiRuntime } from "./api-runtime";
 
 let shellVersion: { buildId: string; rscCompatibilityId: string } | undefined;
@@ -141,7 +142,8 @@ const worker = {
             headers.delete("content-length");
             headers.delete("content-encoding");
             headers.set("X-Vinext-Params", encodeURIComponent(JSON.stringify({ id: detailId })));
-            const body = (await response.text()).split(template.marker).join(detailId!);
+            const payload = await response.text();
+            const body = rsc ? replaceRscShellTemplate(payload, template.marker, detailId!) : payload.split(template.marker).join(detailId!);
             return new Response(request.method === "HEAD" ? null : body, { status: 200, headers });
           }
           return new Response(response.body, { status: response.status, headers });

@@ -4,7 +4,7 @@ import { SITE_SECTIONS } from "@/lib/site-sections";
 import { SITE_EVENTS } from "@/lib/site-events";
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Calculator, ChevronDown, CircleHelp, DraftingCompass, Heart, LogIn, LogOut, Menu, House, Search, ShieldCheck, Sofa, UserRound, WalletCards, Handshake } from "lucide-react";
+import { Bell, Calculator, ChevronDown, CircleHelp, DraftingCompass, Heart, LogIn, LogOut, Menu, House, Search, ShieldCheck, Sofa, UserRound, WalletCards, Handshake, Info } from "lucide-react";
 import { HouseGalleryIcon } from "@/components/house-gallery-icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -23,6 +23,7 @@ const nav = [
   [SITE_SECTIONS.interiors.label, SITE_SECTIONS.interiors.path, Sofa],
   [SITE_SECTIONS.designMarketplace.label, SITE_SECTIONS.designMarketplace.path, Handshake],
   [SITE_SECTIONS.materials.label, SITE_SECTIONS.materials.path, Calculator],
+  [SITE_SECTIONS.about.label, SITE_SECTIONS.about.path, Info],
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -67,7 +68,7 @@ export function ExploreHeader() {
   };
 
   return <header className="social-header sticky top-0 z-50 border-b border-[#e1e7ee] bg-white/95 shadow-[0_1px_8px_rgba(16,40,72,.07)] backdrop-blur-xl">
-    <div className="relative mx-auto grid h-[48px] min-h-[48px] max-h-[48px] max-w-[1360px] grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 px-2.5 sm:gap-2 sm:px-3.5 lg:h-[56px] lg:min-h-[56px] lg:max-h-[56px] lg:grid-cols-[1fr_minmax(300px,480px)_1fr] lg:gap-3 lg:px-5">
+    <div className="relative mx-auto grid h-[48px] min-h-[48px] max-h-[48px] max-w-[1360px] grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 px-2.5 sm:gap-2 sm:px-3.5 lg:h-[56px] lg:min-h-[56px] lg:max-h-[56px] lg:grid-cols-[1fr_minmax(300px,560px)_1fr] lg:gap-3 lg:px-5">
       <div className="flex min-w-0 items-center gap-3">
         <ClientNavigationLink href="/" className="flex shrink-0 items-center" aria-label="NhàĐẹpChất - Trang chủ">
           <EditableImage contentKey="global.logo" src="/nhadepchat-symbol.png?v=4" alt={siteEditor.content["global.name"]?.value || "NhàĐẹpChất"} width={1774} height={887} className="h-[32px] w-[64px] object-contain lg:h-[40px] lg:w-[80px]"/>
@@ -84,7 +85,7 @@ export function ExploreHeader() {
         items={nav}
         activeIndex={nav.findIndex(([, href]) => isActive(menuPathname, href))}
         label="Điều hướng chính"
-        className="hidden h-full w-full grid-cols-6 lg:grid"
+        className="hidden h-full w-full grid-cols-7 lg:grid"
       />
 
       <div className="flex min-w-0 items-center justify-end gap-0.5 sm:gap-1">

@@ -3,7 +3,7 @@
 export const STATIC_SHELL_PATHS = [
   "/", "/dang-nhap", "/dang-ky", "/admin", "/quen-mat-khau", "/tai-khoan",
   "/thue-thiet-ke", "/nhat-ky-xay-nha", "/cam-nang", "/mat-bang-cong-nang",
-  "/hoi-chuyen-gia", "/tinh-vat-tu-nha-dep-chat", "/privacy", "/tim-kiem",
+  "/hoi-chuyen-gia", "/tinh-vat-tu-nha-dep-chat", "/gioi-thieu", "/privacy", "/tim-kiem",
   "/kho-mau-nha-dep-chat", "/file-ban-ve-nha-dep-chat", "/noi-that",
 ] as const;
 // Detail pages load their records through authenticated/public APIs. The only

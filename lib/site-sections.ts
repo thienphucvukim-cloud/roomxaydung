@@ -7,6 +7,7 @@ export const SITE_SECTIONS = {
   interiors: { label: "Nội thất", path: "/noi-that" },
   designMarketplace: { label: "Thuê thiết kế", path: "/thue-thiet-ke" },
   materials: { label: "Tính vật tư", path: "/tinh-vat-tu-nha-dep-chat" },
+  about: { label: "Giới thiệu", path: "/gioi-thieu" },
 } as const;
 
 export function postCategoryLabel(category: string) {

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { POST_CATEGORIES } from "./legacy-contracts";
-import { PUBLIC_SEO_PATHS, SITE_ORIGIN } from "./seo";
+import { PUBLIC_SEO_PATHS, SITE_ORIGIN, SITE_IMAGE } from "./seo";
 
 const PAGE_SIZE = 1000;
 const categories = Object.values(POST_CATEGORIES).filter(category => category !== POST_CATEGORIES.modelDiscussion);
@@ -8,7 +8,7 @@ const categorySql = categories.map(() => "?").join(",");
 const visiblePosts = `p.audience = 'Công khai' AND p.category IN (${categorySql})`;
 const genuineProfile = `mp.account_status = 'active' AND NOT EXISTS (SELECT 1 FROM virtual_profiles vp WHERE vp.id = mp.user_id) AND EXISTS (SELECT 1 FROM posts p WHERE p.user_id = mp.user_id AND ${visiblePosts})`;
 export const xmlEscape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-const urlEntry = (url: string, images: { key: string; title: string }[] = []) => `<url><loc>${xmlEscape(url)}</loc>${images.map(image => `<image:image><image:loc>${xmlEscape(SITE_ORIGIN + "/api/files?key=" + encodeURIComponent(image.key))}</image:loc></image:image>`).join("")}</url>`;
+const urlEntry = (url: string, images: ({ key: string; title: string } | { url: string })[] = []) => `<url><loc>${xmlEscape(url)}</loc>${images.map(image => `<image:image><image:loc>${xmlEscape("url" in image ? image.url : SITE_ORIGIN + "/api/files?key=" + encodeURIComponent(image.key))}</image:loc></image:image>`).join("")}</url>`;
 const reply = (body: string, status = 200) => new Response(body, { status, headers: { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "no-store", "X-Robots-Tag": "noindex", ...(status === 503 ? { "Retry-After": "60" } : {}) } });
 
 export async function sitemapResponse(pathname: string) {
@@ -32,7 +32,7 @@ async function generateSitemap(pathname: string) {
     return reply(`<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map(url => `<sitemap><loc>${SITE_ORIGIN}${url}</loc></sitemap>`).join("")}</sitemapindex>`);
   }
   let entries: string[];
-  if (pathname === "/sitemaps/static.xml") entries = PUBLIC_SEO_PATHS.map(path => urlEntry(SITE_ORIGIN + path));
+  if (pathname === "/sitemaps/static.xml") entries = PUBLIC_SEO_PATHS.map(path => urlEntry(SITE_ORIGIN + path, ["/", "/gioi-thieu"].includes(path) ? [{ url: SITE_ORIGIN + SITE_IMAGE }] : []));
   else {
     const match = pathname.match(/^\/sitemaps\/(posts|profiles)-([1-9]\d*)\.xml$/);
     if (!match || Number(match[2]) > 1000000) return reply("Not found", 404);

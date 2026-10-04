@@ -16,6 +16,23 @@ const image=await file(),text='SEO visible content '+crypto.randomUUID().slice(0
 const {data:{post}}=await call('/api/posts',{category:'Bảng tin',title:'SEO public fixture',content:text,attachments:[image]},cookie,'POST',201);
 const document=async(path,options={})=>{const r=await fetch(origin+path,options);return {status:r.status,headers:r.headers,html:await r.text()};};
 const schemaOf=html=>[...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(match=>JSON.parse(match[1]));
+for(const path of ['/','/gioi-thieu']){
+ const {status,html,headers}=await document(path,{headers:{'user-agent':'Googlebot'}});
+ assert.equal(status,200);
+ const head=html.slice(html.indexOf('<head'),html.indexOf('</head>'));
+ assert.ok(head.includes('rel="icon" href="/favicon.png"'),'Favicon must be discoverable without streamed metadata or JavaScript');
+ assert.ok(html.includes('property="og:image" content="https://nhadepchat.top/nha-dep-chat-kien-truc.webp"'));
+ const graph=schemaOf(html).flatMap(schema=>schema['@graph']||[schema]);
+ assert.ok(graph.some(schema=>schema.primaryImageOfPage?.url==='https://nhadepchat.top/nha-dep-chat-kien-truc.webp'));
+ assert.ok(!headers.get('x-robots-tag')?.includes('noindex'));
+ if(path==='/gioi-thieu')assert.ok(graph.some(schema=>schema['@type']==='AboutPage'));
+}
+const staticMap=await document('/sitemaps/static.xml');
+assert.ok(staticMap.html.includes('https://nhadepchat.top/gioi-thieu</loc>'));
+for(const path of ['/favicon.png','/favicon.ico','/nha-dep-chat-kien-truc.webp']){
+ const response=await fetch(origin+path,{headers:{'user-agent':'Googlebot-Image'}});
+ assert.equal(response.status,200,path);assert.match(response.headers.get('content-type'),/^image\//);
+}
 let page=await document('/bai-viet/'+post.id);
 assert.equal(page.status,200);
 assert.ok(page.html.includes('id="post-'+post.id+'"'),'Public post is rendered before JavaScript');

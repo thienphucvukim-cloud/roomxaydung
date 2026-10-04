@@ -25,7 +25,7 @@ try {
   socket = new WebSocket(tabs.find(tab => tab.type === 'page').webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
   let seq = 0;
-  const pending = new Map(), exceptions = [], apiRequests = [];
+  const pending = new Map(), exceptions = [], apiRequests = [], consoleErrors = [];
   let delayRscUntil = 0, delayedRscRequests = 0;
   socket.addEventListener('message', event => {
     const message = JSON.parse(event.data);
@@ -34,6 +34,7 @@ try {
       if (message.error) task?.reject(new Error(JSON.stringify(message.error))); else task?.resolve(message.result);
     }
     if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
+    if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') consoleErrors.push(message.params.args.map(arg => arg.description || arg.value || '').join(' '));
     if (message.method === 'Network.requestWillBeSent' && message.params.request.url.includes('/api/')) apiRequests.push(message.params.request.url);
     if (message.method === 'Fetch.requestPaused') {
       const request = message.params.request;
@@ -56,7 +57,7 @@ try {
   };
   const waitFor = async expression => {
     for (let i = 0; i < 300; i++) { if (await evaluate(`Boolean(${expression})`)) return; await pause(100); }
-    throw new Error('Timeout: ' + expression + '\n' + await evaluate('document.body?.innerText.slice(0,1000)'));
+    throw new Error('Timeout: ' + expression + '\n' + await evaluate('document.body?.innerText.slice(0,1000)') + '\n' + [...exceptions, ...consoleErrors].join('\n'));
   };
   const click = async (selector, touch = false) => {
     await waitFor(`document.querySelector(${JSON.stringify(selector)})`);
@@ -124,7 +125,7 @@ try {
   await pause(2500);
   assert.equal(await evaluate('location.pathname'), '/noi-that', 'A late response must not override the latest menu click');
   console.log('PASS: rapid menu clicks select the latest target and supersede the previous request.');
-  for (const href of ['/file-ban-ve-nha-dep-chat', '/noi-that', '/tinh-vat-tu-nha-dep-chat', '/thue-thiet-ke', '/']) await route(href);
+  for (const href of ['/file-ban-ve-nha-dep-chat', '/noi-that', '/tinh-vat-tu-nha-dep-chat', '/gioi-thieu', '/thue-thiet-ke', '/']) await route(href);
   await evaluate('history.back()');
   await waitFor(`location.pathname === '/thue-thiet-ke' && document.querySelector('.desktop-tab-link[aria-current="page"]')?.getAttribute('href') === '/thue-thiet-ke'`);
   await pause(350);
@@ -151,6 +152,12 @@ try {
   await pause(550);
   await click('[data-slot="sheet-content"] a[href="/tinh-vat-tu-nha-dep-chat"]', true);
   await waitFor(`location.pathname === '/tinh-vat-tu-nha-dep-chat' && !document.querySelector('[data-slot="sheet-content"]')`);
+  await click('button[aria-label="Mở menu"]', true);
+  await waitFor(`document.querySelector('[data-slot="sheet-content"][data-state="open"]')`);
+  await pause(550);
+  await click('[data-slot="sheet-content"] a[href="/gioi-thieu"]', true);
+  await waitFor(`location.pathname === '/gioi-thieu' && !document.querySelector('[data-slot="sheet-content"]')`);
+  assert.equal(await evaluate(`document.querySelector('h1')?.textContent`), 'Cùng tìm ý tưởng, thiết kế và chuẩn bị xây ngôi nhà của bạn');
   await route('/', true);
   writeFileSync(path.join(dir, 'mobile.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
