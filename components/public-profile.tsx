@@ -5,10 +5,9 @@ import { MyPosts } from "@/components/my-posts";
 import { OwnerPostControls } from "@/components/site-editor";
 import { ProfileActions } from "@/components/profile-actions";
 import { MemberAvatar } from "@/components/member-avatar";
-type Profile = { displayName:string; avatarUrl?:string; profession:string; bio:string; location:string|null; own:boolean;
-  authoredPosts:{id:number;userId:string;title:string;category:string;content:string;imageUrl:string|null}[] };
-export function PublicProfile({ id: userId }: { id: string }) {
-  const [result, setResult] = useState<{ id:string; profile?:Profile; error?:string } | null>(null);
+import type { PublicProfileData as Profile } from "@/lib/public-profile-data";
+export function PublicProfile({ id: userId, initialProfile }: { id: string; initialProfile?: Profile }) {
+  const [result, setResult] = useState<{ id:string; profile?:Profile; error?:string } | null>(initialProfile ? { id: userId, profile: initialProfile } : null);
   useEffect(() => {
     const controller=new AbortController();
     fetch('/api/public-profile/'+encodeURIComponent(userId),{cache:'no-store',signal:controller.signal}).then(async response => {

@@ -4,6 +4,8 @@ import { AUTH_COOKIE } from "../lib/session-cookie";
 import { dispatchApi } from "./api-router";
 import { shellAssetPath, STATIC_SHELL_PATHS, STATIC_SHELL_TEMPLATES } from "../lib/static-shells";
 import { handleConfiguredImageOptimization, isImageOptimizationPath } from "vinext/server/image-optimization";
+import { canonicalUrl, isPublicSeoPage, isSitemapPath } from "../lib/seo";
+import { robotsResponse } from "../lib/seo-robots";
 export { ApiRuntime } from "./api-runtime";
 
 let shellVersion: { buildId: string; rscCompatibilityId: string } | undefined;
@@ -34,6 +36,7 @@ const worker = {
     // needs its own identity provider before authenticated login can be enabled.
     const pathname = new URL(request.url).pathname;
     const readOnly = request.method === "GET" || request.method === "HEAD";
+    if (readOnly && pathname === "/robots.txt") return robotsResponse(request.method);
     if (readOnly) {
       const url = new URL(request.url);
       if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -101,6 +104,13 @@ const worker = {
       }
       return dispatchApi(sanitized);
     }
+    if (readOnly && env.API_RUNTIME && (isPublicSeoPage(pathname) || isSitemapPath(pathname))) {
+      // A dedicated named shard isolates public page rendering from auth and
+      // uploads without adding a binding, migration or paid resource.
+      const headers = new Headers(request.headers);
+      headers.delete("cookie"); headers.delete("authorization");
+      return env.API_RUNTIME.get(env.API_RUNTIME.idFromName("public-pages")).fetch(cloudflareRequest(new Request(request, { headers })));
+    }
     const template = STATIC_SHELL_TEMPLATES.find(template => pathname.startsWith(template.prefix) && /^[A-Za-z0-9_-]{1,180}$/.test(pathname.slice(template.prefix.length)));
     const detailId = template ? pathname.slice(template.prefix.length) : undefined;
     if (template?.numeric && (!/^[1-9]\d*$/.test(detailId!) || !Number.isSafeInteger(Number(detailId)))) return new Response("Not found", { status: 404 });
@@ -147,4 +157,16 @@ const worker = {
   },
 };
 
-export default worker;
+const seoWorker = {
+  async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext) {
+    const response = await worker.fetch(request, env, ctx);
+    const url = new URL(request.url), headers = new Headers(response.headers);
+    const contentType = headers.get("content-type") || "";
+    if (contentType.includes("text/html")) {
+      if (!isPublicSeoPage(url.pathname) || [...url.searchParams.keys()].some(key => !["_rsc", "page"].includes(key))) headers.set("X-Robots-Tag", "noindex, follow");
+      if (isPublicSeoPage(url.pathname)) headers.set("Link", `<${canonicalUrl(url.pathname + url.search)}>; rel="canonical"`);
+    } else if (url.pathname.startsWith("/api/") && url.pathname !== "/api/files") headers.set("X-Robots-Tag", "noindex");
+    return new Response(response.body, { status: response.status, headers });
+  },
+};
+export default seoWorker;

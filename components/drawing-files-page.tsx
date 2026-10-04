@@ -5,19 +5,35 @@ import { ArrowDownToLine, Eye, FileText } from "lucide-react";
 import { CatalogEngagementStats } from "@/components/catalog-engagement";
 import { EditorialContent } from "@/components/editorial-content";
 import { ProjectGallery } from "@/components/project-gallery";
-import { FileCatalog } from "@/components/file-catalog";
+import { FileCatalog, type FileCatalogInitialData } from "@/components/file-catalog";
 import { CatalogPublishButton, RequestActionButton, ShareActionButton, ToggleActionButton } from "@/components/interactive-actions";
 import { PurchaseActionButton } from "@/components/purchase-action-button";
 import { drawings } from "@/lib/drawing-catalog";
 import { modelAuthAnchor } from "@/lib/action-auth-return";
 import type { FileCatalogSort } from "@/lib/file-catalog-sort";
+import { publicCatalog } from "@/lib/seo-data";
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
+import { getSiteContent } from "@/lib/site-content";
+import { demoPostVisible } from "@/lib/demo-posts";
 
 
 
 
-export function DrawingFilesPage({ page = 1, query = "", targetPostId, sort = "latest" }: { page?: number; query?: string; targetPostId?: string; sort?: FileCatalogSort }) {
+export async function DrawingFilesPage({ page = 1, query = "", targetPostId, sort = "latest" }: { page?: number; query?: string; targetPostId?: string; sort?: FileCatalogSort }) {
+  const params = new URLSearchParams({ category: POST_CATEGORIES.drawings, page: String(page), q: query });
+  if (targetPostId) params.set("postId", targetPostId);
+  if (sort !== "latest") {
+    const content = await getSiteContent(), normalized = query.toLocaleLowerCase("vi");
+    const keys = targetPostId ? [] : drawings.filter((drawing, index) => {
+      const prefix = `drawing.${index}`;
+      const search = `${drawing.title} ${drawing.category} ${drawing.price} ${drawing.authorName} ${drawing.isDemo ? "demo bài demo" : ""}`;
+      return demoPostVisible(content, prefix) && (!normalized || [search, ...Object.entries(content).filter(([key]) => key.startsWith(prefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized));
+    }).map(drawing => drawing.title);
+    params.set("sort", sort); params.set("modelKeys", JSON.stringify(keys));
+  }
+  const initialData = await publicCatalog<FileCatalogInitialData>(params);
   return <main className="drawing-files-page mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
-    <FileCatalog key={`${page}:${query}:${targetPostId ?? ""}:${sort}`} page={page} searchQuery={query} targetPostId={targetPostId} sort={sort} catalogCards={drawings.map((drawing, index) => ({
+    <FileCatalog initialData={initialData} key={`${page}:${query}:${targetPostId ?? ""}:${sort}`} page={page} searchQuery={query} targetPostId={targetPostId} sort={sort} catalogCards={drawings.map((drawing, index) => ({
       key: drawing.title,
       contentPrefix: `drawing.${index}`,
       search: `${drawing.title} ${drawing.category} ${drawing.price} ${drawing.authorName} ${drawing.isDemo ? "demo bài demo" : ""}`,

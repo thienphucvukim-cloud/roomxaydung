@@ -4,12 +4,12 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 // Read the current URL after hydration so one public shell can serve every
 // filter without sharing a visitor's query or session with another visitor.
-export function useCatalogLocation(initial: { searchQuery: string; sort: string; targetPostId?: string; page?: number }) {
+export function useCatalogLocation(initial: { searchQuery: string; sort: string; targetPostId?: string; page?: number; initialReady?: boolean }) {
   // These hooks subscribe to client-router commits as well as browser history.
   usePathname();
   useSearchParams();
   const href = useSyncExternalStore(subscribe, () => window.location.href, () => "");
-  if (!href) return { ...initial, ready: false };
+  if (!href) return { ...initial, ready: initial.initialReady ?? false };
   const url = new URL(href);
   const single = (key: string) => url.searchParams.getAll(key).length === 1 ? url.searchParams.get(key) ?? undefined : undefined;
   const page = url.pathname.match(/\/page\/([1-9]\d*)$/)?.[1] ?? single("page");

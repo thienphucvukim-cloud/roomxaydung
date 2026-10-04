@@ -4,8 +4,10 @@ import { SiteChrome } from "@/components/site-chrome";
 import { getSiteContent } from "@/lib/site-content";
 import "./owner-editor.css";
 import "./account-security.css";
+import { SITE_ORIGIN } from "@/lib/seo";
 
 const metadata: Metadata = {
+  metadataBase: new URL(SITE_ORIGIN),
   title: "NhàĐẹpChất — Cộng đồng tư vấn và thiết kế nhà",
   description: "Hỏi đáp, chia sẻ chi phí thực tế và kinh nghiệm từ những người đã và đang xây nhà.",
   icons: {

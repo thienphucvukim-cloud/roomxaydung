@@ -39,10 +39,15 @@ try {
   };
   const waitFor = async (expression, label) => { for (let i = 0; i < 150; i++) { if (await evaluate(`Boolean(${expression})`)) return; await pause(100); } console.log(await evaluate(`JSON.stringify({ url:location.href, body:document.body?.innerText.slice(0,3500), review:!!window.review })`), exceptions); writeFileSync(path.join(dir, 'failure.png'), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64')); throw new Error('Timeout: ' + label); };
   await send('Runtime.enable'); await send('Page.enable');
+  // Public detail pages now return a real 404 for missing posts. Keep the
+  // client API mocks, but use an existing public ID for server-side routing.
+  const publicPosts = (await (await fetch(origin + '/api/news-feed')).json()).posts;
+  assert.ok(publicPosts.length, 'Local review database needs a public post');
+  const fixtureId = publicPosts[0].id;
   const fixture = {
-    id: 900001, userId: 'review-author', authorName: 'Người chia sẻ', avatarUrl: null, category: 'Bản vẽ cộng đồng',
+    id: fixtureId, userId: 'review-author', authorName: 'Người chia sẻ', avatarUrl: null, category: 'Bản vẽ cộng đồng',
     title: 'Nhà phố 5 × 20m', content: 'Giá bán: 150000đ\nChi phí 125000000 VND\nLiên hệ 0912345678', specifications: '5 × 20m', listingType: null, priceLabel: '150000', comments: 1,
-    createdAt: '2026-10-03T08:00:00.000Z', sourceHref: '/file-ban-ve-nha-dep-chat?postId=900001#post-900001', sourceLabel: 'Kho bản vẽ',
+    createdAt: '2026-10-03T08:00:00.000Z', sourceHref: `/file-ban-ve-nha-dep-chat?postId=${fixtureId}#post-${fixtureId}`, sourceLabel: 'Kho bản vẽ',
     images: Array.from({ length: 7 }, (_, index) => ({ url: index % 2 ? '/mat-bang-5x20.png' : '/community-house.png', name: `Ảnh ${index + 1}` })),
   };
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
@@ -215,20 +220,20 @@ try {
   await waitFor(`document.querySelectorAll('article').length === 1 && document.querySelector('article').textContent.includes('Nội dung bài đăng tiếp theo')`, 'category filtering resets loaded pages');
   await evaluate(`Array.from(document.querySelectorAll('aside button')).find(button => button.textContent === 'Tất cả').click()`);
   await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'reset category');
-  await send('Page.navigate', { url: origin + '/bai-viet/900001' });
+  await send('Page.navigate', { url: origin + '/bai-viet/' + fixtureId });
   await waitFor(`document.querySelector('textarea[aria-label="Nội dung bình luận"]')`, 'detail page automatically loads comments');
-  assert.equal(await evaluate('location.pathname'), '/bai-viet/900001');
+  assert.equal(await evaluate('location.pathname'), '/bai-viet/' + fixtureId);
   for (const [category, sourcePath] of [['Bản vẽ cộng đồng', '/file-ban-ve-nha-dep-chat'], ['Bộ sưu tập ảnh', '/kho-mau-nha-dep-chat'], ['Nội thất cộng đồng', '/noi-that']]) {
     await send('Page.navigate', { url: origin });
     await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed for source navigation');
     await evaluate(`window.review.sourceCategory = ${JSON.stringify(category)}; window.dispatchEvent(new Event('nhadepchat-content-changed'))`);
     await pause(350);
-    await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify(sourcePath + '?postId=900001#post-900001')})`, 'original source link');
+    await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify(sourcePath + '?postId=' + fixtureId + '#post-' + fixtureId)})`, 'original source link');
     await evaluate(`Array.from(document.querySelector('article').querySelectorAll('a')).find(link => link.textContent.includes('Xem bài viết')).click()`);
-    await waitFor(`location.pathname === ${JSON.stringify(sourcePath)} && new URLSearchParams(location.search).get('postId') === '900001' && document.getElementById('post-900001')`, 'opens original post in ' + sourcePath);
-    assert.equal(await evaluate('location.hash'), '#post-900001');
+    await waitFor(`location.pathname === ${JSON.stringify(sourcePath)} && new URLSearchParams(location.search).get('postId') === '${fixtureId}' && document.getElementById('post-${fixtureId}')`, 'opens original post in ' + sourcePath);
+    assert.equal(await evaluate('location.hash'), '#post-' + fixtureId);
     assert.equal(await evaluate(`document.querySelectorAll('article[id^="post-"]').length`), 1);
-    assert.ok(await evaluate(`document.getElementById('post-900001').textContent.includes('Nhà phố 5 × 20m')`));
+    assert.ok(await evaluate(`document.getElementById('post-${fixtureId}').textContent.includes('Nhà phố 5 × 20m')`));
   }
   assert.deepEqual(exceptions, []);
   console.log('PASS: feed fits 320–1023px with scrollable categories; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in House Models, Drawings and Interiors.');

@@ -7,6 +7,8 @@ import path from 'node:path';
 
 const origin = process.env.TIPOOK_TEST_ORIGIN || 'http://localhost:5173';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname));
+const publicPosts = (await (await fetch(origin + '/api/news-feed')).json()).posts;
+assert.ok(publicPosts.length >= 2, 'Detail SEO checks need real public posts and profiles');
 const dir = path.resolve('.sites-runtime/menu-review');
 mkdirSync(dir, { recursive: true });
 const browserPath = process.env.TIPOOK_BROWSER_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -124,11 +126,11 @@ try {
   await waitFor('window.next?.router');
   await evaluate('void (window.detailReviewHeader=document.querySelector(".social-header"))');
   for (const [href, endpoint, key, value] of [
-    ['/bai-viet/1', '/api/news-feed', 'postId', '1'],
-    ['/bai-viet/2', '/api/news-feed', 'postId', '2'],
+    [`/bai-viet/${publicPosts[0].id}`, '/api/news-feed', 'postId', String(publicPosts[0].id)],
+    [`/bai-viet/${publicPosts[1].id}`, '/api/news-feed', 'postId', String(publicPosts[1].id)],
     ['/thue-thiet-ke/11', '/api/freelance/projects', 'id', '11'],
     ['/thue-thiet-ke/freelancer/test-member', '/api/freelance/profiles', 'id', 'test-member'],
-    ['/nguoi-dung/test-member', '/api/public-profile/test-member', null, null],
+    [`/nguoi-dung/${publicPosts[0].userId}`, `/api/public-profile/${publicPosts[0].userId}`, null, null],
   ]) {
     apiRequests.length = 0;
     await evaluate(`void window.next.router.push(${JSON.stringify(href)})`);

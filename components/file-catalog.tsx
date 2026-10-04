@@ -28,18 +28,19 @@ type ProfessionalRole = "engineer" | "architect";
 type Attachment = { key: string; name: string; type: string; size: number; url?: string; accessType?: "public" | "private" };
 type Post = { promotionPosition?: number | null; downloads?: number; id: number; userId: string; authorName: string; title: string; content: string; category: string; specifications?: string | null; listingType?: string | null; priceLabel?: string | null; attachments?: Attachment[] };
 type CatalogCard = { key: string; search: string; card: ReactNode; contentPrefix?: string };
-export function FileCatalog({ variant = "drawing", page: initialPage = 1, searchQuery: initialQuery = "", targetPostId: initialPostId, catalogCards = [], sort: initialSort = "latest" }: {
-  variant?: "drawing" | "interior"; page?: number; searchQuery?: string; targetPostId?: string; catalogCards?: CatalogCard[]; sort?: FileCatalogSort;
+export type FileCatalogInitialData = { posts: Post[]; total?: number; catalogOrder?: string[] };
+export function FileCatalog({ variant = "drawing", page: initialPage = 1, searchQuery: initialQuery = "", targetPostId: initialPostId, catalogCards = [], sort: initialSort = "latest", initialData }: {
+  variant?: "drawing" | "interior"; page?: number; searchQuery?: string; targetPostId?: string; catalogCards?: CatalogCard[]; sort?: FileCatalogSort; initialData?: FileCatalogInitialData;
 }) {
-  const location = useCatalogLocation({ searchQuery: initialQuery, sort: initialSort, targetPostId: initialPostId, page: initialPage });
+  const location = useCatalogLocation({ searchQuery: initialQuery, sort: initialSort, targetPostId: initialPostId, page: initialPage, initialReady: Boolean(initialData) });
   const { searchQuery, targetPostId, page = 1 } = location;
   const sort = parseFileCatalogSort(location.sort);
   const router = useRouter();
   const editor = useSiteEditor();
   const basePath = variant === "interior" ? "/noi-that" : "/file-ban-ve-nha-dep-chat";
-  const [totalPosts, setTotalPosts] = useState(0);
+  const [totalPosts, setTotalPosts] = useState(initialData?.total ?? 0);
   const requestScope = JSON.stringify([page, searchQuery, targetPostId, sort]);
-  const [loadedScope, setLoadedScope] = useState("");
+  const [loadedScope, setLoadedScope] = useState(initialData ? requestScope : "");
   const loading = !location.ready || loadedScope !== requestScope;
   const [refresh, setRefresh] = useState(0);
   const category = variant === "interior" ? POST_CATEGORIES.interiors : POST_CATEGORIES.drawings;
@@ -57,8 +58,8 @@ export function FileCatalog({ variant = "drawing", page: initialPage = 1, search
       { label: "Số tầng", options: ["1 tầng", "2 tầng", "3 tầng", "4 tầng"] },
       { label: "Định dạng", options: ["CAD", "DWG", "SketchUp", "Revit", "PDF"] },
     ];
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [catalogOrder, setCatalogOrder] = useState<string[] | null>(null);
+  const [posts, setPosts] = useState<Post[]>(initialData?.posts ?? []);
+  const [catalogOrder, setCatalogOrder] = useState<string[] | null>(initialData?.catalogOrder ?? null);
   usePostAnchor(posts);
   const [queryDraft, setQueryDraft] = useState({ source: searchQuery, value: searchQuery });
   const query = queryDraft.source === searchQuery ? queryDraft.value : searchQuery;

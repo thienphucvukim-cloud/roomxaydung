@@ -117,7 +117,7 @@ async function load(identifier) {
     },
   });
   modules.set(identifier, sourceModule);
-  await sourceModule.link((specifier, referencing) => specifier === "./api-router" ? apiRouter : specifier === "./api-runtime" ? kdfModule : specifier === "vinext/server/image-optimization" ? imageModule : load(new URL(specifier + ".ts", referencing.identifier).href));
+  await sourceModule.link((specifier, referencing) => specifier === "./api-router" ? apiRouter : specifier === "./api-runtime" ? kdfModule : specifier === "vinext/server/image-optimization" ? imageModule : load(new URL(specifier.endsWith(".ts") ? specifier : specifier + ".ts", referencing.identifier).href));
   return sourceModule;
 }
 const entryModule = await load(new URL("../worker/cloudflare.ts", import.meta.url).href);

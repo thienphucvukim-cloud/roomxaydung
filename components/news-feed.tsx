@@ -15,7 +15,7 @@ import { usePostAnchor } from "@/components/use-post-anchor";
 
 const sourceIcons = [House, HouseGalleryIcon, DraftingCompass, Sofa];
 
-export function NewsFeed({ postId }: { postId?: number }) {
+export function NewsFeed({ postId, initialData }: { postId?: number; initialData?: NewsFeedResponse }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [category, setCategory] = useState("");
@@ -25,7 +25,7 @@ export function NewsFeed({ postId }: { postId?: number }) {
   const [revision, setRevision] = useState(0);
   const scope = JSON.stringify([postId ?? null, category, search]);
   const selection = `${scope}:${page}`;
-  const [result, setResult] = useState<{ selection: string; scope: string; data?: NewsFeedResponse; error?: string }>({ selection: "", scope: "" });
+  const [result, setResult] = useState<{ selection: string; scope: string; data?: NewsFeedResponse; error?: string }>(initialData ? { selection, scope, data: initialData } : { selection: "", scope: "" });
   const [refreshing, setRefreshing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const loadedPages = useRef<{ scope: string; batches: NewsFeedResponse[] } | null>(null);
