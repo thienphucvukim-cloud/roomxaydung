@@ -4,7 +4,7 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function LegacyFacadePage({ searchParams }: PageProps) {
+export default async function LegacyHouseModelsPage({ searchParams }: PageProps) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(await searchParams)) {
     if (Array.isArray(value)) value.forEach(item => query.append(key, item));

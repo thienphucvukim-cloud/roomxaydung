@@ -2,6 +2,10 @@
 
 Website tham khảo mẫu nhà, bản vẽ xây dựng, tính vật tư và gửi yêu cầu tư vấn.
 
+Quy ước tên nghiệp vụ và các khóa cần giữ tương thích được ghi trong
+[docs/TERMINOLOGY.md](docs/TERMINOLOGY.md). Build và deploy kiểm tra tên cũ
+để tránh thay giao diện mà giữ logic mang tên chức năng đã bỏ.
+
 ## Công nghệ
 
 - Next.js App Router chạy qua Vinext/Vite
@@ -39,7 +43,7 @@ http://localhost:5173/
 
 Log local nằm tại `.sites-runtime/local/dev-server.log`.
 
-Trang chủ `/` (Bảng tin) tổng hợp bài công khai từ Mặt tiền, Kho bản vẽ và Nội thất,
+Trang chủ `/` (Bảng tin) tổng hợp bài công khai từ Mẫu nhà đẹp, Kho bản vẽ và Nội thất,
 xếp mới nhất trước, hỗ trợ tìm kiếm, lọc danh mục và phân trang. Bảng tin tự
 cập nhật mỗi 30 giây và dẫn đến đúng bài ở trang gốc; bài bị ẩn hoặc xóa sẽ
 không xuất hiện.
@@ -91,7 +95,7 @@ Khi dev server đang chạy, kiểm tra các luồng chức năng và phân tran
 
 ```bash
 node scripts/check-functional-flows.mjs
-node scripts/check-facade-pagination.mjs
+node scripts/check-house-model-pagination.mjs
 node scripts/check-website-auth.mjs
 node --experimental-vm-modules scripts/test-news-feed.mjs
 ```

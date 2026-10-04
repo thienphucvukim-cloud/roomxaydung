@@ -16,7 +16,7 @@ const modelAuthors = [
   ["virtual-architect-006", "KTS. Đặng Quang Vinh"],
 ] as const;
 
-export const facadeModels = modelItems.map((model, index) => {
+export const houseModels = modelItems.map((model, index) => {
   const [authorId, authorName] = modelAuthors[index];
   return { ...model, authorId, authorName, isDemo: true };
 });

@@ -7,7 +7,8 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 
 type Photo = { url: string; name: string };
 
-export function NewsPhotoViewer({ photos, index, onIndexChange, onClose, onRestoreFocus, title, children }: {
+export function NewsPhotoViewer({ photos, index, onIndexChange, onClose, onRestoreFocus, title, children, postId }: {
+  postId?: number;
   photos: Photo[];
   index: number | null;
   onIndexChange: (index: number) => void;
@@ -27,7 +28,7 @@ export function NewsPhotoViewer({ photos, index, onIndexChange, onClose, onResto
   };
 
   return <Dialog open={index !== null && Boolean(photo)} onOpenChange={open => { if (!open) { setZoomed(false); onClose(); } }}>
-    <DialogContent showCloseButton={false} onCloseAutoFocus={event => { event.preventDefault(); onRestoreFocus(); }} className="flex h-dvh max-h-dvh w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-white p-0 sm:max-w-none lg:flex-row" onKeyDown={event => {
+    <DialogContent data-auth-post-id={postId} showCloseButton={false} onCloseAutoFocus={event => { event.preventDefault(); onRestoreFocus(); }} className="flex h-dvh max-h-dvh w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-white p-0 sm:max-w-none lg:flex-row" onKeyDown={event => {
       const target = event.target as HTMLElement;
       if (target.closest("input, textarea, select, [contenteditable='true']")) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); move(event.key === "ArrowLeft" ? -1 : 1); }

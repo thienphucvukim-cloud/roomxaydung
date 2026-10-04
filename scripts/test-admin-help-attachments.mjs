@@ -72,7 +72,7 @@ async function submit(attachmentKey = "", content = "Help", expected = 201) {
   return result;
 }
 try {
-  for (const [name, type, bytes] of [["document.pdf", "application/pdf", "%PDF-fixture"], ["photo.png", "image/png", "image fixture"]]) {
+  for (const [name, type, bytes] of [["document.pdf", "application/pdf", "%PDF-fixture"], ["photo.webp", "image/webp", readFileSync(new URL('./fixtures/upload.webp', import.meta.url))]]) {
     const form = new FormData();
     form.set("file", new File([bytes], name, { type }));
     const response = await (await route("files")).POST(new Request("https://app.test/api/files", { method: "POST", body: form }));
@@ -92,7 +92,7 @@ try {
     assert.equal(document.get("chat_id"), "admin-chat");
     assert.equal(document.get("document").name, name);
     assert.equal(document.get("document").type, type);
-    assert.equal(await document.get("document").text(), bytes);
+    assert.deepEqual(Buffer.from(await document.get("document").arrayBuffer()), Buffer.from(bytes));
     assert.ok(document.get("caption").includes(`#${result.request.id}`));
     assert.equal(sqlite.prepare("SELECT attachment_key FROM direct_messages WHERE request_id=?").get(result.request.id).attachment_key, attachment.key);
   }

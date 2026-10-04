@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useRef, useState } from "react";
 import { Camera, LoaderCircle } from "lucide-react";
 import { MemberAvatar } from "@/components/member-avatar";
@@ -20,13 +21,13 @@ export function AvatarEditor({ name, avatarUrl, hasCustomAvatar, authenticated, 
       if (file) {
         if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) throw new Error("Chọn ảnh JPG, PNG, WebP hoặc GIF.");
         body = new FormData();
-        body.append("file", await optimizeImageForUpload(file));
+        body.append("file", await optimizeImageForUpload(file, "avatar"));
       }
       const response = await fetch("/api/avatar", { method: remove ? "DELETE" : "POST", body });
       const result = await response.json() as AvatarResult & { error?: string };
       if (!response.ok) throw new Error(result.error || "Chưa thể lưu ảnh đại diện.");
       onChange(result);
-      window.dispatchEvent(new Event("tipook-avatar-changed"));
+      window.dispatchEvent(new Event(SITE_EVENTS.avatarChanged));
       setNotice(remove ? "Đã dùng ảnh mặc định." : "Đã cập nhật ảnh đại diện.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Chưa thể lưu ảnh đại diện."); }
     finally { setBusy(false); }

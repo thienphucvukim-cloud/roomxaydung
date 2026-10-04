@@ -16,7 +16,7 @@ const db = drizzle(async (sql, params) => {
   return { rows: statement.all(...params) };
 });
 let isAdmin = true;
-const context = createContext({ URL, Response, Request, console });
+const context = createContext({ URL, URLSearchParams, Response, Request, console });
 const cache = new Map();
 async function load(specifier, referencing) {
   const path = specifier.startsWith(".") ? posix.normalize(posix.join(posix.dirname(referencing.identifier), specifier)) : specifier;
@@ -36,7 +36,7 @@ async function load(specifier, referencing) {
     : !path.startsWith("@/") ? await import(path) : null;
   const mod = namespace ? new SyntheticModule(Object.keys(namespace), function () {
     for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
-  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + ".ts", "utf8"), {
+  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + (path.endsWith(".ts") ? "" : ".ts"), "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
   }).outputText, { context, identifier: path });
   cache.set(path, mod);

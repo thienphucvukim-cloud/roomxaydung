@@ -11,6 +11,9 @@
     { "pattern": "www.nhadepchat.top", "custom_domain": true }
   ],
   "observability": { "enabled": true },
+  "assets": { "binding": "ASSETS", "html_handling": "none", "not_found_handling": "none" },
+  "durable_objects": { "bindings": [{ "name": "API_RUNTIME", "class_name": "ApiRuntime" }] },
+  "migrations": [{ "tag": "api-runtime-v1", "new_sqlite_classes": ["ApiRuntime"] }],
   "d1_databases": [
     {
       "binding": "DB",

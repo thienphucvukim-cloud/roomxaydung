@@ -1,3 +1,5 @@
+import { normalizePostMetadata, postWithLegacyMetadata } from "@/lib/post-metadata";
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { memberAccessResponse } from "@/lib/member-access";
 import { and, asc, count, desc, eq, getTableColumns, gt, inArray, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { currentMember } from "../../../lib/member-identity";
@@ -7,7 +9,7 @@ import { catalogDownloads, catalogViews, userActions, memberProfiles, postAttach
 import { CATALOG_PAGE_SIZE } from "../../../lib/catalog-pagination";
 import { FILE_CATALOG_PAGE_SIZE, PROMOTION_CATEGORIES } from "../../../lib/catalog-promotions";
 import { parseVndPrice } from "../../../lib/drawing-catalog";
-import { FACADE_RANDOM_MODULUS, facadeOrderKey, parseFacadeSort } from "../../../lib/facade-feed";
+import { HOUSE_MODEL_RANDOM_MODULUS, houseModelOrderKey, parseHouseModelSort } from "../../../lib/house-model-feed";
 import { AUTHOR_POST_STATES } from "@/lib/post-ownership";
 import { parseFileCatalogSort } from "@/lib/file-catalog-sort";
 import { fileCatalogRanking } from "@/lib/file-catalog-ranking";
@@ -35,22 +37,22 @@ export async function GET(request: Request) {
     const db = getDb();
     const params = new URL(request.url).searchParams;
     const category = params.get("category");
-    const facadeFeed = category === "Bộ sưu tập ảnh";
-    const randomFeed = category === "Bộ sưu tập ảnh" && params.has("seed");
-    const sort = parseFacadeSort(params.get("sort"));
+    const houseModelFeed = category === POST_CATEGORIES.houseModels;
+    const randomFeed = category === POST_CATEGORIES.houseModels && params.has("seed");
+    const sort = parseHouseModelSort(params.get("sort"));
     const rankedFeed = randomFeed && sort !== "random";
     const seed = Number(params.get("seed"));
     const cursor = params.get("cursor");
     const cursorParts = cursor?.split(":").map(Number);
-    if (randomFeed && (!Number.isSafeInteger(seed) || seed < 1 || seed >= FACADE_RANDOM_MODULUS ||
-      (cursor !== null && (!/^\d+:\d+:\d+$/.test(cursor) || cursorParts?.some(value => !Number.isSafeInteger(value)) || cursorParts?.length !== 3 || (!rankedFeed && cursorParts[1] >= FACADE_RANDOM_MODULUS))))) {
+    if (randomFeed && (!Number.isSafeInteger(seed) || seed < 1 || seed >= HOUSE_MODEL_RANDOM_MODULUS ||
+      (cursor !== null && (!/^\d+:\d+:\d+$/.test(cursor) || cursorParts?.some(value => !Number.isSafeInteger(value)) || cursorParts?.length !== 3 || (!rankedFeed && cursorParts[1] >= HOUSE_MODEL_RANDOM_MODULUS))))) {
       return Response.json({ error: "Thứ tự tải ảnh không hợp lệ." }, { status: 400 });
     }
-    const paginated = ["Bộ sưu tập ảnh", "Bản vẽ cộng đồng", "Nội thất cộng đồng"].includes(category ?? "") && params.has("page");
+    const paginated = [POST_CATEGORIES.houseModels, POST_CATEGORIES.drawings, POST_CATEGORIES.interiors].includes(category ?? "") && params.has("page");
     const fileCatalog = paginated && PROMOTION_CATEGORIES.some(value => value === category);
     const fileSort = parseFileCatalogSort(params.get("sort"));
     let modelKeys: string[] = [];
-    if (fileCatalog && category === "Bản vẽ cộng đồng" && params.has("modelKeys")) {
+    if (fileCatalog && category === POST_CATEGORIES.drawings && params.has("modelKeys")) {
       try {
         const keys: unknown = JSON.parse(params.get("modelKeys")!);
         if (!Array.isArray(keys) || keys.length > 50 || keys.some(key => typeof key !== "string" || key.length > 180)) throw new Error();
@@ -64,16 +66,16 @@ export async function GET(request: Request) {
       return Response.json({ error: "Số trang không hợp lệ." }, { status: 400 });
     }
     const query = params.get("q")?.trim().slice(0, 120) ?? "";
-    const search = (paginated || randomFeed) && query ? or(...[posts.title, posts.content, posts.authorName, posts.feeling, posts.location, posts.pollQuestion].map((column) => sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`)) : undefined;
+    const search = (paginated || randomFeed) && query ? or(...[posts.title, posts.content, posts.authorName, posts.listingType, posts.specifications, posts.priceLabel].map((column) => sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`)) : undefined;
     const targetPostId = params.get("postId");
     if (targetPostId !== null && (!/^[1-9]\d*$/.test(targetPostId) || !Number.isSafeInteger(Number(targetPostId)))) {
       return Response.json({ error: "Bài đăng không hợp lệ." }, { status: 400 });
     }
     // Show drawing previews directly from their source post so edits, visibility
     // and deletion stay in sync. Private attachments never enter this feed.
-    const categoryCondition = facadeFeed
-      ? inArray(posts.category, ["Bộ sưu tập ảnh", "Bản vẽ cộng đồng"])
-      : category ? eq(posts.category, category) : ne(posts.category, "Thảo luận mẫu nhà");
+    const categoryCondition = houseModelFeed
+      ? inArray(posts.category, [POST_CATEGORIES.houseModels, POST_CATEGORIES.drawings])
+      : category ? eq(posts.category, category) : ne(posts.category, POST_CATEGORIES.modelDiscussion);
     const condition = and(eq(posts.audience, "Công khai"), categoryCondition, search, targetPostId ? eq(posts.id, Number(targetPostId)) : undefined);
     const total = paginated ? (await db.select({ value: count() }).from(posts).where(condition))[0].value : undefined;
     const snapshot = randomFeed ? cursorParts?.[0] ?? (await db.select({ value: max(posts.id) }).from(posts).where(condition))[0].value ?? 0 : 0;
@@ -91,7 +93,7 @@ export async function GET(request: Request) {
       .limit(randomFeed ? CATALOG_PAGE_SIZE + 1 : paginated ? pageSize : 30).offset(!catalogOrder && !randomFeed && paginated ? (page - 1) * pageSize : 0);
     const rows = randomFeed ? fetchedRows.slice(0, CATALOG_PAGE_SIZE) : fetchedRows;
     const last = rows.at(-1);
-    const nextCursor = randomFeed && fetchedRows.length > CATALOG_PAGE_SIZE && last ? `${snapshot}:${rankedFeed ? last.sortScore : facadeOrderKey(last.id, seed)}:${last.id}` : null;
+    const nextCursor = randomFeed && fetchedRows.length > CATALOG_PAGE_SIZE && last ? `${snapshot}:${rankedFeed ? last.sortScore : houseModelOrderKey(last.id, seed)}:${last.id}` : null;
     const modelScores = rankedFeed ? Object.fromEntries((sort === "views"
       ? await db.select({ key: catalogViews.targetId, score: count() }).from(catalogViews).where(eq(catalogViews.targetType, "house-model")).groupBy(catalogViews.targetId)
       : await db.select({ key: userActions.targetId, score: count() }).from(userActions).where(and(eq(userActions.targetType, "house-model"), eq(userActions.actionType, "like"))).groupBy(userActions.targetId)
@@ -111,14 +113,14 @@ export async function GET(request: Request) {
       current.push(publicAttachment(attachment));
       byPost.set(attachment.postId, current);
     }
-    const galleryPostIds = rows.filter(post => ["Bộ sưu tập ảnh", "Bản vẽ cộng đồng"].includes(post.category)).map(post => String(post.id));
+    const galleryPostIds = rows.filter(post => [POST_CATEGORIES.houseModels, POST_CATEGORIES.drawings].includes(post.category)).map(post => String(post.id));
     const questionCounts = galleryPostIds.length
       ? await db.select({ targetId: userRequests.targetId, value: count() }).from(userRequests)
         .where(and(eq(userRequests.requestType, "expert-question"), eq(userRequests.targetType, "post"), inArray(userRequests.targetId, galleryPostIds)))
         .groupBy(userRequests.targetId)
       : [];
     const questionsByPost = new Map(questionCounts.map(row => [row.targetId, row.value]));
-    return Response.json({ posts: rows.map((post) => ({ ...post, ...(facadeFeed ? { expertQuestions: questionsByPost.get(String(post.id)) ?? 0 } : {}), attachments: byPost.get(post.id) ?? [] })), ...(catalogOrder ? { catalogOrder: catalogOrder.map(entry => entry.entryKey) } : {}), ...(randomFeed ? { nextCursor, ...(rankedFeed ? { modelScores } : {}) } : paginated ? { total, page, pageSize } : {}) });
+    return Response.json({ posts: rows.map((post) => ({ ...postWithLegacyMetadata(post), ...(houseModelFeed ? { expertQuestions: questionsByPost.get(String(post.id)) ?? 0 } : {}), attachments: byPost.get(post.id) ?? [] })), ...(catalogOrder ? { catalogOrder: catalogOrder.map(entry => entry.entryKey) } : {}), ...(randomFeed ? { nextCursor, ...(rankedFeed ? { modelScores } : {}) } : paginated ? { total, page, pageSize } : {}) });
   } catch (cause) {
     console.error("Failed to load posts", cause);
     return Response.json({ error: "Chưa thể tải bài đăng. Vui lòng thử lại." }, { status: 500 });
@@ -130,21 +132,21 @@ export async function POST(request: Request) {
   if (denied) return denied;
   try {
     const { userId, email, authorName } = await currentMember();
-    const body = await request.json() as { title?: string; content?: string; category?: string; location?: string; audience?: string; feeling?: string; pollQuestion?: string; attachments?: AttachmentInput[]; paidFiles?: AttachmentInput[]; coverImageKey?: unknown };
+    const body = normalizePostMetadata(await request.json()) as { title?: string; content?: string; category?: string; specifications?: string; audience?: string; listingType?: string; priceLabel?: string; attachments?: AttachmentInput[]; paidFiles?: AttachmentInput[]; coverImageKey?: unknown };
     if (body.audience !== undefined && !AUTHOR_POST_STATES.includes(body.audience)) return Response.json({ error: "Quyền hiển thị bài đăng không hợp lệ." }, { status: 400 });
     const category = body.category?.trim() ?? "";
-    if (!["Bảng tin", "Bản vẽ cộng đồng", "Nội thất cộng đồng", "Bộ sưu tập ảnh"].includes(category)) return Response.json({ error: "Danh mục đăng tải không hợp lệ." }, { status: 400 });
-    const isFileListing = category === "Bản vẽ cộng đồng" || category === "Nội thất cộng đồng";
-    const price = body.pollQuestion?.trim() || "";
+    if (![POST_CATEGORIES.news, POST_CATEGORIES.drawings, POST_CATEGORIES.interiors, POST_CATEGORIES.houseModels].includes(category)) return Response.json({ error: "Danh mục đăng tải không hợp lệ." }, { status: 400 });
+    const isFileListing = category === POST_CATEGORIES.drawings || category === POST_CATEGORIES.interiors;
+    const price = body.priceLabel?.trim() || "";
     if (isFileListing && price && !/^(?:0\s*đ?|miễn phí)$/i.test(price) && !parseVndPrice(price)) return Response.json({ error: "Giá bán phải từ 2.000đ hoặc để trống cho hồ sơ miễn phí." }, { status: 400 });
     const enteredTitle = body.title?.trim() ?? "";
     const content = body.content?.trim() ?? "";
-    if (category === "Bảng tin" && !content && !body.attachments?.length) return Response.json({ error: "Vui lòng nhập nội dung hoặc thêm ảnh." }, { status: 400 });
-    const fallbackTitle = category === "Bảng tin" ? "Bài đăng trên bảng tin" : category === "Bản vẽ cộng đồng"
+    if (category === POST_CATEGORIES.news && !content && !body.attachments?.length) return Response.json({ error: "Vui lòng nhập nội dung hoặc thêm ảnh." }, { status: 400 });
+    const fallbackTitle = category === POST_CATEGORIES.news ? "Bài đăng trên bảng tin" : category === POST_CATEGORIES.drawings
       ? "Bản vẽ mới"
-      : category === "Nội thất cộng đồng"
+      : category === POST_CATEGORIES.interiors
         ? "Hồ sơ nội thất mới"
-        : category === "Bộ sưu tập ảnh"
+        : category === POST_CATEGORIES.houseModels
         ? "Bộ sưu tập mẫu nhà"
         : "Bộ sưu tập mẫu nhà";
     const title = enteredTitle || content.slice(0, 80) || fallbackTitle;
@@ -167,7 +169,7 @@ export async function POST(request: Request) {
       attachment.size > 0 &&
       attachment.size <= maxSize;
     const attachments = (body.attachments ?? []).slice(0, 10).filter((attachment) => validAttachment(attachment, 25 * 1024 * 1024));
-    if (category === "Bảng tin" && !content && !attachments.length) return Response.json({ error: "Vui lòng nhập nội dung hoặc thêm ảnh hợp lệ." }, { status: 400 });
+    if (category === POST_CATEGORIES.news && !content && !attachments.length) return Response.json({ error: "Vui lòng nhập nội dung hoặc thêm ảnh hợp lệ." }, { status: 400 });
     if (body.coverImageKey !== undefined) {
       if (typeof body.coverImageKey !== "string" || !attachments.some(attachment => attachment.key === body.coverImageKey)) {
         return Response.json({ error: "Ảnh đại diện phải là một ảnh được chọn cho bài đăng." }, { status: 400 });
@@ -178,7 +180,7 @@ export async function POST(request: Request) {
     }
     const paidFiles = (body.paidFiles ?? []).slice(0, 5).filter((attachment) => validAttachment(attachment, 100 * 1024 * 1024));
     if (isFileListing && !paidFiles.length) return Response.json({ error: "Vui lòng chọn ít nhất một file hồ sơ." }, { status: 400 });
-    if (!isFileListing && paidFiles.length) return Response.json({ error: "Bộ sưu tập ảnh không hỗ trợ file bán." }, { status: 400 });
+    if (!isFileListing && paidFiles.length) return Response.json({ error: "Mẫu nhà đẹp không hỗ trợ file bán." }, { status: 400 });
     const keys = [...attachments, ...paidFiles].map(file => file.key);
     if (new Set(keys).size !== keys.length) return Response.json({ error: "Không thể đính kèm cùng một tệp nhiều lần." }, { status: 400 });
     for (const [files, accessType] of [[attachments, "public"], [paidFiles, "private"]] as const) {
@@ -187,9 +189,10 @@ export async function POST(request: Request) {
         if (!object || object.customMetadata?.ownerUserId !== userId || object.customMetadata?.accessType !== accessType || object.size !== file.size) {
           return Response.json({ error: "Tệp đính kèm không thuộc phiên tài khoản này hoặc không đúng quyền truy cập." }, { status: 400 });
         }
-        if (accessType === "public" && !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(object.httpMetadata?.contentType || "")) {
-          return Response.json({ error: "Ảnh đại diện phải là JPG, PNG, WebP hoặc GIF." }, { status: 400 });
+        if (accessType === "public" && !isOptimizedImageObject(object)) {
+          return Response.json({ error: "Vui lòng tải lại ảnh để nén và chuyển sang WebP trước khi đăng bài." }, { status: 400 });
         }
+        file.type = object.httpMetadata?.contentType || "application/octet-stream";
         const [attached] = await db.select({ id: postAttachments.id }).from(postAttachments).where(eq(postAttachments.objectKey, file.key as string)).limit(1);
         if (attached) return Response.json({ error: "Tệp đã được dùng trong một bài đăng khác. Vui lòng tải lại tệp." }, { status: 409 });
       }
@@ -214,10 +217,10 @@ export async function POST(request: Request) {
       category,
       title,
       content,
-      location: body.location?.trim() || null,
+      specifications: body.specifications?.trim() || null,
       audience: body.audience?.slice(0, 40) || "Công khai",
-      feeling: body.feeling?.slice(0, 80) || null,
-      pollQuestion: body.pollQuestion?.trim().slice(0, 240) || null,
+      listingType: body.listingType?.slice(0, 80) || null,
+      priceLabel: body.priceLabel?.trim().slice(0, 240) || null,
     }).returning();
 
     let savedAttachments: ReturnType<typeof publicAttachment>[] = [];
@@ -230,8 +233,9 @@ export async function POST(request: Request) {
       savedAttachments = inserted.filter((attachment) => attachment.accessType === "public").sort((a, b) => a.id - b.id).map(publicAttachment);
     }
 
-    return Response.json({ post: { ...post, attachments: savedAttachments } }, { status: 201 });
+    return Response.json({ post: { ...postWithLegacyMetadata(post), attachments: savedAttachments } }, { status: 201 });
   } catch {
     return Response.json({ error: "Chưa thể đăng bài lúc này. Vui lòng thử lại." }, { status: 500 });
   }
 }
+import { isOptimizedImageObject } from "@/lib/image-upload-policy";

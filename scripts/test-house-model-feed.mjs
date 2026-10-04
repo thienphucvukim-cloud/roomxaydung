@@ -1,4 +1,4 @@
-// Run with node --experimental-vm-modules scripts/test-facade-feed.mjs.
+// Run with node --experimental-vm-modules scripts/test-house-model-feed.mjs.
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
@@ -6,11 +6,12 @@ import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
 import ts from "typescript";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import * as schema from "../db/schema.ts";
-import * as feed from "../lib/facade-feed.ts";
+import * as drawingCatalog from "../lib/drawing-catalog.ts";
+import * as feed from "../lib/house-model-feed.ts";
 import * as pagination from "../lib/catalog-pagination.ts";
 import * as promotions from "../lib/catalog-promotions.ts";
 import * as ownership from "../lib/post-ownership.ts";
-import { facadePageHref } from "../lib/facade-pagination.ts";
+import { houseModelHref } from "../lib/house-model-links.ts";
 import { drawingPostHref } from "../lib/catalog-pagination.ts";
 
 const sqlite = new DatabaseSync(":memory:");
@@ -30,18 +31,23 @@ const mocks = {
   "../../../lib/catalog-pagination": pagination,
   "../../../lib/catalog-promotions": promotions,
   "@/lib/post-ownership": ownership,
-  "../../../lib/facade-feed": feed,
-  "../../../lib/drawing-catalog": { parseVndPrice: () => 0 },
+  "../../../lib/house-model-feed": feed,
+  "../../../lib/drawing-catalog": drawingCatalog,
 };
-const route = new SourceTextModule(ts.transpileModule(readFileSync("app/api/posts/route.ts", "utf8"), {
-  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
-}).outputText, { context });
-await route.link(async specifier => {
-  const namespace = mocks[specifier] ?? await import(specifier);
-  return new SyntheticModule(Object.keys(namespace), function () {
-    for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
-  }, { context });
-});
+const cache = new Map();
+async function load(specifier, referencing = { identifier: '@/app/api/posts/route' }) {
+ const {posix}=await import('node:path');
+ const id=specifier.startsWith('.')?posix.normalize(posix.join(posix.dirname(referencing.identifier),specifier)):specifier;
+ if(cache.has(id))return cache.get(id);
+ let namespace=mocks[specifier];
+ if(id==='@/db')namespace={getDb:()=>db};if(id==='@/db/schema')namespace=schema;
+ if(id==='@/lib/member-access')namespace={memberAccessResponse:async()=>null};
+ if(id==='@/lib/member-identity')namespace={currentMember:()=>{throw Error('Not used in GET');}};
+ if(!namespace&&!id.startsWith('@/'))namespace=await import(id);
+ const mod=namespace?new SyntheticModule(Object.keys(namespace),function(){for(const [key,value]of Object.entries(namespace))this.setExport(key,value);},{context}):new SourceTextModule(ts.transpileModule(readFileSync(id.slice(2)+(id.endsWith('.ts')?'':'.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText,{context,identifier:id});
+ cache.set(id,mod);return mod;
+}
+const route=await load('@/app/api/posts/route');await route.link(load);
 await route.evaluate();
 async function read(params = {}, status = 200) {
   const query = new URLSearchParams({ category: "Bộ sưu tập ảnh", seed: "4321", ...params });
@@ -139,17 +145,17 @@ try {
     assert.equal(matching.posts[0].id, ids[60]);
   }
   const items = Array.from({ length: 30 }, (_, index) => index);
-  assert.deepEqual([...feed.shuffleFacadeItems(items, 4321)].sort((a, b) => a - b), items);
-  assert.deepEqual(feed.shuffleFacadeItems(items, 4321), feed.shuffleFacadeItems(items, 4321));
-  assert.notDeepEqual(feed.shuffleFacadeItems(items, 4321), feed.shuffleFacadeItems(items, 987654));
-  assert.equal(facadePageHref(2), "/kho-mau-nha-dep-chat");
-  assert.equal(new URL(facadePageHref(1, " Mặt tiền & 5m "), "http://localhost").searchParams.get("q"), "Mặt tiền & 5m");
-  const sortedLink = new URL(facadePageHref(1, "Hiện đại", "views"), "http://localhost");
+  assert.deepEqual([...feed.shuffleHouseModels(items, 4321)].sort((a, b) => a - b), items);
+  assert.deepEqual(feed.shuffleHouseModels(items, 4321), feed.shuffleHouseModels(items, 4321));
+  assert.notDeepEqual(feed.shuffleHouseModels(items, 4321), feed.shuffleHouseModels(items, 987654));
+  assert.equal(houseModelHref(), "/kho-mau-nha-dep-chat");
+  assert.equal(new URL(houseModelHref(" Mặt tiền & 5m "), "http://localhost").searchParams.get("q"), "Mặt tiền & 5m");
+  const sortedLink = new URL(houseModelHref("Hiện đại", "views"), "http://localhost");
   assert.equal(sortedLink.searchParams.get("q"), "Hiện đại");
   assert.equal(sortedLink.searchParams.get("sort"), "views");
-  assert.equal(feed.parseFacadeSort("featured"), "featured");
-  assert.equal(feed.parseFacadeSort("unknown"), "random");
-  console.log("Facade feed: random and ranked ordering, cursor traversal, insert/delete safety, filtering, validation and links passed.");
+  assert.equal(feed.parseHouseModelSort("featured"), "featured");
+  assert.equal(feed.parseHouseModelSort("unknown"), "random");
+  console.log("House model feed: random and ranked ordering, cursor traversal, insert/delete safety, filtering, validation and links passed.");
 } finally {
   sqlite.close();
 }

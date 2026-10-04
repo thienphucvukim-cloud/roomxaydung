@@ -1,6 +1,6 @@
+import { IMAGE_UPLOAD_LIMITS, webpFileName, type ImageUploadKind } from "./image-upload-policy";
+
 const MAX_SOURCE_SIZE = 25 * 1024 * 1024;
-const MAX_IMAGE_EDGE = 1920;
-const TARGET_IMAGE_SIZE = 1024 * 1024;
 
 function encodeWebp(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -15,10 +15,11 @@ function encodeWebp(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
 }
 
 /** Optimize images locally before uploading; documents pass through unchanged. */
-export async function optimizeImageForUpload(file: File): Promise<File> {
+export async function optimizeImageForUpload(file: File, kind: ImageUploadKind = "post"): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
   if (!file.size) throw new Error("Không thể tải ảnh rỗng.");
   if (file.size > MAX_SOURCE_SIZE) throw new Error("Ảnh gốc không được vượt quá 25 MB.");
+  const { maxEdge, maxBytes } = IMAGE_UPLOAD_LIMITS[kind];
 
   const sourceUrl = URL.createObjectURL(file);
   const image = new Image();
@@ -34,7 +35,7 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
 
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Không thể xử lý ảnh trên trình duyệt này.");
-    let scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
+    let scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
     const draw = () => {
       canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
       canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -45,20 +46,20 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
     };
     draw();
 
-    let result = await encodeWebp(canvas, 0.8);
-    for (const quality of [0.7, 0.6]) {
-      if (result.size <= TARGET_IMAGE_SIZE) break;
-      result = await encodeWebp(canvas, quality);
+    let result = await encodeWebp(canvas, 0.7);
+    for (const quality of [0.6, 0.5]) {
+      if (result.size <= maxBytes) break;
+      const smaller = await encodeWebp(canvas, quality);
+      if (smaller.size < result.size) result = smaller;
     }
-    while (result.size > TARGET_IMAGE_SIZE) {
+    while (result.size > maxBytes) {
       if (canvas.width === 1 && canvas.height === 1) throw new Error("Không thể giảm dung lượng ảnh. Vui lòng chọn ảnh khác.");
       scale *= 0.8;
       draw();
-      result = await encodeWebp(canvas, 0.6);
+      result = await encodeWebp(canvas, 0.5);
     }
 
-    const name = file.name.replace(/\.[^.]+$/, "") || "anh";
-    return new File([result], `${name}.webp`, { type: "image/webp", lastModified: file.lastModified });
+    return new File([result], webpFileName(file.name), { type: "image/webp", lastModified: file.lastModified });
   } finally {
     URL.revokeObjectURL(sourceUrl);
     image.src = "";

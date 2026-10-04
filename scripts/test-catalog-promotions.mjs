@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
 import ts from "typescript";
 import { catalogPageWindow } from "../lib/catalog-pagination.ts";
+import * as legacyContracts from "../lib/legacy-contracts.ts";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const file of readdirSync("drizzle").filter(file => file.endsWith(".sql")).sort()) sqlite.exec(readFileSync(`drizzle/${file}`, "utf8"));
@@ -28,12 +29,19 @@ const database = {
 };
 const context = createContext({ URL, Response, Request, console, crypto, Date });
 const helpers = new SourceTextModule(ts.transpileModule(readFileSync("lib/catalog-promotions.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
-await helpers.link(() => { throw new Error("Unexpected helper import"); });
+await helpers.link(specifier => {
+  assert.equal(specifier, "./legacy-contracts.ts");
+  return new SyntheticModule(Object.keys(legacyContracts), function () {
+    for (const [key, value] of Object.entries(legacyContracts)) this.setExport(key, value);
+  }, { context });
+});
 await helpers.evaluate();
 const route = new SourceTextModule(ts.transpileModule(readFileSync("app/api/catalog-promotions/route.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
 await route.link(specifier => {
   if (specifier.endsWith("catalog-promotions")) return helpers;
-  const namespace = specifier === "cloudflare:workers" ? { env: { DB: database } } : { getPaymentBuyerId: async () => userId };
+  const namespace = specifier === "cloudflare:workers" ? { env: { DB: database } }
+    : specifier === "@/lib/member-access" ? { memberAccessResponse: async () => userId ? null : Response.json({}, { status: 401 }) }
+    : { getPaymentBuyerId: async () => userId };
   return new SyntheticModule(Object.keys(namespace), function () { for (const [key, value] of Object.entries(namespace)) this.setExport(key, value); }, { context });
 });
 await route.evaluate();

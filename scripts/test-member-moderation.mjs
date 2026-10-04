@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
 import ts from "typescript";
+import path from "node:path";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import * as schema from "../db/schema.ts";
 
@@ -34,7 +35,8 @@ const db = drizzle(async (sql, params, method) => {
 });
 const context = createContext({ URL, Request, Response, Headers, Buffer, console, crypto });
 const cache = new Map();
-async function load(specifier) {
+async function load(specifier, reference) {
+  if (specifier.startsWith(".")) specifier = "@/" + path.posix.normalize(path.posix.join(path.posix.dirname(reference.identifier.slice(2)), specifier));
   if (cache.has(specifier)) return cache.get(specifier);
   let namespace;
   if (specifier === "cloudflare:workers") namespace = { env };
@@ -44,7 +46,7 @@ async function load(specifier) {
   else if (specifier === "@/db/schema") namespace = schema;
   else if (!specifier.startsWith("@/")) namespace = await import(specifier);
   const vmModule = namespace ? new SyntheticModule(Object.keys(namespace), function () { for (const [key, value] of Object.entries(namespace)) this.setExport(key, value); }, { context })
-    : new SourceTextModule(ts.transpileModule(readFileSync(specifier.slice(2) + ".ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
+    : new SourceTextModule(ts.transpileModule(readFileSync(specifier.slice(2) + (specifier.endsWith(".ts") ? "" : ".ts"), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context, identifier: specifier });
   cache.set(specifier, vmModule);
   return vmModule;
 }

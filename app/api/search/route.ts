@@ -1,7 +1,10 @@
+import { postCategoryLabel } from "@/lib/site-sections";
+import { houseModelContentKey } from "@/lib/legacy-contracts";
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { posts } from "../../../db/schema";
-import { facadeModels } from "../../../lib/facade-catalog";
+import { houseModels } from "../../../lib/house-models";
 import { drawings } from "../../../lib/drawing-catalog";
 import { catalogPageHref } from "../../../lib/catalog-pagination";
 import { getSiteContent } from "../../../lib/site-content";
@@ -24,20 +27,20 @@ export async function GET(request: Request) {
   const content = await getSiteContent();
   const catalog = [
     ...resources,
-    ...facadeModels.flatMap((model, index) => demoPostVisible(content, `facade.${index}`) ? [{ title: content[`facade.${index}.title`]?.value ?? model.title, copy: `${content[`facade.${index}.meta`]?.value ?? model.meta} · ${content[`facade.${index}.style`]?.value ?? model.style} · ${model.authorName}`, href: catalogPageHref("/kho-mau-nha-dep-chat", 1, model.title), type: "Mặt tiền" }] : []),
+    ...houseModels.flatMap((model, index) => demoPostVisible(content, houseModelContentKey(index)) ? [{ title: content[houseModelContentKey(index, "title")]?.value ?? model.title, copy: `${content[houseModelContentKey(index, "meta")]?.value ?? model.meta} · ${content[houseModelContentKey(index, "style")]?.value ?? model.style} · ${model.authorName}`, href: catalogPageHref("/kho-mau-nha-dep-chat", 1, model.title), type: "Mẫu nhà đẹp" }] : []),
     ...drawings.flatMap((drawing, index) => demoPostVisible(content, `drawing.${index}`) ? [{ title: content[`drawing.${index}.title`]?.value ?? drawing.title, copy: `${content[`drawing.${index}.style`]?.value ?? drawing.category} · ${drawing.price} · ${drawing.authorName}`, href: catalogPageHref("/file-ban-ve-nha-dep-chat", 1, drawing.title), type: "Bản vẽ" }] : []),
   ].filter(item => `${item.title} ${item.copy}`.toLocaleLowerCase("vi").includes(normalized));
   try {
     const matchedPosts = await getDb().select().from(posts).where(and(
-      ne(posts.category, "Thảo luận mẫu nhà"),
+      ne(posts.category, POST_CATEGORIES.modelDiscussion),
       eq(posts.audience, "Công khai"),
-      or(...[posts.title, posts.content, posts.authorName, posts.feeling, posts.location].map(column => sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`)),
+      or(...[posts.title, posts.content, posts.authorName, posts.listingType, posts.specifications].map(column => sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`)),
     )).orderBy(desc(posts.createdAt), desc(posts.id)).limit(50);
-    const community = matchedPosts.map(post => ({
-      title: post.title, copy: `${post.authorName} · ${post.content}`, type: post.category,
-      href: catalogPageHref(post.category === "Bản vẽ cộng đồng" ? "/file-ban-ve-nha-dep-chat" : post.category === "Nội thất cộng đồng" ? "/noi-that" : "/kho-mau-nha-dep-chat", 1, post.title),
+    const memberResults = matchedPosts.map(post => ({
+      title: post.title, copy: `${post.authorName} · ${post.content}`, type: postCategoryLabel(post.category),
+      href: catalogPageHref(post.category === POST_CATEGORIES.drawings ? "/file-ban-ve-nha-dep-chat" : post.category === POST_CATEGORIES.interiors ? "/noi-that" : "/kho-mau-nha-dep-chat", 1, post.title),
     }));
-    return Response.json({ results: [...community, ...catalog] });
+    return Response.json({ results: [...memberResults, ...catalog] });
   } catch {
     return Response.json({ results: catalog, warning: "Chưa thể tìm trong bài đăng cộng đồng. Vui lòng thử lại." });
   }

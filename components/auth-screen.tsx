@@ -1,6 +1,9 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { safeAuthReturn } from "@/lib/auth-return";
 import Image from "next/image";
 import { ClientNavigationLink as Link } from "@/components/client-navigation-link";
 import { EditableImage } from "@/components/site-editor";
@@ -11,6 +14,11 @@ import { TotpCodeForm, type TotpChallengeResult } from "@/components/totp-code-f
 import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, Eye, EyeOff, Fingerprint, House, LoaderCircle, LockKeyhole, Mail, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 
 export function AuthScreen({ register = false, admin = false, recovery = false, addingAccount = false, returnTo = "/tai-khoan", notice = "" }: { register?: boolean; admin?: boolean; recovery?: boolean; addingAccount?: boolean; returnTo?: string; notice?: string }) {
+  const router = useRouter();
+  const completeAuth = (data: AuthResult) => {
+    window.dispatchEvent(new Event(SITE_EVENTS.avatarChanged));
+    router.replace(safeAuthReturn(data.redirectTo, returnTo));
+  };
   const [visible, setVisible] = useState(false);
   const [ready, setReady] = useState(false);
   useEffect(() => { const timer = window.setTimeout(() => setReady(true), 0); return () => window.clearTimeout(timer); }, []);
@@ -29,7 +37,7 @@ export function AuthScreen({ register = false, admin = false, recovery = false, 
       const data = await response.json() as AuthResult & Partial<EmailChallengeResult | TotpChallengeResult>;
       if (!response.ok) throw new Error(data.error || "Chưa thể đăng nhập.");
       if (data.requiresCode) { formElement.reset(); setChallenge(data as EmailChallengeResult | TotpChallengeResult); setBusy(false); return; }
-      window.location.assign(data.redirectTo || returnTo);
+      completeAuth(data);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể kết nối. Vui lòng thử lại."); setBusy(false); }
   }
   return <main className="auth-page">
@@ -48,7 +56,7 @@ export function AuthScreen({ register = false, admin = false, recovery = false, 
       <div className="auth-form-wrap"><div className="auth-form-symbol" aria-hidden="true">{admin ? <ShieldCheck size={27}/> : recovery ? <LockKeyhole size={27}/> : <Fingerprint size={29}/>}</div>
         <p className="auth-form-eyebrow">{admin ? "KHÔNG GIAN QUẢN TRỊ" : "KHÔNG GIAN CỦA BẠN"}</p>
         <h2 id="auth-title">{recovery ? "Khôi phục mật khẩu" : challenge ? "Xác nhận đăng nhập" : register ? "Bắt đầu hành trình mới." : addingAccount ? "Thêm tài khoản" : admin ? "Đăng nhập quản trị" : "Chào mừng trở lại."}</h2><p className="auth-form-description">{recovery ? admin ? "Dùng mã khôi phục đã lưu để đặt mật khẩu mới." : "Nhập email đã đăng ký để lấy lại quyền truy cập tài khoản." : challenge ? "Xác nhận danh tính để tiếp tục vào tài khoản của bạn." : register ? "Tạo tài khoản miễn phí. Cùng xây nên tổ ấm của bạn." : addingAccount ? "Đăng nhập tài khoản khác để chuyển đổi nhanh trên trình duyệt này." : admin ? "Mọi thứ bạn cần để quản lý website, ở một nơi." : "Những ý tưởng cho tổ ấm vẫn đang chờ bạn."}</p>
-        {!admin && !recovery && !challenge && <nav className="auth-mode" aria-label="Tài khoản"><a href={`/dang-nhap${accountQuery}`} aria-current={!register ? "page" : undefined}>Đăng nhập</a><a href={`/dang-ky${accountQuery}`} aria-current={register ? "page" : undefined}>Đăng ký</a></nav>}
+        {!admin && !recovery && !challenge && <nav className="auth-mode" aria-label="Tài khoản"><Link href={`/dang-nhap${accountQuery}`} aria-current={!register ? "page" : undefined}>Đăng nhập</Link><Link href={`/dang-ky${accountQuery}`} aria-current={register ? "page" : undefined}>Đăng ký</Link></nav>}
         {!admin && !recovery && !challenge && <div className="auth-google-wrap">
           <a className="auth-google" href={`/api/auth/google?return_to=${encodeURIComponent(returnTo)}`} aria-disabled={busy} onClick={event => { if (busy) event.preventDefault(); }}>
             <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
@@ -61,14 +69,14 @@ export function AuthScreen({ register = false, admin = false, recovery = false, 
           </a>
           <p className="auth-divider"><span>hoặc dùng tài khoản của bạn</span></p>
         </div>}
-        {recovery ? (admin ? <AdminPasswordRecovery onBack={() => window.location.assign(loginPath)}/> : <PasswordRecovery/>) : challenge ? ("method" in challenge && challenge.method === "totp" ? <TotpCodeForm challenge={challenge} onVerified={data => window.location.assign(data.redirectTo || returnTo)} onRestart={() => { setChallenge(null); setError(""); }}/> : <EmailCodeForm challenge={challenge as EmailChallengeResult} onChallenge={setChallenge} onVerified={data => window.location.assign(data.redirectTo || returnTo)} onRestart={() => { setChallenge(null); setError(""); }}/>) : <form onSubmit={submit} className="auth-form" data-ready={ready} aria-busy={busy} method="post" action={`/api/auth/${register ? "register" : "login"}`}>
+        {recovery ? (admin ? <AdminPasswordRecovery onBack={() => window.location.assign(loginPath)}/> : <PasswordRecovery/>) : challenge ? ("method" in challenge && challenge.method === "totp" ? <TotpCodeForm challenge={challenge} onVerified={completeAuth} onRestart={() => { setChallenge(null); setError(""); }}/> : <EmailCodeForm challenge={challenge as EmailChallengeResult} onChallenge={setChallenge} onVerified={completeAuth} onRestart={() => { setChallenge(null); setError(""); }}/>) : <form onSubmit={submit} className="auth-form" data-ready={ready} aria-busy={busy} method="post" action={`/api/auth/${register ? "register" : "login"}`}>
           {register && <div className="auth-field"><label htmlFor="auth-name">Họ và tên</label><div className="auth-input"><UserRound size={18} aria-hidden="true"/><input id="auth-name" required name="name" autoComplete="name" minLength={2} maxLength={80} placeholder="Nhập họ và tên của bạn" disabled={busy}/></div></div>}
           <div className="auth-field"><label htmlFor="auth-login">{admin ? "Địa chỉ email" : register ? "Tên đăng nhập" : "Tên đăng nhập hoặc email"}</label><div className="auth-input">{admin ? <Mail size={18} aria-hidden="true"/> : <UserRound size={18} aria-hidden="true"/>}<input id="auth-login" required name={admin ? "email" : register ? "username" : "login"} type={admin ? "email" : "text"} autoComplete="username" autoCapitalize="none" spellCheck={false} minLength={register ? 3 : 1} maxLength={register ? 32 : 254} pattern={register ? "[a-zA-Z0-9][a-zA-Z0-9._\\-]{2,31}" : undefined} title={register ? "Từ 3 đến 32 ký tự: chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang." : undefined} aria-describedby={register ? "auth-username-help" : undefined} placeholder={admin ? "Email quản trị của bạn" : register ? "Ví dụ: nguyen_van_an" : "Nhập tên đăng nhập hoặc email"} disabled={busy}/></div>{register && <span id="auth-username-help" className="auth-input-help">Không cần email. Dùng 3–32 ký tự: chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.</span>}</div>
           <div className="auth-field"><div className="auth-password-header"><label htmlFor="auth-password">Mật khẩu</label>{!register && <a href={admin ? "/admin?recovery=1" : "/quen-mat-khau"}>Quên mật khẩu?</a>}</div><div className="auth-input"><LockKeyhole size={18} aria-hidden="true"/><input id="auth-password" required name="password" type={visible ? "text" : "password"} autoComplete={register ? "new-password" : "current-password"} minLength={register ? 6 : 1} maxLength={128} placeholder={register ? "Tạo mật khẩu ít nhất 6 ký tự" : "Nhập mật khẩu của bạn"} disabled={busy}/><button type="button" onClick={() => setVisible(!visible)} aria-label={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={visible} aria-controls="auth-password" disabled={busy}>{visible ? <EyeOff size={18} aria-hidden="true"/> : <Eye size={18} aria-hidden="true"/>}</button></div></div>
           {error && <p className="auth-error" role="alert">{error}</p>}
           <button className="auth-submit" type="submit" disabled={busy || !ready}>{busy ? <><LoaderCircle size={18} className="animate-spin" aria-hidden="true"/>Đang xử lý...</> : <>{register ? "Tạo tài khoản miễn phí" : "Đăng nhập"}<ArrowRight size={18} aria-hidden="true"/></>}</button>
         </form>}
-        <p className="auth-switch">{recovery ? <a href={loginPath}>Quay lại đăng nhập</a> : admin ? "Dành riêng cho tài khoản được cấp quyền quản trị." : challenge ? null : register ? <>Đã có tài khoản? <a href={`/dang-nhap${accountQuery}`}>Đăng nhập</a></> : <>Chưa có tài khoản? <a href={`/dang-ky${accountQuery}`}>Đăng ký miễn phí<ArrowUpRight size={14} aria-hidden="true"/></a></>}</p>
+        <p className="auth-switch">{recovery ? <a href={loginPath}>Quay lại đăng nhập</a> : admin ? "Dành riêng cho tài khoản được cấp quyền quản trị." : challenge ? null : register ? <>Đã có tài khoản? <Link href={`/dang-nhap${accountQuery}`}>Đăng nhập</Link></> : <>Chưa có tài khoản? <Link href={`/dang-ky${accountQuery}`}>Đăng ký miễn phí<ArrowUpRight size={14} aria-hidden="true"/></Link></>}</p>
         <div className="auth-security"><ShieldCheck size={16} aria-hidden="true"/><span>An tâm kết nối. Riêng tư được bảo vệ.</span></div>
       </div><footer className="auth-form-footer"><span>© {new Date().getFullYear()} NhàĐẹpChất</span><a href="/privacy">Chính sách bảo mật<ArrowUpRight size={12} aria-hidden="true"/></a></footer>
     </section>

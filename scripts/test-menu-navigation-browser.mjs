@@ -1,4 +1,5 @@
-// Read-only local navigation checks. Run after starting the local server.
+// Local navigation checks. TIPOOK_TEST_CLOUDFLARE_SHELLS=1 also creates an
+// authentication fixture; use isolated local D1/R2 state for that mode.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -22,7 +23,7 @@ try {
   socket = new WebSocket(tabs.find(tab => tab.type === 'page').webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
   let seq = 0;
-  const pending = new Map(), exceptions = [];
+  const pending = new Map(), exceptions = [], apiRequests = [];
   socket.addEventListener('message', event => {
     const message = JSON.parse(event.data);
     if (message.id) {
@@ -30,6 +31,7 @@ try {
       if (message.error) task?.reject(new Error(JSON.stringify(message.error))); else task?.resolve(message.result);
     }
     if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
+    if (message.method === 'Network.requestWillBeSent' && message.params.request.url.includes('/api/')) apiRequests.push(message.params.request.url);
   });
   const send = (method, params = {}) => new Promise((resolve, reject) => {
     const id = ++seq;
@@ -59,7 +61,7 @@ try {
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 120 });
   };
-  await send('Runtime.enable'); await send('Page.enable');
+  await send('Runtime.enable'); await send('Page.enable'); await send('Network.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: origin });
   await waitFor(`window.next?.router && document.querySelector('.desktop-tab-link') && document.querySelector('main')`);
@@ -106,8 +108,61 @@ try {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   assert.ok(await evaluate(`parseFloat(getComputedStyle(document.querySelector('.tab-liquid-light')).transitionDuration) < .001`), 'Reduced motion must disable movement');
   await route('/noi-that', true);
+  for (const [url, expected] of [
+    ['/kho-mau-nha-dep-chat?q=nh%C3%A0&sort=views', { q: 'nhà', sort: 'views' }],
+    ['/file-ban-ve-nha-dep-chat?q=CAD&sort=downloads&page=2', { q: 'CAD', sort: 'downloads', page: '2' }],
+    ['/noi-that?postId=42', { postId: '42' }],
+  ]) {
+    apiRequests.length = 0;
+    await send('Page.navigate', { url: origin + url });
+    for (let i = 0; i < 100; i++) {
+      if (apiRequests.some(href => { const u = new URL(href); return u.pathname === '/api/posts' && Object.entries(expected).every(([key, value]) => u.searchParams.get(key) === value); })) break;
+      await pause(100);
+    }
+    assert.ok(apiRequests.some(href => { const u = new URL(href); return u.pathname === '/api/posts' && Object.entries(expected).every(([key, value]) => u.searchParams.get(key) === value); }), 'Public shell must hydrate the actual catalog URL: ' + url);
+  }
+  await waitFor('window.next?.router');
+  await evaluate('void (window.detailReviewHeader=document.querySelector(".social-header"))');
+  for (const [href, endpoint, key, value] of [
+    ['/bai-viet/1', '/api/news-feed', 'postId', '1'],
+    ['/bai-viet/2', '/api/news-feed', 'postId', '2'],
+    ['/thue-thiet-ke/11', '/api/freelance/projects', 'id', '11'],
+    ['/thue-thiet-ke/freelancer/test-member', '/api/freelance/profiles', 'id', 'test-member'],
+    ['/nguoi-dung/test-member', '/api/public-profile/test-member', null, null],
+  ]) {
+    apiRequests.length = 0;
+    await evaluate(`void window.next.router.push(${JSON.stringify(href)})`);
+    await waitFor(`location.pathname===${JSON.stringify(href)}`);
+    for (let i = 0; i < 100; i++) {
+      if (apiRequests.some(href => { const u = new URL(href); return u.pathname === endpoint && (!key || u.searchParams.get(key) === value); })) break;
+      await pause(100);
+    }
+    assert.ok(apiRequests.some(href => { const u = new URL(href); return u.pathname === endpoint && (!key || u.searchParams.get(key) === value); }), 'Detail shell must request the real identifier: ' + href);
+    assert.equal(await evaluate('window.detailReviewHeader===document.querySelector(".social-header")'), true, 'Detail navigation must retain the root layout');
+  }
+  console.log('PASS: detail shells hydrate post, project, freelancer and public profile identifiers without remounting the root.');
+  if (process.env.TIPOOK_TEST_CLOUDFLARE_SHELLS === '1') {
+  await send('Page.navigate', { url: origin + '/dang-nhap?auth_error=fixture&return_to=https%3A%2F%2Fexternal.example' });
+  await waitFor(`document.querySelector('input[type="password"]') && document.body.innerText.includes('fixture')`);
+  await send('Page.navigate', { url: origin + '/dang-nhap?role=admin' });
+  await waitFor(`location.pathname === '/admin' && document.querySelector('input[type="password"]')`);
+  await send('Page.navigate', { url: origin + '/quen-mat-khau' });
+  await waitFor(`document.querySelector('form') && !document.querySelector('input[type="password"]')`);
+  await send('Page.navigate', { url: origin + '/dang-ky' });
+  await waitFor(`document.querySelector('input[type="password"]')`);
+  const registration = await evaluate(`(async () => {const r=await fetch('/api/auth/register',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'browser_'+crypto.randomUUID().slice(0,8),password:'browser-test-123456',name:'Shell Browser'})});return r.status;})()`);
+  assert.equal(registration, 200);
+  await send('Page.navigate', { url: origin + '/dang-nhap?return_to=%2Ftai-khoan' });
+  await waitFor(`location.pathname === '/tai-khoan'`);
+  await send('Page.navigate', { url: origin + '/dang-nhap?add_account=1&return_to=%2Ftai-khoan' });
+  await waitFor(`location.pathname === '/dang-nhap' && document.querySelector('input[type="password"]')`);
+  await send('Page.navigate', { url: origin + '/admin' });
+  await waitFor(`location.pathname === '/admin' && document.body.innerText.includes('chưa có quyền quản trị')`);
+  }
   assert.deepEqual(exceptions, [], 'No uncaught browser exceptions');
   console.log('PASS: persistent desktop/mobile menus, current-page alignment, Back/Forward, keyboard, mobile sheet, reduced motion, no horizontal overflow or browser exceptions.');
+  console.log('PASS: static shells honor catalog filters, pagination and post links.');
+  if (process.env.TIPOOK_TEST_CLOUDFLARE_SHELLS === '1') console.log('PASS: login/admin/recovery, authenticated redirects and add-account mode.');
   console.log('Screenshots: ' + dir);
 } finally {
   if (socket?.readyState === 1) socket.send(JSON.stringify({ id: 999999, method: 'Browser.close' }));

@@ -50,8 +50,8 @@ export function ModelCardActions({ title, meta, image, recipientUserId }: { titl
     setError("");
     try {
       const form = new FormData();
-      form.append("file", await optimizeImageForUpload(file));
-      form.append("purpose", "drawing-preview");
+      form.append("file", await optimizeImageForUpload(file, "comment"));
+      form.append("purpose", "comment-image");
       const response = await fetch("/api/files", { method: "POST", body: form });
       const data = await response.json() as { error?: string; attachment?: CommentImage };
       if (!response.ok || !data.attachment?.url) throw new Error(data.error || "Không thể tải ảnh bình luận.");
@@ -85,7 +85,7 @@ export function ModelCardActions({ title, meta, image, recipientUserId }: { titl
 
   return <>
     <ModelCardFooter title={title} meta={meta} targetType="house-model" targetId={title} recipientUserId={recipientUserId} comments={counts.comments} expertQuestions={counts.expertQuestions} commentOpen={open} onToggleComments={() => void toggle()} onQuestionSent={() => void refreshCounts()}/>
-    <PostCommentPanel open={open} onOpenChange={setOpen} title={title} image={image} meta={meta}>
+    <PostCommentPanel modelQuery={title} open={open} onOpenChange={setOpen} title={title} image={image} meta={meta}>
       {comments?.map((comment) => <div key={comment.id} className="rounded-2xl bg-[#eef1f4] px-3 py-2"><b className="block text-xs text-[#182230]">{comment.authorName}</b>{comment.content && <p className="mt-0.5 whitespace-pre-wrap text-sm leading-5 text-[#344054]">{comment.content}</p>}{comment.imageUrl && <img src={comment.imageUrl} alt="Ảnh trong bình luận" className="mt-2 max-h-64 max-w-full rounded-xl object-contain"/>}</div>)}
       {comments === null && <p className="py-1 text-center text-xs text-[#667085]">Đang tải bình luận...</p>}
       {comments?.length === 0 && <p className="py-1 text-center text-xs text-[#667085]">Chưa có bình luận.</p>}

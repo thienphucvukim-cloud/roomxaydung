@@ -1,8 +1,10 @@
+import { SITE_SECTIONS } from "./site-sections.ts";
+import { POST_CATEGORIES } from "./legacy-contracts.ts";
 export const NEWS_SOURCES = [
-  { category: "Bảng tin", label: "Bảng tin", path: "/" },
-  { category: "Bộ sưu tập ảnh", label: "Mặt tiền", path: "/kho-mau-nha-dep-chat" },
-  { category: "Bản vẽ cộng đồng", label: "Kho bản vẽ", path: "/file-ban-ve-nha-dep-chat" },
-  { category: "Nội thất cộng đồng", label: "Nội thất", path: "/noi-that" },
+  { category: POST_CATEGORIES.news, ...SITE_SECTIONS.news },
+  { category: POST_CATEGORIES.houseModels, ...SITE_SECTIONS.houseModels },
+  { category: POST_CATEGORIES.drawings, ...SITE_SECTIONS.drawings },
+  { category: POST_CATEGORIES.interiors, ...SITE_SECTIONS.interiors },
 ] as const;
 
 export const NEWS_PAGE_SIZE = 20;
@@ -15,9 +17,9 @@ export type NewsPost = {
   category: string;
   title: string;
   content: string;
-  location: string | null;
-  feeling: string | null;
-  pollQuestion: string | null;
+  specifications: string | null;
+  listingType: string | null;
+  priceLabel: string | null;
   createdAt: string;
   comments: number;
   sourceLabel: string;
@@ -37,6 +39,6 @@ export function newsSourceLink(category: string, postId: number) {
   if (!source) throw new Error("Unknown news source");
   return {
     sourceLabel: source.label,
-    sourceHref: category === "Bảng tin" ? `/bai-viet/${postId}` : `${source.path}?postId=${postId}#post-${postId}`,
+    sourceHref: category === POST_CATEGORIES.news ? `/bai-viet/${postId}` : `${source.path}?postId=${postId}#post-${postId}`,
   };
 }

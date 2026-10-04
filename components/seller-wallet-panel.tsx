@@ -1,11 +1,13 @@
 "use client";
 
+import { PENDING_WALLET_STORAGE } from "@/lib/legacy-contracts";
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useEffect, useState } from "react";
 import { ArrowRightLeft, Landmark, WalletCards } from "lucide-react";
 import type { Withdrawal } from "@/lib/seller-wallet";
 
 type Pending = { userId: string; requestId: string; action: "transfer" | "withdraw"; amount: number; bankName: string; accountNumber: string; accountName: string };
-const storageKey = "tipook:pending-sales-wallet";
+const storageKey = PENDING_WALLET_STORAGE.sellerOperation;
 const money = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
 export type SaleCredit = { purchaseId: number; amount: number; createdAt: string; availableAt: string; ready: boolean; revokedAt: string | null; revocationReason: string | null };
 
@@ -48,7 +50,7 @@ export function SellerWalletPanel({ userId, balance, available, lockedAmount, he
       setPending(null); setAmount("");
       try { sessionStorage.removeItem(storageKey); } catch {}
       setNotice(operation.action === "transfer" ? "Đã chuyển tiền sang ví nạp." : "Đã gửi yêu cầu rút. Tiền được giữ lại chờ admin chuyển khoản.");
-      window.dispatchEvent(new Event("tipook-wallet-changed"));
+      window.dispatchEvent(new Event(SITE_EVENTS.walletChanged));
       await refresh();
     } catch (cause) { setNotice(cause instanceof Error ? cause.message : "Chưa xác định được kết quả. Bấm Kiểm tra / gửi lại để tránh trừ tiền trùng."); }
     finally { setBusy(false); }

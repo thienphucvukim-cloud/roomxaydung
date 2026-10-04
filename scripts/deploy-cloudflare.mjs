@@ -3,6 +3,10 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { requireProductionSchema } from "./cloudflare-data.mjs";
+import { checkCloudflareBuild } from "./check-cloudflare-build.mjs";
+import { checkTerminology } from "./check-terminology.mjs";
+
+checkTerminology();
 
 const source = JSON.parse(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
 let built;
@@ -14,16 +18,21 @@ try {
 const identity = config => ({
   name: config.name,
   account_id: config.account_id,
+  limits: config.limits,
+  durable_objects: config.durable_objects,
+  migrations: config.migrations,
+  assets: { binding: config.assets?.binding, html_handling: config.assets?.html_handling, not_found_handling: config.assets?.not_found_handling },
   routes: config.routes ?? [],
   d1_databases: (config.d1_databases ?? []).map(({ binding, database_name, database_id }) => ({ binding, database_name, database_id })),
   r2_buckets: (config.r2_buckets ?? []).map(({ binding, bucket_name }) => ({ binding, bucket_name })),
 });
 assert.deepEqual(identity(built), identity(source),
   "The build uses different Cloudflare bindings or domains. Run pnpm run build:cloudflare before deploying.");
+checkCloudflareBuild();
 requireProductionSchema();
 const result = spawnSync(process.execPath, [
   fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url)),
-  "deploy", "--config", "dist/server/wrangler.json", ...process.argv.slice(2),
+  "deploy", "--config", "dist/server/wrangler.json", "--keep-vars", ...process.argv.slice(2),
 ], { stdio: "inherit", windowsHide: true });
 if (result.error) throw result.error;
 process.exit(result.status ?? 1);

@@ -9,7 +9,7 @@
 4. Nhấn **Chỉnh sửa**, sau đó nhấn vào chữ hoặc ảnh có viền để thay đổi.
 5. Nhấn **Áp dụng** để xem trước, rồi **Lưu website** để cập nhật cho mọi người.
 
-Bạn có thể sửa tiêu đề, mô tả, nội dung hướng dẫn, ảnh mẫu mặt tiền, mặt bằng,
+Bạn có thể sửa tiêu đề, mô tả, nội dung hướng dẫn, ảnh mẫu nhà, mặt bằng,
 tên và ảnh mẫu bản vẽ. Mục **Cài đặt** cho phép đổi tên website, logo, màu chủ đạo
 và mật khẩu của chủ website. Bản xem trước giữ thay đổi khi chuyển trang bằng menu.
 Khi rời website hoặc tải lại mà chưa lưu, trình duyệt nhắc về thay đổi chưa lưu.
@@ -129,7 +129,7 @@ node scripts/check-website-auth.mjs
 node scripts/check-password-recovery.mjs
 node --experimental-vm-modules scripts/test-admin-member-password-reset.mjs
 node scripts/check-functional-flows.mjs
-node scripts/check-facade-pagination.mjs
+node scripts/check-house-model-pagination.mjs
 ```
 
 Các kiểm tra tạo fixture trên database local và dọn dữ liệu thử, không gọi giao dịch

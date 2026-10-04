@@ -1,4 +1,5 @@
 "use client";
+import { SITE_EVENTS } from "@/lib/site-events";
 import { createContext, useContext, useEffect, useState, type ChangeEvent, type FormEvent, type ImgHTMLAttributes, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Eye, LoaderCircle, LogOut, Pencil, RotateCcw, Save, Settings2, ShieldCheck, SlidersHorizontal, Upload, X } from "lucide-react";
@@ -50,9 +51,17 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
   const count = Object.keys(drafts).length;
   const authPage = ["/admin", "/dang-nhap", "/dang-ky", "/quen-mat-khau"].includes(pathname);
   useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/site-content", { cache: "no-store", signal: controller.signal })
+      .then(response => response.ok ? response.json() as Promise<{ content: SiteContent }> : Promise.reject())
+      .then(data => { if (!controller.signal.aborted) setSaved(data.content); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [pathname]);
+  useEffect(() => {
     const refresh = () => router.refresh();
-    window.addEventListener("tipook-content-changed", refresh);
-    return () => window.removeEventListener("tipook-content-changed", refresh);
+    window.addEventListener(SITE_EVENTS.contentChanged, refresh);
+    return () => window.removeEventListener(SITE_EVENTS.contentChanged, refresh);
   }, [router]);
   useEffect(() => {
     if (authPage) return;
@@ -104,7 +113,7 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
     if (!response.ok || !result.content) throw new Error(result.error || "Chưa thể lưu bài demo.");
     setSaved(result.content);
     setDrafts(current => Object.fromEntries(Object.entries(current).filter(([key]) => !Object.hasOwn(changes, key))));
-    window.dispatchEvent(new Event("tipook-content-changed"));
+    window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
   }
   const isOwner = Boolean(owner?.isAdmin);
   return <Editor.Provider value={{ content, editing: editing && isOwner && !authPage, isOwner, accountSwitchBlocked: saving || count > 0, memberId: authPage ? undefined : memberId, select, manage, saveContent }}><div className={`owner-site ${isOwner && !authPage ? "has-owner-toolbar" : ""}`} style={{ "--site-accent": content["global.accent"]?.value || "#229ed9" } as React.CSSProperties}>

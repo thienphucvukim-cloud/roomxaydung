@@ -5,11 +5,11 @@ export function drawingPostHref(postId: number) {
 }
 
 export function catalogPageHref(basePath: string, page: number, query = "", sort = "latest") {
-  const path = `${basePath}/page/${page}`;
   const params = new URLSearchParams();
+  if (page > 1) params.set("page", String(page));
   if (query.trim()) params.set("q", query.trim());
   if (sort !== "latest") params.set("sort", sort);
-  return params.size ? `${path}?${params.toString()}` : path;
+  return params.size ? `${basePath}?${params.toString()}` : basePath;
 }
 
 export function catalogPageWindow(page: number, postCount: number, modelCount: number, pageSize = CATALOG_PAGE_SIZE) {

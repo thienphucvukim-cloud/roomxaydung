@@ -4,7 +4,6 @@ import { SiteChrome } from "@/components/site-chrome";
 import { getSiteContent } from "@/lib/site-content";
 import "./owner-editor.css";
 import "./account-security.css";
-export const dynamic = "force-dynamic";
 
 const metadata: Metadata = {
   title: "NhàĐẹpChất — Cộng đồng tư vấn và thiết kế nhà",

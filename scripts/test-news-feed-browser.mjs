@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 // Local browser regression checks use mocked APIs and do not publish test posts.
 // Run with node scripts/test-news-feed-browser.mjs after starting the local server.
@@ -40,7 +41,7 @@ try {
   await send('Runtime.enable'); await send('Page.enable');
   const fixture = {
     id: 900001, userId: 'review-author', authorName: 'Người chia sẻ', avatarUrl: null, category: 'Bản vẽ cộng đồng',
-    title: 'Nhà phố 5 × 20m', content: 'Giá bán: 150000đ\nChi phí 125000000 VND\nLiên hệ 0912345678', location: '5 × 20m', feeling: null, pollQuestion: '150000', comments: 1,
+    title: 'Nhà phố 5 × 20m', content: 'Giá bán: 150000đ\nChi phí 125000000 VND\nLiên hệ 0912345678', specifications: '5 × 20m', listingType: null, priceLabel: '150000', comments: 1,
     createdAt: '2026-10-03T08:00:00.000Z', sourceHref: '/file-ban-ve-nha-dep-chat?postId=900001#post-900001', sourceLabel: 'Kho bản vẽ',
     images: Array.from({ length: 7 }, (_, index) => ({ url: index % 2 ? '/mat-bang-5x20.png' : '/community-house.png', name: `Ảnh ${index + 1}` })),
   };
@@ -86,6 +87,38 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: origin });
   await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed hydration');
+  const browserModule = file => ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/^import .*;\s*$/gm, '').replace(/^export /gm, '');
+  await evaluate(`(() => { ${browserModule('lib/image-upload-policy.ts')} ${browserModule('lib/image-upload.ts')} window.optimizeUploadFixture=optimizeImageForUpload; window.inspectWebpFixture=inspectWebp; })()`);
+  const compression = await evaluate(`(async () => {
+    const canvas=document.createElement('canvas'); canvas.width=2200; canvas.height=1600;
+    const ctx=canvas.getContext('2d'), pixels=ctx.createImageData(canvas.width,canvas.height);
+    let seed=42; for(let i=0;i<pixels.data.length;i+=4){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;pixels.data[i]=seed&255;pixels.data[i+1]=(seed>>>8)&255;pixels.data[i+2]=(seed>>>16)&255;pixels.data[i+3]=255;} ctx.putImageData(pixels,0,0);
+    const source=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    const results=[]; for(const kind of ['post','comment','avatar']) {
+      const result=await window.optimizeUploadFixture(new File([source],'large.png',{type:'image/png'}),kind);
+      results.push({kind,type:result.type,name:result.name,size:result.size,sourceSize:source.size,...window.inspectWebpFixture(new Uint8Array(await result.arrayBuffer()))});
+    }
+    canvas.width=32;canvas.height=20;ctx.clearRect(0,0,32,20);ctx.fillStyle='rgba(10,80,90,.4)';ctx.fillRect(0,0,32,20);
+    const transparent=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    const alphaFile=await window.optimizeUploadFixture(new File([transparent],'alpha.png',{type:'image/png'}));
+    const bitmap=await createImageBitmap(alphaFile);ctx.clearRect(0,0,32,20);ctx.drawImage(bitmap,0,0);const alpha=ctx.getImageData(0,0,1,1).data[3];bitmap.close();
+    const gif=Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'),c=>c.charCodeAt(0));
+    const gifFile=await window.optimizeUploadFixture(new File([gif],'tiny.gif',{type:'image/gif'}),'comment');
+    let corruptRejected=false;try{await window.optimizeUploadFixture(new File(['broken'],'bad.jpg',{type:'image/jpeg'}));}catch{corruptRejected=true;}
+    const pdf=new File(['%PDF-1.4'],'drawing.pdf',{type:'application/pdf'});const untouched=await window.optimizeUploadFixture(pdf)===pdf;
+    const original=HTMLCanvasElement.prototype.toBlob; let unsupportedRejected=false;
+    try{HTMLCanvasElement.prototype.toBlob=function(callback){callback(new Blob(['fallback'],{type:'image/png'}));};await window.optimizeUploadFixture(new File([source],'fallback.png',{type:'image/png'}));}catch{unsupportedRejected=true;}finally{HTMLCanvasElement.prototype.toBlob=original;}
+    canvas.width=0;canvas.height=0;
+    return {results,alpha,gifType:gifFile.type,corruptRejected,untouched,unsupportedRejected};
+  })()`);
+  for (const item of compression.results) {
+    const limits = {post:[1600,512*1024],comment:[1280,256*1024],avatar:[512,96*1024]}[item.kind];
+    assert.equal(item.type,'image/webp'); assert.ok(item.name.endsWith('.webp'));
+    assert.ok(Math.max(item.width,item.height)<=limits[0]); assert.ok(item.size<=limits[1]); assert.ok(item.size<item.sourceSize);
+  }
+  assert.ok(compression.alpha>0 && compression.alpha<255,'Preserve transparency');
+  assert.equal(compression.gifType,'image/webp');assert.equal(compression.corruptRejected,true);assert.equal(compression.untouched,true);assert.equal(compression.unsupportedRejected,true);
+  console.log('PASS: browser compresses large noisy PNG to bounded WebP for posts/comments/avatars; transparency, GIF, invalid images and unsupported encoder handled.');
   assert.equal(await evaluate(`Math.round(document.querySelector('main').getBoundingClientRect().width)`), 1320);
   assert.ok(await evaluate(`document.querySelector('article').innerText.includes('150.000đ') && document.querySelector('article').innerText.includes('125.000.000 VND')`));
   assert.equal(await evaluate(`document.querySelector('article time').closest('a')`), null);
@@ -123,7 +156,7 @@ try {
   await evaluate(`(() => { const raw = atob(${JSON.stringify(photoBytes)}); const data = Uint8Array.from(raw, c => c.charCodeAt(0)); const transfer = new DataTransfer(); transfer.items.add(new File([data], 'review.png', { type: 'image/png' })); const input = document.querySelector('input[aria-label="Thêm ảnh bình luận"]'); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await waitFor(`document.querySelector('button[aria-label="Bỏ ảnh bình luận"]')`, 'uploaded image preview');
   assert.equal(await evaluate('window.review.uploads[0].type'), 'image/webp');
-  assert.ok(await evaluate('window.review.uploads[0].size <= 1024 * 1024'));
+  assert.ok(await evaluate('window.review.uploads[0].size <= 256 * 1024'));
   await evaluate(`window.review.failSend = true; document.querySelector('button[aria-label="Gửi bình luận"]').click()`);
   await waitFor(`document.querySelector('article [role="alert"]')`, 'failed comment feedback');
   assert.ok(await evaluate(`Boolean(document.querySelector('button[aria-label="Bỏ ảnh bình luận"]'))`));
@@ -188,7 +221,7 @@ try {
   for (const [category, sourcePath] of [['Bản vẽ cộng đồng', '/file-ban-ve-nha-dep-chat'], ['Bộ sưu tập ảnh', '/kho-mau-nha-dep-chat'], ['Nội thất cộng đồng', '/noi-that']]) {
     await send('Page.navigate', { url: origin });
     await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed for source navigation');
-    await evaluate(`window.review.sourceCategory = ${JSON.stringify(category)}; window.dispatchEvent(new Event('tipook-content-changed'))`);
+    await evaluate(`window.review.sourceCategory = ${JSON.stringify(category)}; window.dispatchEvent(new Event('nhadepchat-content-changed'))`);
     await pause(350);
     await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify(sourcePath + '?postId=900001#post-900001')})`, 'original source link');
     await evaluate(`Array.from(document.querySelector('article').querySelectorAll('a')).find(link => link.textContent.includes('Xem bài viết')).click()`);
@@ -198,6 +231,6 @@ try {
     assert.ok(await evaluate(`document.getElementById('post-900001').textContent.includes('Nhà phố 5 × 20m')`));
   }
   assert.deepEqual(exceptions, []);
-  console.log('PASS: feed fits 320–1023px with scrollable categories; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in Facades, Drawings and Interiors.');
+  console.log('PASS: feed fits 320–1023px with scrollable categories; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in House Models, Drawings and Interiors.');
   console.log('Screenshots: ' + dir);
 } finally { socket?.close(); chrome.kill(); }

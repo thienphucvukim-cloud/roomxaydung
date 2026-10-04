@@ -1,5 +1,6 @@
-/* eslint-disable @next/next/no-img-element -- Portfolio images are supplied by freelancers on arbitrary hosts. */
 "use client";
+/* eslint-disable @next/next/no-img-element -- Portfolio images are supplied by freelancers on arbitrary hosts. */
+
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';

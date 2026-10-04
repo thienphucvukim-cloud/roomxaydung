@@ -1,8 +1,9 @@
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { and, count, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { postComments, posts, userRequests } from "../../../db/schema";
 
-const discussionCategory = "Thảo luận mẫu nhà";
+const discussionCategory = POST_CATEGORIES.modelDiscussion;
 
 export async function GET(request: Request) {
   const targetId = new URL(request.url).searchParams.get("targetId")?.trim() ?? "";

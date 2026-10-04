@@ -11,6 +11,8 @@ const deployToCloudflare = process.env.TIPOOK_DEPLOY_TARGET === "cloudflare";
 
 const localBindingConfig = {
   main: "vinext/server/fetch-handler",
+  durable_objects: { bindings: [] },
+  migrations: [],
   // Explicit integration-test mode; never applied to Cloudflare builds.
   ...(process.env.TIPOOK_AUTH_EMAIL_TEST === "1" ? { vars: { AUTH_EMAIL_PROVIDER: "test" } } : {}),
   compatibility_flags: ["nodejs_compat"],
@@ -33,6 +35,13 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    // Vinext's runtime sidecars and SSR loader use paths relative to the server
+    // root. Keep the lazily imported framework there, rather than in _next/static.
+    ...(deployToCloudflare ? { environments: { rsc: { build: { rolldownOptions: { output: {
+      chunkFileNames: (chunk: { name: string }) => chunk.name === "fetch-handler"
+        ? "fetch-handler-[hash].js"
+        : "_next/static/[name]-[hash].js",
+    } } } } } } : {}),
     server: {
       ...(managedLinux ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] } : {}),
       watch: {

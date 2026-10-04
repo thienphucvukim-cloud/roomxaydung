@@ -1,16 +1,17 @@
 "use client";
 
+import { SITE_SECTIONS } from "@/lib/site-sections";
 import { usePathname } from "next/navigation";
 import { DraftingCompass, House, Sofa, Handshake } from "lucide-react";
 import { HouseGalleryIcon } from "@/components/house-gallery-icon";
 import { AnimatedTabNavigation } from "@/components/animated-tab-navigation";
 
 const items = [
-  ["Bảng tin", "/", House],
-  ["Mẫu nhà đẹp", "/kho-mau-nha-dep-chat", HouseGalleryIcon],
-  ["Kho bản vẽ", "/file-ban-ve-nha-dep-chat", DraftingCompass],
-  ["Nội thất", "/noi-that", Sofa],
-  ["Thuê thiết kế", "/thue-thiet-ke", Handshake],
+  [SITE_SECTIONS.news.label, SITE_SECTIONS.news.path, House],
+  [SITE_SECTIONS.houseModels.label, SITE_SECTIONS.houseModels.path, HouseGalleryIcon],
+  [SITE_SECTIONS.drawings.label, SITE_SECTIONS.drawings.path, DraftingCompass],
+  [SITE_SECTIONS.interiors.label, SITE_SECTIONS.interiors.path, Sofa],
+  [SITE_SECTIONS.designMarketplace.label, SITE_SECTIONS.designMarketplace.path, Handshake],
 ] as const;
 
 export function SocialDock() {

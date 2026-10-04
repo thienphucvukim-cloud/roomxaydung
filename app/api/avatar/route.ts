@@ -4,8 +4,7 @@ import { getDb } from "@/db";
 import { memberProfiles } from "@/db/schema";
 import { getAuthenticatedIdentity, validOrigin } from "@/lib/website-auth";
 import { memberAvatarUrl } from "@/lib/member-avatar";
-
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+import { validateOptimizedImage } from "@/lib/image-upload-policy";
 
 export async function POST(request: Request) {
   if (!validOrigin(request)) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
@@ -13,11 +12,12 @@ export async function POST(request: Request) {
   if (!identity) return Response.json({ error: "Vui lòng đăng nhập để đổi ảnh đại diện." }, { status: 401 });
   try {
     const file = (await request.formData()).get("file");
-    if (!(file instanceof File) || !IMAGE_TYPES.has(file.type)) return Response.json({ error: "Chọn ảnh JPG, PNG, WebP hoặc GIF." }, { status: 400 });
-    if (!file.size || file.size > 5 * 1024 * 1024) return Response.json({ error: "Ảnh phải có dung lượng từ 1 byte đến 5 MB." }, { status: 400 });
+    if (!(file instanceof File)) return Response.json({ error: "Vui lòng chọn ảnh đại diện." }, { status: 400 });
+    const invalid = await validateOptimizedImage(file, "avatar");
+    if (invalid) return Response.json({ error: invalid.error }, { status: invalid.status });
     if (!env.BUCKET) return Response.json({ error: "Kho ảnh chưa được cấu hình." }, { status: 503 });
     const key = crypto.randomUUID();
-    await env.BUCKET.put(key, file.stream(), { httpMetadata: { contentType: file.type }, customMetadata: { accessType: "public", ownerUserId: identity.userId, fileName: encodeURIComponent("avatar") } });
+    await env.BUCKET.put(key, file.stream(), { httpMetadata: { contentType: "image/webp" }, customMetadata: { accessType: "public", ownerUserId: identity.userId, fileName: "avatar.webp" } });
     const db = getDb();
     try {
       await db.insert(memberProfiles).values({ userId: identity.userId, displayName: identity.displayName, email: identity.email, avatarKey: key })

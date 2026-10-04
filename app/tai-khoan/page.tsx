@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Bookmark, BriefcaseBusiness, ChevronRight, ExternalLink, FileText, Heart, Info, LoaderCircle, Mail, MessageCircle, Settings, ShieldCheck, UserPlus, Users, WalletCards } from "lucide-react";
 import { WalletPanel } from "@/components/wallet-panel";
@@ -96,8 +97,8 @@ export default function AccountPage() {
       setLoading(false);
     });
     const refresh = () => setRevision(value => value + 1);
-    window.addEventListener("tipook-content-changed", refresh);
-    return () => { controller.abort(); window.removeEventListener("tipook-content-changed", refresh); };
+    window.addEventListener(SITE_EVENTS.contentChanged, refresh);
+    return () => { controller.abort(); window.removeEventListener(SITE_EVENTS.contentChanged, refresh); };
   }, [revision]);
 
   useEffect(() => {

@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (imageKey) {
       if (!env.BUCKET) throw new Error("Kho lưu trữ ảnh chưa được cấu hình.");
       const image = await env.BUCKET.head(imageKey);
-      if (!image || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(image.httpMetadata?.contentType ?? "") || image.customMetadata?.accessType === "private") return Response.json({ error: "Ảnh bình luận không hợp lệ hoặc không còn tồn tại." }, { status: 400 });
+      if (!image || !isOptimizedImageObject(image, "comment") || image.customMetadata?.accessType !== "public") return Response.json({ error: "Vui lòng tải lại ảnh bình luận để nén và chuyển sang WebP." }, { status: 400 });
       if (image.customMetadata?.ownerUserId !== userId) return Response.json({ error: "Vui lòng tải ảnh bình luận từ tài khoản của bạn." }, { status: 403 });
     }
     const [comment] = await db.insert(postComments).values({ postId, content, imageKey: imageKey || null, userId, authorName }).returning();
@@ -75,3 +75,4 @@ export async function POST(request: Request) {
     return Response.json({ error: "Chưa thể gửi bình luận lúc này." }, { status: 500 });
   }
 }
+import { isOptimizedImageObject } from "@/lib/image-upload-policy";

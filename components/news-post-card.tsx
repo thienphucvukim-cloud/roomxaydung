@@ -1,5 +1,7 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Image from "next/image";
 import { ArrowUpRight, Globe2, ImagePlus, LoaderCircle, MapPin, MessageCircle, Send, X } from "lucide-react";
@@ -98,7 +100,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) { setCommentError("Vui lòng chọn ảnh JPG, PNG, WebP hoặc GIF."); return; }
     setUploading(true); setCommentError("");
     try {
-      const form = new FormData(); form.append("file", await optimizeImageForUpload(file));
+      const form = new FormData(); form.append("file", await optimizeImageForUpload(file, "comment")); form.append("purpose", "comment-image");
       const response = await fetch("/api/files", { method: "POST", body: form });
       const payload = await response.json() as { attachment?: CommentImage; error?: string };
       if (!response.ok || !payload.attachment) throw new Error(payload.error || "Không thể tải ảnh bình luận.");
@@ -119,7 +121,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
       setComments(previous => [...new Map([...(previous ?? []), payload.comment!].map(item => [item.id, item])).values()].sort((a, b) => a.id - b.id));
       setCommentTotal(value => typeof payload.total === "number" ? Math.max(value ?? 0, payload.total) : (value ?? post.comments ?? 0) + 1);
       setDraft(""); setCommentImage(undefined);
-      window.dispatchEvent(new Event("tipook-content-changed"));
+      window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
       window.setTimeout(() => commentInput.current?.focus(), 0);
     } catch (cause) { if (mounted.current) setCommentError(cause instanceof Error ? cause.message : "Chưa thể gửi bình luận."); }
     finally { if (mounted.current) setSending(false); }
@@ -145,16 +147,16 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
   </header>;
 
   const postContent = <div className="px-4 pb-3">
-    {post.category !== "Bảng tin" && <h3 className="break-words text-[15px] font-semibold leading-6">{title}</h3>}
+    {post.category !== POST_CATEGORIES.news && <h3 className="break-words text-[15px] font-semibold leading-6">{title}</h3>}
     {post.content && <>
       <p className={`mt-1 whitespace-pre-wrap break-words text-[15px] leading-6 ${canExpand && !expanded && !gallery ? "line-clamp-4" : ""}`}>{content}</p>
       {canExpand && !gallery && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)} className="mt-1 text-sm font-semibold hover:underline">{expanded ? "Thu gọn" : "Xem thêm"}</button>}
     </>}
-    {(post.location || post.feeling) && <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#65676b]">
-      {post.location && <span className="flex items-center gap-1"><MapPin size={13} />{formatPriceDescription(post.location)}</span>}
-      {post.feeling && <span>{formatPriceDescription(post.feeling)}</span>}
+    {(post.specifications || post.listingType) && <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#65676b]">
+      {post.specifications && <span className="flex items-center gap-1"><MapPin size={13} />{formatPriceDescription(post.specifications)}</span>}
+      {post.listingType && <span>{formatPriceDescription(post.listingType)}</span>}
     </div>}
-    {post.pollQuestion && <p className="mt-3 rounded-lg bg-[#f0f2f5] p-3 text-sm font-semibold">{formatFeedPrice(post.pollQuestion)}</p>}
+    {post.priceLabel && <p className="mt-3 rounded-lg bg-[#f0f2f5] p-3 text-sm font-semibold">{formatFeedPrice(post.priceLabel)}</p>}
   </div>;
 
   const postLink = <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -196,7 +198,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
     </form>
   </section>;
 
-  return <article ref={articleRef} aria-label={title} className="overflow-hidden rounded-xl border border-[#dddfe2] bg-white text-[#1c1e21] shadow-sm">
+  return <article id={`post-${post.id}`} data-auth-post-id={post.id} ref={articleRef} aria-label={title} className="scroll-mt-24 overflow-hidden rounded-xl border border-[#dddfe2] bg-white text-[#1c1e21] shadow-sm">
     {postHeader}{postContent}
     {images.length > 0 && <div className={`grid gap-0.5 bg-[#f0f2f5] ${images.length === 1 ? "grid-cols-1" : images.length === 2 ? "h-[clamp(240px,48vw,480px)] grid-cols-2" : `h-[clamp(320px,75vw,640px)] grid-rows-2 ${images.length <= 4 ? "grid-cols-2" : "grid-cols-6"}`}`}>
       {images.map((photo, index) => <button key={`${photo.url}:${index}`} type="button" onClick={event => openPhoto(post.images, index, event.currentTarget)} aria-haspopup="dialog" aria-label={`Xem ảnh ${index + 1} của bài viết ${post.title}`} className={`relative block min-h-0 min-w-0 overflow-hidden focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-[#229ed9] ${images.length === 1 ? "" : images.length === 3 && index === 0 ? "row-span-2" : images.length === 5 ? index < 2 ? "col-span-3" : "col-span-2" : ""}`}>
@@ -206,7 +208,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
     </div>}
     {postLink}{actions}
     {commentsOpen && !gallery && commentThread}
-    <NewsPhotoViewer photos={gallery?.photos ?? []} index={gallery?.index ?? null} onIndexChange={index => setGallery(previous => previous ? { ...previous, index } : null)} onClose={() => setGallery(null)} onRestoreFocus={() => {
+    <NewsPhotoViewer postId={post.id} photos={gallery?.photos ?? []} index={gallery?.index ?? null} onIndexChange={index => setGallery(previous => previous ? { ...previous, index } : null)} onClose={() => setGallery(null)} onRestoreFocus={() => {
       const trigger = photoTrigger.current;
       if (trigger?.isConnected) trigger.focus();
       else Array.from(articleRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []).find(button => button.getAttribute("aria-label") === trigger?.getAttribute("aria-label"))?.focus();

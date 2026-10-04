@@ -43,7 +43,7 @@ body:has(.drawing-files-page) { background: #F5F7FA; }
   box-shadow: 0 2px 10px rgba(16, 36, 58, .06);
   padding: 14px;
 }
-/* Use the facade card type sizes across all catalogs. */
+/* Use the house model card type sizes across all catalogs. */
 .catalog-card-title {
   font-size: 1rem;
   line-height: 1.5rem;

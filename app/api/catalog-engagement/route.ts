@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   try {
     const target = await resolveCatalogTarget(body.targetType, body.targetId);
     if (!target) return Response.json({ error: "Nội dung không tồn tại." }, { status: 404 });
-    if ((body.action === "view" && target.kind !== "facade" && !("canView" in target && target.canView)) || (body.action === "rate" && target.kind !== "file")) {
+    if ((body.action === "view" && target.kind !== "house-model" && !("canView" in target && target.canView)) || (body.action === "rate" && target.kind !== "file")) {
       return Response.json({ error: "Hành động không áp dụng cho nội dung này." }, { status: 400 });
     }
     if (body.action === "view") {

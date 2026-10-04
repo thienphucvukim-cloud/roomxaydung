@@ -1,16 +1,18 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useEffect, useId, useRef, useState } from "react";
 import { Bookmark, Check, CircleHelp, FileDown, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, UserRound, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { optimizeImageForUpload } from "@/lib/image-upload";
+import { authActionTarget } from "@/lib/action-auth-return";
 import { ChatThread } from "@/components/chat-thread";
 import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
 
 type IconName = "heart" | "bookmark" | "star" | "follow" | "check";
 const iconMap = { heart: Heart, bookmark: Bookmark, star: Star, follow: UserPlus, check: Check };
-const actionChangedEvent = "tipook-action-changed";
+const actionChangedEvent = SITE_EVENTS.actionChanged;
 type ActionChange = { actionType: string; targetType: string; targetId: string; active: boolean; count?: number };
 
 function ExpertIcon() {
@@ -107,7 +109,7 @@ export function ToggleActionButton({
   const actionLabel = active ? activeLabel ?? label : label;
   const countLabel = actionCount === null ? "—" : actionCount.toLocaleString("vi-VN");
   const visibleLabel = showCount ? showLabelWithCount ? `${actionLabel} (${countLabel})` : countLabel : active ? activeLabel ?? "Đã lưu" : label;
-  return <button type="button" data-requires-account onClick={toggle} disabled={busy} className={className} aria-pressed={active} aria-label={showCount ? `${actionLabel} (${countLabel})` : undefined} title={showCount ? actionLabel : undefined}>
+  return <button type="button" data-requires-account {...authActionTarget(targetType, targetId)} onClick={toggle} disabled={busy} className={className} aria-pressed={active} aria-label={showCount ? `${actionLabel} (${countLabel})` : undefined} title={showCount ? actionLabel : undefined}>
     {busy ? <LoaderCircle size={17} className="animate-spin"/> : <Icon size={17} className={active ? (icon === "heart" ? "fill-red-500 text-red-500" : "fill-current") : ""}/>}
     <span className={showCount ? "tabular-nums" : undefined}>{visibleLabel}</span>
   </button>;
@@ -144,7 +146,7 @@ export function ShareActionButton({ title, url, iconOnly = false, className = ""
   };
   const label = copied ? "Đã sao chép liên kết" : "Sao chép liên kết chia sẻ";
   return <>
-    <button type="button" data-requires-account onClick={() => void share()} disabled={busy} className={className} aria-label={label} title={label}>
+    <button type="button" data-requires-account {...authActionTarget(targetType, targetId)} onClick={() => void share()} disabled={busy} className={className} aria-label={label} title={label}>
       {copied ? <Check size={17} aria-hidden="true"/> : <Share2 size={17} aria-hidden="true"/>}
       <span className={iconOnly ? "sr-only" : undefined} aria-live="polite">{copied ? "Đã sao chép" : "Chia sẻ"}</span>
     </button>
@@ -251,7 +253,7 @@ export function RequestActionButton({
   };
 
   return <>
-    <button type="button" data-requires-account onClick={() => setOpen(true)} className={`group/request relative ${className}`} aria-label={iconOnly && iconCount !== undefined ? `${label} (${iconCount})` : label} title={iconOnly ? undefined : label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <ExpertIcon/> : iconOnly === "file" ? <FileDown size={19}/> : iconOnly === "help" ? <CircleHelp size={20}/> : iconOnly === "admin" ? <span aria-hidden="true" className="flex flex-col items-center gap-0.5"><UserRound size={20} strokeWidth={1.9}/><span className="text-[9px] font-semibold leading-none">admin</span></span> : label}{iconOnly && iconCount !== undefined && <span className="text-[11px] leading-4 tabular-nums">{iconCount}</span>}{iconOnly && <span role="tooltip" className={`pointer-events-none absolute z-30 hidden whitespace-nowrap rounded-md bg-[#182230] px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg group-hover/request:block group-focus-visible/request:block ${iconOnly === "help" || iconOnly === "admin" ? "right-0 top-full mt-2 group-focus/request:block group-active/request:block" : `bottom-full mb-2 ${iconOnly === "expert" ? "right-0" : "left-1/2 -translate-x-1/2"}`}`}>{label}</span>}</button>
+    <button type="button" data-requires-account {...authActionTarget(targetType, targetId)} onClick={() => setOpen(true)} className={`group/request relative ${className}`} aria-label={iconOnly && iconCount !== undefined ? `${label} (${iconCount})` : label} title={iconOnly ? undefined : label}>{iconOnly === "comment" ? <MessageCircle size={19}/> : iconOnly === "expert" ? <ExpertIcon/> : iconOnly === "file" ? <FileDown size={19}/> : iconOnly === "help" ? <CircleHelp size={20}/> : iconOnly === "admin" ? <span aria-hidden="true" className="flex flex-col items-center gap-0.5"><UserRound size={20} strokeWidth={1.9}/><span className="text-[9px] font-semibold leading-none">admin</span></span> : label}{iconOnly && iconCount !== undefined && <span className="text-[11px] leading-4 tabular-nums">{iconCount}</span>}{iconOnly && <span role="tooltip" className={`pointer-events-none absolute z-30 hidden whitespace-nowrap rounded-md bg-[#182230] px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg group-hover/request:block group-focus-visible/request:block ${iconOnly === "help" || iconOnly === "admin" ? "right-0 top-full mt-2 group-focus/request:block group-active/request:block" : `bottom-full mb-2 ${iconOnly === "expert" ? "right-0" : "left-1/2 -translate-x-1/2"}`}`}>{label}</span>}</button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent showCloseButton={false} className="max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-[520px] gap-0 overflow-y-auto rounded-2xl border-0 bg-white p-0 shadow-2xl">
         <DialogHeader className="relative border-b border-[#e4e6eb] px-14 py-5 text-center sm:text-center">

@@ -1,20 +1,21 @@
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { and, avg, count, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { catalogRatings, catalogViews, posts } from "@/db/schema";
 import { drawings } from "@/lib/drawing-catalog";
-import { facadeModels } from "@/lib/facade-catalog";
+import { houseModels } from "@/lib/house-models";
 
 export type CatalogTarget = { targetType: "house-model" | "drawing" | "post"; targetId: string };
 export type CatalogEngagement = { views: number; rating: number | null; ratingCount: number; myRating: number | null };
 
 export async function resolveCatalogTarget(targetType: unknown, targetId: unknown) {
   if (typeof targetId !== "string" || !targetId || targetId.length > 180) return null;
-  if (targetType === "house-model" && facadeModels.some(model => model.title === targetId)) return { targetType, targetId, kind: "facade" } as const;
+  if (targetType === "house-model" && houseModels.some(model => model.title === targetId)) return { targetType, targetId, kind: "house-model" } as const;
   if (targetType === "drawing" && drawings.some(drawing => drawing.title === targetId)) return { targetType, targetId, kind: "file", canView: true } as const;
   if (targetType !== "post" || !/^[1-9]\d*$/.test(targetId) || !Number.isSafeInteger(Number(targetId))) return null;
   const [post] = await getDb().select({ category: posts.category }).from(posts).where(and(eq(posts.id, Number(targetId)), eq(posts.audience, "Công khai"))).limit(1);
-  if (post?.category === "Bộ sưu tập ảnh") return { targetType, targetId, kind: "facade" } as const;
-  if (post && ["Bản vẽ cộng đồng", "Nội thất cộng đồng"].includes(post.category)) return { targetType, targetId, kind: "file", canView: true } as const;
+  if (post?.category === POST_CATEGORIES.houseModels) return { targetType, targetId, kind: "house-model" } as const;
+  if (post && [POST_CATEGORIES.drawings, POST_CATEGORIES.interiors].includes(post.category)) return { targetType, targetId, kind: "file", canView: true } as const;
   return null;
 }
 

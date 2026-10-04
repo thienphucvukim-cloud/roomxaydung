@@ -80,12 +80,12 @@ export async function POST(request: Request) {
       ? `Bạn đã thanh toán ${product.amount.toLocaleString("vi-VN")}đ từ Ví NhàĐẹpChất cho “${product.title}”.\n\nLink tải có hiệu lực 24 giờ:\n${downloadLinks.map((item) => `${item.name}: ${item.url}`).join("\n")}`
       : `Bạn đã thanh toán ${product.amount.toLocaleString("vi-VN")}đ từ Ví NhàĐẹpChất cho “${product.title}”. Admin hoặc tác giả sẽ gửi file qua tin nhắn nội bộ.`;
     await db.insert(directMessages).values([
-      { senderUserId: "tipook-wallet", senderName: "Ví NhàĐẹpChất", recipientUserId: userId, subject: `Đã mua bản vẽ #${orderCode}`, content: buyerContent },
-      { senderUserId: "tipook-wallet", senderName: "Ví NhàĐẹpChất", recipientUserId: product.sellerUserId, subject: `Có đơn mua bản vẽ #${orderCode}`, content: `Bản vẽ “${product.title}” đã được mua với giá ${product.amount.toLocaleString("vi-VN")}đ. Admin sẽ kiểm tra và cộng tiền vào ví bán file. Sau đó bạn có thể yêu cầu rút về ngân hàng hoặc chuyển sang ví nạp tại trang Tài khoản.` },
+      { senderUserId: "nhadepchat-wallet", senderName: "Ví NhàĐẹpChất", recipientUserId: userId, subject: `Đã mua hồ sơ #${orderCode}`, content: buyerContent },
+      { senderUserId: "nhadepchat-wallet", senderName: "Ví NhàĐẹpChất", recipientUserId: product.sellerUserId, subject: `Có đơn mua hồ sơ #${orderCode}`, content: `Hồ sơ “${product.title}” đã được mua với giá ${product.amount.toLocaleString("vi-VN")}đ. Admin sẽ kiểm tra và cộng tiền vào ví bán file. Sau đó bạn có thể yêu cầu rút về ngân hàng hoặc chuyển sang ví nạp tại trang Tài khoản.` },
     ]);
 
     const postLink = requestTargetLink(new URL(request.url).origin, targetType, targetId, product.category);
-    const telegram = await notifyAdminTelegram(`[NhàĐẹpChất] Đơn mua file mới\nMã đơn: #${orderCode}\nBản vẽ: ${product.title}\nSố tiền: ${product.amount.toLocaleString("vi-VN")}đ\nTrạng thái: Đã thanh toán bằng Ví NhàĐẹpChất\nLink bài viết: ${postLink}\nTác giả: ${product.sellerUserId}`, userId);
+    const telegram = await notifyAdminTelegram(`[NhàĐẹpChất] Đơn mua file mới\nMã đơn: #${orderCode}\nHồ sơ: ${product.title}\nSố tiền: ${product.amount.toLocaleString("vi-VN")}đ\nTrạng thái: Đã thanh toán bằng Ví NhàĐẹpChất\nLink bài viết: ${postLink}\nTác giả: ${product.sellerUserId}`, userId);
     return Response.json({ ok: true, orderCode, downloadLinks, telegram, message: downloadLinks.length ? "Thanh toán thành công. Link tải có hiệu lực 24 giờ." : "Thanh toán thành công. Admin hoặc tác giả sẽ gửi file qua tin nhắn." }, { status: 201 });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Chưa thể thanh toán bằng Ví NhàĐẹpChất.";

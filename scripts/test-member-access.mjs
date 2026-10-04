@@ -14,7 +14,7 @@ const db = { select: fail, update: fail, delete: fail, insert: table => {
   assert.equal(table, schema.catalogViews, "Only visit analytics can be written anonymously");
   return { values: value => ({ onConflictDoNothing: async () => { assert.equal(value.userId, guest); views++; } }) };
 } };
-const target = { targetType: "house-model", targetId: "fixture", kind: "facade" };
+const target = { targetType: "house-model", targetId: "fixture", kind: "house-model" };
 const fixtures = {
   "@/lib/website-auth": { getAuthenticatedIdentity: async () => identity, isAdminIdentity: () => false, validOrigin: () => true },
   "next/headers": { cookies: async () => ({ get: () => ({ value: guest }) }) },
@@ -109,12 +109,24 @@ console.log(`PASS: ${checked} protected API mutations, private reads, anonymous 
 // Exercise the actual client gate handlers without a browser or real network.
 let uiMember = { loaded: true, authenticated: false };
 let requestedPath = null;
-class ElementFixture { constructor(protectedControl) { this.protectedControl = protectedControl; } closest() { return this.protectedControl ? this : null; } }
-const uiContext = createContext({ Element: ElementFixture });
+class ElementFixture {
+  constructor(protectedControl) { this.protectedControl = protectedControl; }
+  closest(selector) { return this.protectedControl && selector.startsWith('[data-requires-account]') ? this : null; }
+  getAttribute() { return null; }
+}
+const uiContext = createContext({ Element: ElementFixture, window: { location: { href: "https://nhadepchat.top/kho-mau-nha-dep-chat" } } });
+const actionReturnModule = new SourceTextModule(ts.transpileModule(readFileSync("lib/action-auth-return.ts", "utf8"), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText, { context: createContext({ URL, URLSearchParams }) });
+await actionReturnModule.link(async () => new SourceTextModule(ts.transpileModule(readFileSync("lib/auth-return.ts", "utf8"), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+}).outputText, { context: actionReturnModule.context }));
+await actionReturnModule.evaluate();
 const uiFixtures = {
   react: { useState: () => [requestedPath, value => { requestedPath = value; }] },
   "react/jsx-runtime": { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }), Fragment: "fragment" },
-  "next/navigation": { usePathname: () => "/kho-mau-nha-dep-chat" },
+  "next/navigation": { usePathname: () => "/kho-mau-nha-dep-chat", useSearchParams: () => new URLSearchParams() },
+  "@/lib/action-auth-return": actionReturnModule.namespace,
   "@/components/member-avatar": { useCurrentMember: () => uiMember },
   "@/components/ui/dialog": Object.fromEntries(["Dialog", "DialogContent", "DialogHeader", "DialogTitle"].map(name => [name, name])),
   "@/components/client-navigation-link": { ClientNavigationLink: "a" },
@@ -137,7 +149,8 @@ const click = (protectedControl, key) => {
 };
 assert.equal(click(false), false, "Public navigation, search and gallery controls remain usable");
 assert.equal(click(true), true, "Guest clicks cannot invoke member actions");
-assert.equal(requestedPath, "/kho-mau-nha-dep-chat");
+assert.equal(requestedPath.pathname, "/kho-mau-nha-dep-chat");
+assert.equal(requestedPath.returnTo, "/kho-mau-nha-dep-chat");
 assert.equal(click(true, "Enter"), true, "Keyboard activation cannot bypass the gate");
 assert.equal(click(true, "Tab"), false, "Keyboard navigation stays available");
 assert.notEqual(MemberOnly({ children: "private functionality" }), "private functionality");

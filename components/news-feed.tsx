@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { DraftingCompass, Flame, LoaderCircle, House, MessageCircle, RefreshCw, Sofa } from "lucide-react";
@@ -10,6 +11,7 @@ import { NewsPostComposer } from "@/components/news-post-composer";
 import { NewsPostCard } from "@/components/news-post-card";
 import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { formatPriceDescription } from "@/lib/price-description";
+import { usePostAnchor } from "@/components/use-post-anchor";
 
 const sourceIcons = [House, HouseGalleryIcon, DraftingCompass, Sofa];
 
@@ -29,6 +31,7 @@ export function NewsFeed({ postId }: { postId?: number }) {
   const loadedPages = useRef<{ scope: string; batches: NewsFeedResponse[] } | null>(null);
   const current = result.selection === selection;
   const data = result.scope === scope ? result.data : undefined;
+  usePostAnchor(data?.posts ?? []);
   const error = current ? result.error : undefined;
   const loading = !current && !data;
   const featuredPosts = [...(data?.posts ?? [])]
@@ -89,15 +92,15 @@ export function NewsFeed({ postId }: { postId?: number }) {
     const timer = window.setInterval(update, 30_000);
     window.addEventListener("focus", update);
     document.addEventListener("visibilitychange", update);
-    window.addEventListener("tipook-content-changed", updateContent);
-    window.addEventListener("tipook-avatar-changed", updateContent);
+    window.addEventListener(SITE_EVENTS.contentChanged, updateContent);
+    window.addEventListener(SITE_EVENTS.avatarChanged, updateContent);
     return () => {
       controller.abort();
       window.clearInterval(timer);
       window.removeEventListener("focus", update);
       document.removeEventListener("visibilitychange", update);
-      window.removeEventListener("tipook-content-changed", updateContent);
-      window.removeEventListener("tipook-avatar-changed", updateContent);
+      window.removeEventListener(SITE_EVENTS.contentChanged, updateContent);
+      window.removeEventListener(SITE_EVENTS.avatarChanged, updateContent);
     };
   }, [category, search, page, selection, scope, revision, postId]);
 

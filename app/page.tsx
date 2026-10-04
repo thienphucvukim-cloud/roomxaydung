@@ -3,7 +3,7 @@ import { NewsFeed } from "@/components/news-feed";
 
 export const metadata: Metadata = {
   title: "Bảng tin cộng đồng | NhàĐẹpChất",
-  description: "Cập nhật bài đăng mới về mặt tiền, bản vẽ và nội thất từ cộng đồng NhàĐẹpChất.",
+  description: "Cập nhật bài đăng mới về mẫu nhà, bản vẽ và nội thất từ cộng đồng NhàĐẹpChất.",
 };
 
 export default function Home() {

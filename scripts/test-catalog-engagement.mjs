@@ -43,7 +43,7 @@ const route = await load("@/app/api/catalog-engagement/route");
 await route.link(load);
 await route.evaluate();
 const { GET, POST } = route.namespace;
-const facade = { targetType: "house-model", targetId: "Nhà phố 3 tầng xanh mát" };
+const houseModel = { targetType: "house-model", targetId: "Nhà phố 3 tầng xanh mát" };
 const drawing = { targetType: "drawing", targetId: "Nhà cấp 4 mái Thái 1 tầng 11 × 13m, diện tích 130m²" };
 async function send(target, action, rating, status = 200) {
   const response = await POST(new Request("http://localhost/api/catalog-engagement", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...target, action, rating }) }));
@@ -58,15 +58,15 @@ async function read(target) {
   return response.json();
 }
 try {
-  assert.equal((await read(facade)).views, 0);
-  assert.equal((await send(facade, "view")).views, 1);
-  await Promise.all(Array.from({ length: 5 }, () => send(facade, "view")));
-  assert.equal((await read(facade)).views, 1, "Repeated opens by one visitor must not inflate views.");
+  assert.equal((await read(houseModel)).views, 0);
+  assert.equal((await send(houseModel, "view")).views, 1);
+  await Promise.all(Array.from({ length: 5 }, () => send(houseModel, "view")));
+  assert.equal((await read(houseModel)).views, 1, "Repeated opens by one visitor must not inflate views.");
   visitor = "guest_second";
-  assert.equal((await send(facade, "view")).views, 2);
-  await send({ ...facade, targetId: "missing" }, "view", undefined, 404);
+  assert.equal((await send(houseModel, "view")).views, 2);
+  await send({ ...houseModel, targetId: "missing" }, "view", undefined, 404);
   assert.equal((await send(drawing, "view")).views, 1);
-  await send(facade, "rate", 5, 400);
+  await send(houseModel, "rate", 5, 400);
   await send(drawing, "rate", 5, 401);
   assert.equal((await read(drawing)).rating, null);
   member = { userId: "member_first" };
@@ -82,12 +82,12 @@ try {
   assert.equal(average.ratingCount, 2);
   assert.equal(average.myRating, 5);
   const insert = sqlite.prepare("INSERT INTO posts (user_id, author_name, category, title, content, audience, created_at) VALUES ('author', 'Author', ?, 'Same title', '', ?, '2026-10-02')");
-  const facadePost = String(insert.run("Bộ sưu tập ảnh", "Công khai").lastInsertRowid);
+  const houseModelPost = String(insert.run("Bộ sưu tập ảnh", "Công khai").lastInsertRowid);
   const drawingPost = String(insert.run("Bản vẽ cộng đồng", "Công khai").lastInsertRowid);
   const interiorPost = String(insert.run("Nội thất cộng đồng", "Công khai").lastInsertRowid);
   const privatePost = String(insert.run("Nội thất cộng đồng", "Riêng tư").lastInsertRowid);
   const post = targetId => ({ targetType: "post", targetId });
-  assert.equal((await send(post(facadePost), "view")).views, 1);
+  assert.equal((await send(post(houseModelPost), "view")).views, 1);
   assert.equal((await send(post(drawingPost), "view")).views, 1);
   assert.equal((await send(post(interiorPost), "view")).views, 1);
   assert.equal((await send(post(drawingPost), "rate", 2)).rating, 2);

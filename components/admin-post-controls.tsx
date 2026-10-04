@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useState } from "react";
 import { EyeOff, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 
@@ -22,7 +23,7 @@ export function AdminPostControls({ postId, onEdit }: { postId: number; onEdit: 
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Chưa thể cập nhật bài viết.");
       setRemoved(true);
-      window.dispatchEvent(new Event("tipook-content-changed"));
+      window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chưa thể cập nhật bài viết.");
     } finally {

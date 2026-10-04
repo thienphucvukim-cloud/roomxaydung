@@ -1,11 +1,12 @@
 "use client";
 
+import { PENDING_WALLET_STORAGE } from "@/lib/legacy-contracts";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 type Account = { userId: string; displayName: string; email?: string | null; username?: string | null };
 type Credit = { reference: string; userId: string; amount: number; orderCode: number; reason: string; performedBy: string; createdAt: string };
 type CreditRequest = { userId: string; amount: number; reason: string; requestId: string };
-const pendingStorageKey = "tipook:pending-manual-credit";
+const pendingStorageKey = PENDING_WALLET_STORAGE.manualCredit;
 
 export function ManualWalletCredit() {
   const [query, setQuery] = useState("");

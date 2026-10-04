@@ -4,6 +4,8 @@ import { currentUserId } from "../../../lib/member-identity";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { memberProfiles, postAttachments, postComments, websiteContent } from "../../../db/schema";
+import { readPublicFile } from "../../../lib/public-file";
+import { isImageUpload, optimizedImageMetadata, validateOptimizedImage, webpFileName } from "@/lib/image-upload-policy";
 
 const MAX_PUBLIC_FILE_SIZE = 25 * 1024 * 1024;
 const MAX_PRIVATE_FILE_SIZE = 100 * 1024 * 1024;
@@ -36,15 +38,21 @@ export async function POST(request: Request) {
     if (purpose === "private" && !DRAWING_EXTENSIONS.has(ext)) return Response.json({ error: "File bản vẽ phải là DWG, DXF, SKP, RVT, RFA, PLN, PDF, ZIP, RAR hoặc 7Z." }, { status: 415 });
     const maxSize = purpose === "private" ? MAX_PRIVATE_FILE_SIZE : MAX_PUBLIC_FILE_SIZE;
     if (file.size > maxSize) return Response.json({ error: `Mỗi tệp không được vượt quá ${maxSize / 1024 / 1024} MB.` }, { status: 413 });
+    const imageUpload = purpose === "public" && (uploadPurpose === "drawing-preview" || uploadPurpose === "comment-image" || await isImageUpload(file));
+    if (imageUpload) {
+      const invalid = await validateOptimizedImage(file, uploadPurpose === "comment-image" ? "comment" : "post");
+      if (invalid) return Response.json({ error: invalid.error }, { status: invalid.status });
+    }
 
     const key = crypto.randomUUID();
     const ownerUserId = await currentUserId();
-    const type = file.type || "application/octet-stream";
+    const type = imageUpload ? "image/webp" : file.type || "application/octet-stream";
+    const name = imageUpload ? webpFileName(file.name) : file.name;
     await getBucket().put(key, file.stream(), {
       httpMetadata: { contentType: type },
-      customMetadata: { fileName: encodeURIComponent(file.name.slice(0, 240)), accessType: purpose, ownerUserId },
+      customMetadata: { fileName: encodeURIComponent(name.slice(0, 240)), accessType: purpose, ownerUserId, ...(imageUpload ? optimizedImageMetadata(uploadPurpose === "comment-image" ? "comment" : "post") : {}) },
     });
-    return Response.json({ attachment: { key, name: file.name, type, size: file.size, accessType: purpose, ...(purpose === "public" ? { url: "/api/files?key=" + encodeURIComponent(key) } : {}) } }, { status: 201 });
+    return Response.json({ attachment: { key, name, type, size: file.size, accessType: purpose, ...(purpose === "public" ? { url: "/api/files?key=" + encodeURIComponent(key) } : {}) } }, { status: 201 });
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Không thể tải tệp lên.";
     return Response.json({ error: message }, { status: 500 });
@@ -52,31 +60,11 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  try {
-    const url = new URL(request.url);
-    const key = url.searchParams.get("key") || "";
-    if (!/^[0-9a-f-]{36}$/i.test(key)) return Response.json({ error: "Tệp không hợp lệ." }, { status: 400 });
-    const object = await getBucket().get(key);
-    if (!object) return Response.json({ error: "Không tìm thấy tệp." }, { status: 404 });
-    if (object.customMetadata?.accessType === "private") return Response.json({ error: "File bản vẽ chỉ được tải bằng liên kết cấp sau khi mua." }, { status: 403 });
+  return readPublicFile(request, env.BUCKET);
+}
 
-    const name = decodeURIComponent(object.customMetadata?.fileName || "tep-dinh-kem");
-    const safeName = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    const contentType = headers.get("content-type") || "application/octet-stream";
-    const inline = SAFE_INLINE_TYPES.has(contentType) && !url.searchParams.has("download");
-    headers.set("etag", object.httpEtag);
-    headers.set("content-length", String(object.size));
-    headers.set("cache-control", "private, max-age=3600");
-    headers.set("content-disposition", `${inline ? "inline" : "attachment"}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(name)}`);
-    headers.set("x-content-type-options", "nosniff");
-    headers.set("content-security-policy", "sandbox");
-    return new Response(object.body, { headers });
-  } catch (cause) {
-    const message = cause instanceof Error ? cause.message : "Không thể đọc tệp.";
-    return Response.json({ error: message }, { status: 500 });
-  }
+export async function HEAD(request: Request) {
+  return readPublicFile(request, env.BUCKET);
 }
 
 export async function DELETE(request: Request) {

@@ -1,5 +1,6 @@
+import { POST_CATEGORIES } from "./legacy-contracts.ts";
 export const FILE_CATALOG_PAGE_SIZE = 16;
-export const PROMOTION_CATEGORIES = ["Bản vẽ cộng đồng", "Nội thất cộng đồng"] as const;
+export const PROMOTION_CATEGORIES = [POST_CATEGORIES.drawings, POST_CATEGORIES.interiors] as const;
 
 export function promotionMonthlyPrice(position: number) {
   if (!Number.isInteger(position) || position < 1 || position > FILE_CATALOG_PAGE_SIZE) throw new Error("Vị trí không hợp lệ.");

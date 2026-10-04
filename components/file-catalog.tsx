@@ -1,4 +1,6 @@
 "use client";
+import { SITE_EVENTS } from "@/lib/site-events";
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { OwnerPostControls, useSiteEditor } from "@/components/site-editor";
 import { demoPostVisible } from "@/lib/demo-posts";
 import { usePostAnchor } from "@/components/use-post-anchor";
@@ -20,21 +22,27 @@ import { PurchaseActionButton } from "@/components/purchase-action-button";
 import { ProjectGallery } from "@/components/project-gallery";
 import { FILE_CATALOG_SORT_OPTIONS, parseFileCatalogSort, type FileCatalogSort } from "@/lib/file-catalog-sort";
 import { parseVndPrice } from "@/lib/drawing-catalog";
+import { useCatalogLocation } from "@/components/use-catalog-location";
 
 type ProfessionalRole = "engineer" | "architect";
 type Attachment = { key: string; name: string; type: string; size: number; url?: string; accessType?: "public" | "private" };
-type Post = { promotionPosition?: number | null; downloads?: number; id: number; userId: string; authorName: string; title: string; content: string; category: string; location?: string | null; feeling?: string | null; pollQuestion?: string | null; attachments?: Attachment[] };
+type Post = { promotionPosition?: number | null; downloads?: number; id: number; userId: string; authorName: string; title: string; content: string; category: string; specifications?: string | null; listingType?: string | null; priceLabel?: string | null; attachments?: Attachment[] };
 type CatalogCard = { key: string; search: string; card: ReactNode; contentPrefix?: string };
-export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = "", targetPostId, catalogCards = [], sort = "latest" }: {
+export function FileCatalog({ variant = "drawing", page: initialPage = 1, searchQuery: initialQuery = "", targetPostId: initialPostId, catalogCards = [], sort: initialSort = "latest" }: {
   variant?: "drawing" | "interior"; page?: number; searchQuery?: string; targetPostId?: string; catalogCards?: CatalogCard[]; sort?: FileCatalogSort;
 }) {
+  const location = useCatalogLocation({ searchQuery: initialQuery, sort: initialSort, targetPostId: initialPostId, page: initialPage });
+  const { searchQuery, targetPostId, page = 1 } = location;
+  const sort = parseFileCatalogSort(location.sort);
   const router = useRouter();
   const editor = useSiteEditor();
   const basePath = variant === "interior" ? "/noi-that" : "/file-ban-ve-nha-dep-chat";
   const [totalPosts, setTotalPosts] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const requestScope = JSON.stringify([page, searchQuery, targetPostId, sort]);
+  const [loadedScope, setLoadedScope] = useState("");
+  const loading = !location.ready || loadedScope !== requestScope;
   const [refresh, setRefresh] = useState(0);
-  const category = variant === "interior" ? "Nội thất cộng đồng" : "Bản vẽ cộng đồng";
+  const category = variant === "interior" ? POST_CATEGORIES.interiors : POST_CATEGORIES.drawings;
   const itemLabel = variant === "interior" ? "hồ sơ nội thất" : "bản vẽ";
   const itemTitle = variant === "interior" ? "Hồ sơ nội thất" : "Bản vẽ";
   const marketLabel = variant === "interior" ? "Nội thất" : "Kho bản vẽ";
@@ -52,7 +60,9 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
   const [posts, setPosts] = useState<Post[]>([]);
   const [catalogOrder, setCatalogOrder] = useState<string[] | null>(null);
   usePostAnchor(posts);
-  const [query, setQuery] = useState(searchQuery);
+  const [queryDraft, setQueryDraft] = useState({ source: searchQuery, value: searchQuery });
+  const query = queryDraft.source === searchQuery ? queryDraft.value : searchQuery;
+  const setQuery = (value: string) => setQueryDraft({ source: searchQuery, value });
   const [open, setOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [professionalRole, setProfessionalRole] = useState<ProfessionalRole | null>(null);
@@ -81,7 +91,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
   const filteredCards = targetPostId ? [] : catalogCards.filter(card => demoPostVisible(editor.content, card.contentPrefix, editor.isOwner) && (!normalized || [card.search, ...Object.entries(editor.content).filter(([key]) => card.contentPrefix && key.startsWith(card.contentPrefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized)));
   const modelKeys = JSON.stringify(filteredCards.map(card => card.key));
 
-  useEffect(() => { const update = () => setRefresh(value => value + 1); window.addEventListener("tipook-content-changed", update); return () => window.removeEventListener("tipook-content-changed", update); }, []);
+  useEffect(() => { const update = () => setRefresh(value => value + 1); window.addEventListener(SITE_EVENTS.contentChanged, update); return () => window.removeEventListener(SITE_EVENTS.contentChanged, update); }, []);
   useEffect(() => {
     fetch("/api/professional-profile").then((response) => response.ok ? response.json() as Promise<{ profile?: { accountType?: string } }> : Promise.reject()).then((data) => {
       const accountType = data.profile?.accountType;
@@ -90,6 +100,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
   }, []);
   useEffect(() => {
     const controller = new AbortController();
+    if (!location.ready) return;
     const params = new URLSearchParams({ category, page: String(page), q: searchQuery });
     if (sort !== "latest") { params.set("sort", sort); params.set("modelKeys", modelKeys); }
     if (targetPostId) params.set("postId", targetPostId);
@@ -97,9 +108,9 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
       .then(response => response.ok ? response.json() as Promise<{ posts?: Post[]; total?: number; catalogOrder?: string[] }> : Promise.reject())
       .then(data => { if (!controller.signal.aborted) { setPosts(data.posts ?? []); setTotalPosts(data.total ?? 0); setCatalogOrder(data.catalogOrder ?? null); } })
       .catch(() => { if (!controller.signal.aborted) setNotice(`Chưa thể tải ${itemLabel} cộng đồng.`); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .finally(() => { if (!controller.signal.aborted) setLoadedScope(requestScope); });
     return () => controller.abort();
-  }, [category, page, searchQuery, targetPostId, refresh, itemLabel, sort, modelKeys]);
+  }, [category, page, searchQuery, targetPostId, refresh, itemLabel, sort, modelKeys, location.ready, requestScope]);
 
   const pagination = catalogPageWindow(page, totalPosts, filteredCards.length, FILE_CATALOG_PAGE_SIZE);
   const visibleCards = catalogOrder ? filteredCards.filter(card => catalogOrder.includes("drawing:" + card.key)) : filteredCards.slice(pagination.modelStart, pagination.modelEnd);
@@ -176,7 +187,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
     try {
       let publishedPostId = pendingPostId;
       if (!publishedPostId) {
-        const response = await fetch("/api/posts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), content: description.trim(), category, audience: "Công khai", feeling: drawingType, location: format, pollQuestion: price.trim(), coverImageKey: files.find(file => file.key === coverImageKey)?.key ?? files[0]?.key, attachments: files.map(({ key, name, type, size }) => ({ key, name, type, size })), paidFiles: drawingFiles.map(({ key, name, type, size }) => ({ key, name, type, size })) }) });
+        const response = await fetch("/api/posts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), content: description.trim(), category, audience: "Công khai", listingType: drawingType, specifications: format, priceLabel: price.trim(), coverImageKey: files.find(file => file.key === coverImageKey)?.key ?? files[0]?.key, attachments: files.map(({ key, name, type, size }) => ({ key, name, type, size })), paidFiles: drawingFiles.map(({ key, name, type, size }) => ({ key, name, type, size })) }) });
         const data = await response.json() as { error?: string; post?: Post };
         if (!response.ok || !data.post) throw new Error(data.error || `Chưa thể đăng ${itemLabel}.`);
         publishedPostId = data.post.id;
@@ -194,7 +205,7 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
           }
           throw new Error("Hồ sơ đã đăng. " + (result.error || "Chưa thể bật quảng cáo.") + " Bạn có thể thử thanh toán lại hoặc tắt quảng cáo để hoàn tất.");
         }
-        window.dispatchEvent(new Event("tipook-wallet-changed"));
+        window.dispatchEvent(new Event(SITE_EVENTS.walletChanged));
       }
       setPendingPostId(null); setPromotion(null); promotionRequestId.current = null;
       if (page === 1 && !searchQuery) setRefresh(current => current + 1); else router.push(catalogPageHref(basePath, 1));
@@ -214,18 +225,18 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
         const post = entry.post;
         if (variant === "drawing") {
           const preview = post.attachments?.find(item => item.type.startsWith("image/") && item.url);
-          const amount = parseVndPrice(post.pollQuestion);
+          const amount = parseVndPrice(post.priceLabel);
           const displayPrice = amount ? amount.toLocaleString("vi-VN") + "đ" : "Miễn phí";
-          return <article key={post.id} id={`post-${post.id}`} className="group flex h-full min-w-0 scroll-mt-24 flex-col">
+          return <article key={post.id} data-auth-post-id={post.id} id={`post-${post.id}`} className="group flex h-full min-w-0 scroll-mt-24 flex-col">
             <div className="relative aspect-[4/3] shrink-0 overflow-hidden rounded-lg bg-[#f7f9fc]">
               {preview?.url ? <>
                 <img src={preview.url} alt={post.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"/>
-                <ProjectGallery model={{ title: post.title, meta: [post.location, post.content].filter(Boolean).join(" · "), style: post.feeling || itemTitle, image: preview.url, photos: post.attachments?.filter(item => item.type.startsWith("image/")).map(item => item.url!).filter(Boolean) }} trigger="overlay" engagementTarget={{ targetType: "post", targetId: String(post.id) }}/>
+                <ProjectGallery model={{ title: post.title, meta: [post.specifications, post.content].filter(Boolean).join(" · "), style: post.listingType || itemTitle, image: preview.url, photos: post.attachments?.filter(item => item.type.startsWith("image/")).map(item => item.url!).filter(Boolean) }} trigger="overlay" engagementTarget={{ targetType: "post", targetId: String(post.id) }}/>
               </> : <div className="grid h-full place-items-center text-[#168ac0]"><FileText size={42}/></div>}
               <ToggleActionButton actionType="save" targetType="post" targetId={String(post.id)} label="Lưu bản vẽ" activeLabel="Đã lưu" icon="heart" className="absolute right-3 top-3 z-20 grid size-9 place-items-center rounded-full bg-white/90 text-[#3f5064] opacity-0 shadow-sm transition group-hover:opacity-100 focus-visible:opacity-100 [&>span]:sr-only"/>
             </div>
             <div className="mt-3 flex items-center justify-between gap-3 text-xs font-semibold text-[#3f5064]">
-              <span className="truncate uppercase text-[#147aa8]">{post.feeling || itemTitle}</span>
+              <span className="truncate uppercase text-[#147aa8]">{post.listingType || itemTitle}</span>
               <span className="flex shrink-0 items-center gap-2">
                 <CatalogEngagementStats targetType="post" targetId={String(post.id)} mode="views" layout="compact"/>
                 <span className="flex items-center gap-1" aria-label={`Lượt tải (${post.downloads ?? 0})`}><ArrowDownToLine size={14}/>{(post.downloads ?? 0).toLocaleString("vi-VN")}</span>
@@ -240,12 +251,12 @@ export function DrawingCommunity({ variant = "drawing", page = 1, searchQuery = 
               <span className="flex shrink-0 items-center gap-1.5">
                 <ShareActionButton title={post.title} url={`${basePath}?postId=${post.id}#post-${post.id}`} targetType="post" targetId={String(post.id)} iconOnly className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#168ac0] disabled:opacity-50"/>
                 <RequestActionButton requestType="drawing-file-request" targetType="post" targetId={String(post.id)} recipientUserId={post.userId} label="Yêu cầu file" title={"Yêu cầu file: " + post.title} description={`Tin nhắn sẽ được gửi trực tiếp đến người đăng ${itemLabel}.`} iconOnly="file" className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"/>
-                <PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.pollQuestion || "Miễn phí"} label={!amount ? "Tải miễn phí" : undefined} className="grid size-9 place-items-center rounded-full bg-[#229ed9] text-white transition hover:bg-[#168ac0]"/>
+                <PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.priceLabel || "Miễn phí"} label={!amount ? "Tải miễn phí" : undefined} className="grid size-9 place-items-center rounded-full bg-[#229ed9] text-white transition hover:bg-[#168ac0]"/>
               </span>
             </div>
           </article>;
         }
-        const preview = post.attachments?.find((item) => item.type.startsWith("image/")); return <article key={post.id} id={`post-${post.id}`} className="flex min-w-0 scroll-mt-24 flex-col overflow-hidden rounded-2xl border border-[#e3eaf2]">{preview?.url ? <div className="relative aspect-[4/3] shrink-0 overflow-hidden"><img src={preview.url} alt={post.title} loading="lazy" decoding="async" className="h-full w-full object-cover"/><ProjectGallery model={{ title: post.title, meta: post.location || "", style: post.feeling || itemTitle, image: preview.url, photos: post.attachments?.filter(item => item.type.startsWith("image/")).map(item => item.url!).filter(Boolean) }} trigger="overlay" engagementTarget={{ targetType: "post", targetId: String(post.id) }}/></div> : <div className="grid aspect-[4/3] shrink-0 place-items-center bg-[#f3f6f9] text-[#168ac0]"><FileText size={42}/></div>}<p className="catalog-card-author flex min-w-0 flex-wrap items-center gap-1 border-b border-[#eef1f4] px-4 py-3 text-xs text-[#667085]"><span className="shrink-0">Đăng bởi</span> <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="min-w-0 truncate font-bold text-[#168ac0] hover:underline">{post.authorName}</a><OwnerPostControls postId={post.id} authorId={post.userId}/></p><div className="flex flex-1 flex-col p-4"><span className="min-h-4 text-xs font-bold text-[#168ac0]">{post.feeling}</span>{post.promotionPosition && <span className="mt-2 w-fit rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800">Nổi bật · Quảng cáo</span>}<h3 className="catalog-card-title mt-1 line-clamp-2 font-extrabold">{post.title}</h3><p className="catalog-card-detail mt-2 text-sm text-[#667085]">{post.location}{post.pollQuestion ? " · " + post.pollQuestion : ""}</p><p className="catalog-card-detail mt-2 line-clamp-2 text-sm text-[#667085]">{post.content}</p><CatalogEngagementStats targetType="post" targetId={String(post.id)} mode="rating"/><div className="mt-auto flex items-center justify-end gap-3 pt-3"><span className="flex shrink-0 items-center gap-1.5"><ShareActionButton title={post.title} url={`${basePath}?postId=${post.id}#post-${post.id}`} targetType="post" targetId={String(post.id)} iconOnly className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#168ac0] disabled:opacity-50"/><RequestActionButton requestType="drawing-file-request" targetType="post" targetId={String(post.id)} recipientUserId={post.userId} label="Yêu cầu file" title={"Yêu cầu file: " + post.title} description={`Tin nhắn sẽ được gửi trực tiếp đến người đăng ${itemLabel}.`} iconOnly="file" className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"/><PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.pollQuestion || "Miễn phí"} label={!post.pollQuestion ? "Tải miễn phí" : undefined} className="grid size-9 place-items-center rounded-full bg-[#229ed9] text-white transition hover:bg-[#168ac0]"/></span></div></div></article>; })}
+        const preview = post.attachments?.find((item) => item.type.startsWith("image/")); return <article key={post.id} data-auth-post-id={post.id} id={`post-${post.id}`} className="flex min-w-0 scroll-mt-24 flex-col overflow-hidden rounded-2xl border border-[#e3eaf2]">{preview?.url ? <div className="relative aspect-[4/3] shrink-0 overflow-hidden"><img src={preview.url} alt={post.title} loading="lazy" decoding="async" className="h-full w-full object-cover"/><ProjectGallery model={{ title: post.title, meta: post.specifications || "", style: post.listingType || itemTitle, image: preview.url, photos: post.attachments?.filter(item => item.type.startsWith("image/")).map(item => item.url!).filter(Boolean) }} trigger="overlay" engagementTarget={{ targetType: "post", targetId: String(post.id) }}/></div> : <div className="grid aspect-[4/3] shrink-0 place-items-center bg-[#f3f6f9] text-[#168ac0]"><FileText size={42}/></div>}<p className="catalog-card-author flex min-w-0 flex-wrap items-center gap-1 border-b border-[#eef1f4] px-4 py-3 text-xs text-[#667085]"><span className="shrink-0">Đăng bởi</span> <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="min-w-0 truncate font-bold text-[#168ac0] hover:underline">{post.authorName}</a><OwnerPostControls postId={post.id} authorId={post.userId}/></p><div className="flex flex-1 flex-col p-4"><span className="min-h-4 text-xs font-bold text-[#168ac0]">{post.listingType}</span>{post.promotionPosition && <span className="mt-2 w-fit rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800">Nổi bật · Quảng cáo</span>}<h3 className="catalog-card-title mt-1 line-clamp-2 font-extrabold">{post.title}</h3><p className="catalog-card-detail mt-2 text-sm text-[#667085]">{post.specifications}{post.priceLabel ? " · " + post.priceLabel : ""}</p><p className="catalog-card-detail mt-2 line-clamp-2 text-sm text-[#667085]">{post.content}</p><CatalogEngagementStats targetType="post" targetId={String(post.id)} mode="rating"/><div className="mt-auto flex items-center justify-end gap-3 pt-3"><span className="flex shrink-0 items-center gap-1.5"><ShareActionButton title={post.title} url={`${basePath}?postId=${post.id}#post-${post.id}`} targetType="post" targetId={String(post.id)} iconOnly className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#168ac0] disabled:opacity-50"/><RequestActionButton requestType="drawing-file-request" targetType="post" targetId={String(post.id)} recipientUserId={post.userId} label="Yêu cầu file" title={"Yêu cầu file: " + post.title} description={`Tin nhắn sẽ được gửi trực tiếp đến người đăng ${itemLabel}.`} iconOnly="file" className="grid size-9 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"/><PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.priceLabel || "Miễn phí"} label={!post.priceLabel ? "Tải miễn phí" : undefined} className="grid size-9 place-items-center rounded-full bg-[#229ed9] text-white transition hover:bg-[#168ac0]"/></span></div></div></article>; })}
 
       {visiblePosts.length === 0 && visibleCards.length === 0 && <div className="col-span-full p-6 text-center text-sm text-[#667085]">{searchQuery ? `Không tìm thấy ${itemLabel} phù hợp trên trang này.` : `Trang này chưa có ${itemLabel}. Nhấn dấu + để đăng hồ sơ.`}</div>}
     </section>}

@@ -38,7 +38,7 @@ try {
   ownerId = db.prepare("SELECT user_id FROM website_accounts WHERE email = ?").get(email).user_id;
   assert.equal(setup.data.method, "totp"); assert.equal(setup.data.setupRequired, true);
   assert.ok(setup.data.setupUri.startsWith("otpauth://")); assert.ok(!setup.session);
-  assert.ok(!stored()); assert.equal((await adminState(setup.cookie)).isAdmin, false);
+  assert.ok(!stored()); assert.equal(Boolean((await adminState(setup.cookie))?.isAdmin), false);
   const pending = db.prepare("SELECT pending_secret FROM admin_totp_challenges WHERE id = ?").get(setup.data.challengeId);
   assert.ok(!pending.pending_secret.includes(setup.data.setupSecret));
   await send("totp-verify", { challengeId: setup.data.challengeId, code: "000000" }, undefined, 400);
@@ -79,7 +79,7 @@ try {
   assert.equal(db.prepare("SELECT password_hash FROM website_accounts WHERE user_id = ?").get(ownerId).password_hash, before);
   await verify(change, codes[1], true, 200, admin);
   password = next;
-  assert.equal((await adminState(otherSession)).authenticated, false);
+  assert.equal(Boolean((await adminState(otherSession))?.authenticated), false);
   assert.equal((await adminState(admin)).isAdmin, true);
   await verify(stale, codes[2], true, 400);
   await send("login", { email, password: initialPassword }, undefined, 401);
@@ -90,7 +90,7 @@ try {
   await send("admin-recover", { email, newPassword: recoveredPassword, code: "bad" }, undefined, 400);
   await send("admin-recover", { email, newPassword: recoveredPassword, code: codes[3] });
   password = recoveredPassword;
-  assert.equal((await adminState(admin)).authenticated, false);
+  assert.equal(Boolean((await adminState(admin))?.authenticated), false);
   await send("admin-recover", { email, newPassword: recoveredPassword, code: codes[3] }, undefined, 400);
   assert.ok(await verifyPassword(password, db.prepare("SELECT password_hash FROM website_accounts WHERE user_id = ?").get(ownerId).password_hash));
   const recovered = await login(); assert.equal(recovered.data.setupRequired, false);

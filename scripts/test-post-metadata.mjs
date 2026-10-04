@@ -1,0 +1,50 @@
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { drizzle } from "drizzle-orm/sqlite-proxy";
+import { eq, getTableColumns } from "drizzle-orm";
+import { normalizePostMetadata, postWithLegacyMetadata } from "../lib/post-metadata.ts";
+import { posts, virtualProfiles } from "../db/schema.ts";
+import { postCategoryLabel, SITE_SECTIONS } from "../lib/site-sections.ts";
+import { POST_CATEGORIES, houseModelContentKey, isSystemMessageSender } from "../lib/legacy-contracts.ts";
+
+const legacy = { location: "5 × 20m", feeling: "Hiện đại", pollQuestion: "95.000đ", title: "Bài cũ" };
+const normalized = normalizePostMetadata(legacy);
+assert.deepEqual(normalized, { specifications: "5 × 20m", listingType: "Hiện đại", priceLabel: "95.000đ", title: "Bài cũ" });
+assert.equal(legacy.feeling, "Hiện đại", "Input is not mutated");
+assert.equal(normalizePostMetadata({ feeling: "cũ", listingType: "mới" }).listingType, "mới");
+assert.equal(normalizePostMetadata({ pollQuestion: "100đ", priceLabel: "" }).priceLabel, "", "Explicit free price takes precedence");
+for (const input of [null, [], 1, "bad"]) assert.throws(() => normalizePostMetadata(input), TypeError);
+assert.deepEqual(normalizePostMetadata({ arbitrary: "value" }), { arbitrary: "value" }, "Route validation can still reject unknown fields");
+
+const sqlite = new DatabaseSync(":memory:");
+for (const file of readdirSync("drizzle").filter(file => file.endsWith(".sql")).sort()) sqlite.exec(readFileSync(`drizzle/${file}`, "utf8"));
+const db = drizzle(async (sql, params, method) => {
+  const statement = sqlite.prepare(sql);
+  if (method === "run") { statement.run(...params); return { rows: [] }; }
+  statement.setReturnArrays(true);
+  const rows = statement.all(...params);
+  return { rows: method === "get" ? rows[0] : rows };
+});
+const inserted = sqlite.prepare("INSERT INTO posts (user_id, author_name, category, title, content, audience, location, feeling, poll_question, created_at) VALUES ('legacy', 'An', ?, 'Bài cũ', '', 'Công khai', ?, ?, ?, '2026-10-01')").run(POST_CATEGORIES.drawings, legacy.location, legacy.feeling, legacy.pollQuestion);
+const id = Number(inserted.lastInsertRowid);
+let [post] = await db.select().from(posts).where(eq(posts.id, id));
+assert.equal(post.specifications, legacy.location);
+assert.equal(post.listingType, legacy.feeling);
+assert.equal(post.priceLabel, legacy.pollQuestion);
+const oldClient = postWithLegacyMetadata(post);
+assert.equal(oldClient.location, post.specifications);
+assert.equal(oldClient.feeling, post.listingType);
+assert.equal(oldClient.pollQuestion, post.priceLabel);
+await db.update(posts).set({ specifications: "PDF · 7 × 16m", listingType: "Nhà phố", priceLabel: "80.000đ" }).where(eq(posts.id, id));
+const stored = sqlite.prepare("SELECT location, feeling, poll_question FROM posts WHERE id = ?").get(id);
+assert.equal(stored.location, "PDF · 7 × 16m"); assert.equal(stored.feeling, "Nhà phố"); assert.equal(stored.poll_question, "80.000đ");
+assert.equal(getTableColumns(posts).specifications.name, "location");
+assert.equal(getTableColumns(virtualProfiles).location.name, "location", "Geographic location remains geographic");
+for (const key of ["news", "houseModels", "drawings", "interiors"]) assert.equal(postCategoryLabel(POST_CATEGORIES[key]), SITE_SECTIONS[key].label);
+assert.equal(houseModelContentKey(0, "title"), "facade.0.title", "Saved owner edits remain readable");
+assert.equal(isSystemMessageSender("tipook-wallet"), true);
+assert.equal(isSystemMessageSender("nhadepchat-wallet"), true);
+assert.equal(isSystemMessageSender("member-fixture"), false);
+sqlite.close();
+console.log("PASS: historical SQLite rows, canonical ORM writes, old/new API fields and precedence, geographic fields, section labels, saved catalog edits and system-message identities.");

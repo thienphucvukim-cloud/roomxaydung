@@ -1,5 +1,7 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Image from "next/image";
 import { ImagePlus, LoaderCircle, X } from "lucide-react";
@@ -48,13 +50,13 @@ export function NewsPostComposer({ open, onOpenChange, onPublished }: { open: bo
       }
       const response = await fetch("/api/posts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: "Bảng tin", content: content.trim(), audience: "Công khai", attachments }),
+        body: JSON.stringify({ category: POST_CATEGORIES.news, content: content.trim(), audience: "Công khai", attachments }),
       });
       const payload = await response.json() as { error?: string; post?: { id: number } };
       if (!response.ok || !payload.post) throw new Error(payload.error || "Chưa thể đăng bài. Vui lòng thử lại.");
       images.forEach(image => URL.revokeObjectURL(image.preview));
       setImages([]); setContent(""); onOpenChange(false); onPublished();
-      window.dispatchEvent(new Event("tipook-content-changed"));
+      window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chưa thể đăng bài. Vui lòng thử lại.");
     } finally { setBusy(false); }

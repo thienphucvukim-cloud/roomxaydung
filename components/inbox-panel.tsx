@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useEffect, useState } from "react";
 import { MessageCircle, RefreshCw } from "lucide-react";
 import { ChatThread, type ChatMessage } from "@/components/chat-thread";
@@ -29,9 +30,9 @@ export function InboxPanel({ active = true }: { active?: boolean } = {}) {
     };
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
-    window.addEventListener("tipook-messages-changed", refresh);
+    window.addEventListener(SITE_EVENTS.messagesChanged, refresh);
     document.addEventListener("visibilitychange", refresh);
-    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("tipook-messages-changed", refresh); document.removeEventListener("visibilitychange", refresh); };
+    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener(SITE_EVENTS.messagesChanged, refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [refreshKey, active]);
   return <section id="tin-nhan" className="mt-5 scroll-mt-24 overflow-hidden rounded-2xl border border-[#e3eaf2] bg-white">
     <div className="flex items-center justify-between gap-3 border-b border-[#e3eaf2] p-4"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0b2e59]"><MessageCircle size={20}/>Tin nhắn</h2><button type="button" onClick={() => { setBusy(true); setRefreshKey(value => value + 1); }} disabled={busy} className="rounded-lg p-2 text-[#168ac0] hover:bg-sky-50" aria-label="Tải lại hội thoại"><RefreshCw size={18} className={busy ? "animate-spin" : ""}/></button></div>

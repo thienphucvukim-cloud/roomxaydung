@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_EVENTS } from "@/lib/site-events";
 import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { avatarInitial } from "@/lib/member-avatar";
@@ -29,8 +30,8 @@ export function MemberAvatarProvider({ children, enabled = true }: { children: R
       }).then(data => setMember({ ...(data.user ?? { name: "", authenticated: false }), loaded: true })).catch(() => { if (!controller.signal.aborted) setMember({ name: "", authenticated: false, loaded: true }); });
     };
     refresh();
-    window.addEventListener("tipook-avatar-changed", refresh);
-    return () => { controller.abort(); window.removeEventListener("tipook-avatar-changed", refresh); };
+    window.addEventListener(SITE_EVENTS.avatarChanged, refresh);
+    return () => { controller.abort(); window.removeEventListener(SITE_EVENTS.avatarChanged, refresh); };
   }, [pathname, enabled]);
   return <AvatarContext.Provider value={member}>{children}</AvatarContext.Provider>;
 }

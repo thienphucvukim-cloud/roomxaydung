@@ -4,7 +4,9 @@ import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
-export function PostCommentPanel({ open, onOpenChange, title, image, meta, content, children }: {
+export function PostCommentPanel({ open, onOpenChange, title, image, meta, content, children, postId, modelQuery }: {
+  postId?: number;
+  modelQuery?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -14,7 +16,7 @@ export function PostCommentPanel({ open, onOpenChange, title, image, meta, conte
   children: ReactNode;
 }) {
   return <Sheet open={open} onOpenChange={onOpenChange}>
-    <SheetContent side="right" showCloseButton={false} className="h-dvh w-full gap-0 overflow-hidden bg-white p-0 sm:max-w-[480px]">
+    <SheetContent data-auth-post-id={postId} data-auth-model-query={modelQuery} side="right" showCloseButton={false} className="h-dvh w-full gap-0 overflow-hidden bg-white p-0 sm:max-w-[480px]">
       <SheetHeader className="shrink-0 border-b border-[#e3eaf2] pr-14">
         <SheetTitle className="text-lg font-extrabold text-[#0b2e59]">{title}</SheetTitle>
         <SheetDescription>Bài viết và bình luận</SheetDescription>

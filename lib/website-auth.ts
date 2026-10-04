@@ -5,8 +5,10 @@ import { getDb } from "@/db";
 import { websiteAccounts, websiteSessions } from "@/db/schema";
 import { hashToken } from "@/lib/password";
 import { memberAccountStatus } from "@/lib/member-account-status";
+import { AUTH_COOKIE } from "@/lib/session-cookie";
 
-export const AUTH_COOKIE = "tipook_auth_session";
+export { AUTH_COOKIE } from "@/lib/session-cookie";
+export { safeAuthReturn } from "@/lib/auth-return";
 export const SESSION_SECONDS = 7 * 24 * 60 * 60;
 export type Identity = { userId: string; email: string | null; username?: string | null; displayName: string; source: "website" | "sites"; isOwner?: boolean; hasPassword?: boolean };
 export async function getAuthenticatedIdentity(): Promise<Identity | null> {
@@ -41,12 +43,4 @@ export function authCookie(token: string, request: Request, maxAge = SESSION_SEC
 export function validOrigin(request: Request) {
   const origin = request.headers.get("origin");
   return request.headers.get("sec-fetch-site") !== "cross-site" && (!origin || origin === new URL(request.url).origin);
-}
-export function safeAuthReturn(value: string | null | undefined, fallback = "/tai-khoan") {
-  if (!value?.startsWith("/") || value.startsWith("//")) return fallback;
-  try {
-    const url = new URL(value, "https://tipook.local");
-    if (url.origin !== "https://tipook.local" || /^\/(?:api|admin|dang-nhap|dang-ky|quen-mat-khau|signin-with-chatgpt|signout-with-chatgpt|callback)(?:\/|$)/.test(url.pathname)) return fallback;
-    return url.pathname + url.search + url.hash;
-  } catch { return fallback; }
 }

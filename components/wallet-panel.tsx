@@ -1,5 +1,7 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
+import { SITE_EVENTS } from "@/lib/site-events";
+/* eslint-disable @next/next/no-img-element */
+
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock3, Copy, LoaderCircle, RefreshCw, WalletCards } from "lucide-react";
@@ -53,8 +55,8 @@ export function WalletPanel() {
     const refresh = () => void load().catch(cause => setNotice(cause instanceof Error ? cause.message : "Không thể tải ví."));
     const timer = window.setTimeout(refresh, 0);
     const interval = window.setInterval(refresh, 15_000);
-    window.addEventListener("tipook-wallet-changed", refresh);
-    return () => { window.clearTimeout(timer); window.clearInterval(interval); window.removeEventListener("tipook-wallet-changed", refresh); };
+    window.addEventListener(SITE_EVENTS.walletChanged, refresh);
+    return () => { window.clearTimeout(timer); window.clearInterval(interval); window.removeEventListener(SITE_EVENTS.walletChanged, refresh); };
   }, []);
 
   const createTopup = async () => {

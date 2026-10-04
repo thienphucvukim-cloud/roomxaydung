@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { DOWNLOAD_SIGNATURE_NAMESPACE } from "./legacy-contracts";
 
 function downloadSecret() {
   const bindings = env as unknown as Record<string, string | undefined>;
@@ -8,7 +9,7 @@ function downloadSecret() {
 }
 
 function payload(orderCode: number, attachmentId: number, expires: number, buyerUserId: string) {
-  return `tipook-download:${orderCode}:${attachmentId}:${expires}:${buyerUserId}`;
+  return `${DOWNLOAD_SIGNATURE_NAMESPACE}:${orderCode}:${attachmentId}:${expires}:${buyerUserId}`;
 }
 
 function signatureBytes(signature: string) {

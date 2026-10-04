@@ -1,3 +1,4 @@
+import { postWithLegacyMetadata } from "@/lib/post-metadata";
 import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { memberProfiles, postAttachments, posts } from "@/db/schema";
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
       inArray(posts.category, NEWS_SOURCES.map(source => source.category)),
       postId ? eq(posts.id, Number(postId)) : undefined,
       category ? eq(posts.category, category) : undefined,
-      query ? or(...[posts.title, posts.content, posts.authorName, posts.location, posts.feeling].map(column =>
+      query ? or(...[posts.title, posts.content, posts.authorName, posts.specifications, posts.listingType].map(column =>
         sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`,
       )) : undefined,
     );
@@ -53,10 +54,10 @@ export async function GET(request: Request) {
       imagesByPost.set(image.postId, current);
     }
     return Response.json({
-      posts: rows.map(post => ({
+      posts: rows.map(post => postWithLegacyMetadata({
         id: post.id, userId: post.userId, authorName: post.authorName, avatarUrl: avatars.get(post.userId) ?? null, category: post.category,
-        title: post.title, content: post.content, location: post.location, feeling: post.feeling,
-        pollQuestion: post.pollQuestion, createdAt: post.createdAt, comments: post.comments,
+        title: post.title, content: post.content, specifications: post.specifications, listingType: post.listingType,
+        priceLabel: post.priceLabel, createdAt: post.createdAt, comments: post.comments,
         ...newsSourceLink(post.category, post.id),
         images: imagesByPost.get(post.id) ?? [],
       })),

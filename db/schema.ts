@@ -1,3 +1,4 @@
+import { POST_STORAGE_COLUMNS } from "../lib/legacy-contracts.ts";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const freelanceProfiles = sqliteTable('freelance_profiles', {
@@ -23,10 +24,10 @@ export const posts = sqliteTable("posts", {
   category: text("category").notNull(),
   title: text("title").notNull(),
   content: text("content").notNull(),
-  location: text("location"),
+  specifications: text(POST_STORAGE_COLUMNS.specifications),
   audience: text("audience").notNull().default("Công khai"),
-  feeling: text("feeling"),
-  pollQuestion: text("poll_question"),
+  listingType: text(POST_STORAGE_COLUMNS.listingType),
+  priceLabel: text(POST_STORAGE_COLUMNS.priceLabel),
   comments: integer("comments").notNull().default(0),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 });

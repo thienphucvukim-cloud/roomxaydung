@@ -1,5 +1,6 @@
+import { POST_CATEGORIES } from "./legacy-contracts.ts";
 export function requestTargetLink(origin: string, targetType: string, targetId: string, category?: string) {
-  const basePath = category === "Nội thất cộng đồng" ? "/noi-that" : "/file-ban-ve-nha-dep-chat";
+  const basePath = category === POST_CATEGORIES.interiors ? "/noi-that" : "/file-ban-ve-nha-dep-chat";
   if (targetType === "post") {
     const url = new URL(basePath, origin);
     url.searchParams.set("postId", targetId);

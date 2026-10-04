@@ -1,5 +1,7 @@
 "use client";
 
+import { isSystemMessageSender } from "@/lib/legacy-contracts";
+import { SITE_EVENTS } from "@/lib/site-events";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, LoaderCircle, Paperclip, Send, X } from "lucide-react";
 import { optimizeImageForUpload } from "@/lib/image-upload";
@@ -40,7 +42,7 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
       const read = await fetch("/api/messages", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: unread }), signal });
       if (read.ok) {
         setMessages(previous => previous.map(message => unread.includes(message.id) ? { ...message, readAt: new Date().toISOString() } : message));
-        window.dispatchEvent(new Event("tipook-messages-changed"));
+        window.dispatchEvent(new Event(SITE_EVENTS.messagesChanged));
       }
     }
   }, [query]);
@@ -78,7 +80,7 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Không thể gửi tin nhắn.");
       setContent(""); setAttachment(null); stickToBottom.current = true;
-      window.dispatchEvent(new Event("tipook-messages-changed"));
+      window.dispatchEvent(new Event(SITE_EVENTS.messagesChanged));
       onSent?.();
       try { await load(); } catch { setError("Đã gửi tin nhắn. Đang chờ tải lại hội thoại."); }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể gửi tin nhắn."); }
@@ -110,7 +112,7 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
     finally { setLoadingOlder(false); }
   };
 
-  const readOnly = Boolean(identity.peerId) && (identity.peerId.startsWith("tipook-") || identity.peerId === identity.userId);
+  const readOnly = Boolean(identity.peerId) && (isSystemMessageSender(identity.peerId) || identity.peerId === identity.userId);
   return <div className="flex min-h-0 flex-col">
     <div className="border-b border-[#e3eaf2] px-4 py-3"><p className="font-bold text-[#0b2e59]">{identity.name || "Đang mở cuộc trò chuyện…"}</p>{description && <p className="mt-1 text-xs leading-5 text-[#667085]">{description}</p>}</div>
     <div ref={scroll} onScroll={() => { const element = scroll.current; if (element) stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80; }} className="h-[min(48vh,420px)] min-h-48 space-y-3 overflow-y-auto bg-[#f4f7fb] p-4" role="log" aria-label="Lịch sử trò chuyện">

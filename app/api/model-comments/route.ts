@@ -1,12 +1,13 @@
+import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { memberAccessResponse } from "@/lib/member-access";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { currentMember } from "../../../lib/member-identity";
 import { getDb } from "../../../db";
 import { postComments, posts } from "../../../db/schema";
 import { env } from "cloudflare:workers";
+import { isOptimizedImageObject } from "@/lib/image-upload-policy";
 
-const discussionCategory = "Thảo luận mẫu nhà";
-const imageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const discussionCategory = POST_CATEGORIES.modelDiscussion;
 
 function imageUrl(imageKey: string | null) {
   return imageKey && /^[0-9a-f-]{36}$/i.test(imageKey) ? "/api/files?key=" + encodeURIComponent(imageKey) : null;
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     if (imageKey) {
       if (!env.BUCKET) throw new Error("Kho lưu trữ ảnh chưa được cấu hình.");
       const object = await env.BUCKET.head(imageKey);
-      if (!object || object.customMetadata?.accessType !== "public" || !imageTypes.has(object.httpMetadata?.contentType || "")) return Response.json({ error: "Ảnh bình luận không tồn tại hoặc không phải ảnh công khai." }, { status: 400 });
+      if (!object || object.customMetadata?.accessType !== "public" || !isOptimizedImageObject(object, "comment")) return Response.json({ error: "Vui lòng tải lại ảnh bình luận để nén và chuyển sang WebP." }, { status: 400 });
       if (object.customMetadata?.ownerUserId !== member.userId) return Response.json({ error: "Bạn không có quyền sử dụng ảnh này." }, { status: 403 });
     }
     const db = getDb();

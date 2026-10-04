@@ -31,7 +31,7 @@ async function load(specifier, referencing) {
     : !path.startsWith("@/") ? await import(path) : null;
   const vmModule = namespace ? new SyntheticModule(Object.keys(namespace), function () {
     for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
-  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + ".ts", "utf8"), {
+  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + (path.endsWith(".ts") ? "" : ".ts"), "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
   }).outputText, { context, identifier: path });
   cache.set(path, vmModule);
@@ -156,10 +156,10 @@ try {
   signedIn = false;
   await publish({ category: "Bảng tin", content: "Anonymous" }, 401);
   signedIn = true;
-  const image = { key: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "photo.png", type: "image/png", size: 100 };
-  objects.set(image.key, { size: 100, customMetadata: { ownerUserId: "member", accessType: "public" }, httpMetadata: { contentType: "image/png" } });
+  const image = { key: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "photo.webp", type: "image/webp", size: 100 };
+  objects.set(image.key, { size: 100, customMetadata: { ownerUserId: "member", accessType: "public", imageOptimized: "webp-v1", imageMaxEdge: "1280" }, httpMetadata: { contentType: "image/webp" } });
   const photoPost = await publish({ category: "Bảng tin", attachments: [image] });
-  assert.equal((await read({ postId: String(photoPost.post.id) })).posts[0].images[0].name, "photo.png");
+  assert.equal((await read({ postId: String(photoPost.post.id) })).posts[0].images[0].name, "photo.webp");
   const target = photoPost.post.id;
   await comment({ postId: target, content: "" }, 400);
   await comment({ postId: target, content: "x".repeat(601) }, 400);
@@ -169,7 +169,7 @@ try {
   await comment({ postId: target, imageKey: missing }, 400);
   objects.set(missing, { httpMetadata: { contentType: "application/pdf" }, customMetadata: { ownerUserId: "member" } });
   await comment({ postId: target, imageKey: missing }, 400);
-  objects.set(missing, { httpMetadata: { contentType: "image/png" }, customMetadata: { ownerUserId: "other" } });
+  objects.set(missing, { size: 100, httpMetadata: { contentType: "image/webp" }, customMetadata: { ownerUserId: "other", accessType: "public", imageOptimized: "webp-v1", imageMaxEdge: "1280" } });
   await comment({ postId: target, imageKey: missing }, 403);
   objects.set(missing, { httpMetadata: { contentType: "image/png" }, customMetadata: { ownerUserId: "member", accessType: "private" } });
   await comment({ postId: target, imageKey: missing }, 400);
@@ -180,7 +180,7 @@ try {
   assert.equal(imageOnly.imageUrl, `/api/files?key=${image.key}`);
   assert.equal(imageOnly.avatarUrl, "/api/files?key=member-avatar");
   const commentOnlyImage = "cccccccc-cccc-cccc-cccc-cccccccccccc";
-  objects.set(commentOnlyImage, { httpMetadata: { contentType: "image/png" }, customMetadata: { ownerUserId: "member", accessType: "public" } });
+  objects.set(commentOnlyImage, { size: 100, httpMetadata: { contentType: "image/webp" }, customMetadata: { ownerUserId: "member", accessType: "public", imageOptimized: "webp-v1", imageMaxEdge: "1280" } });
   const withProtectedImage = await comment({ postId: target, content: "Có ảnh", imageKey: commentOnlyImage });
   assert.equal(withProtectedImage.total, 2);
   assert.equal((await files.namespace.DELETE(new Request(`http://localhost/api/files?key=${commentOnlyImage}`, { method: "DELETE" }))).status, 409);

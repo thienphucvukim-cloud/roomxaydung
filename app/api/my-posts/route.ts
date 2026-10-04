@@ -1,3 +1,4 @@
+import { normalizePostMetadata, postWithLegacyMetadata } from "@/lib/post-metadata";
 import { and, asc, count, desc, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getDb } from "@/db";
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
       db.select({ value: count() }).from(posts).where(condition),
     ]);
     const images = await postImages(items.map(post => post.id));
-    return reply({ posts: items.map(post => ({ ...post, images: images.filter(image => image.postId === post.id) })), total: total.value, totalPages: Math.max(1, Math.ceil(total.value / 20)) });
+    return reply({ posts: items.map(post => ({ ...postWithLegacyMetadata(post), images: images.filter(image => image.postId === post.id) })), total: total.value, totalPages: Math.max(1, Math.ceil(total.value / 20)) });
   } catch { return reply({ error: "Chưa thể tải bài viết của bạn." }, 500); }
 }
 
@@ -46,11 +47,11 @@ async function mutate(request: Request, deleting: boolean) {
   if (!userId) return reply({ error: "Vui lòng đăng nhập để quản lý bài viết." }, 401);
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = normalizePostMetadata(await request.json());
     if (!body || Array.isArray(body) || typeof body !== "object") throw new Error();
   } catch { return reply({ error: "Dữ liệu không hợp lệ." }, 400); }
   if (typeof body.id !== "number" || !Number.isSafeInteger(body.id) || body.id < 1) return reply({ error: "Mã bài không hợp lệ." }, 400);
-  const allowed = deleting ? ["id"] : ["id", "title", "content", "location", "feeling", "imageKeys", "action"];
+  const allowed = deleting ? ["id"] : ["id", "title", "content", "specifications", "listingType", "imageKeys", "action"];
   if (Object.keys(body).some(key => !allowed.includes(key))) return reply({ error: "Bạn có thể quản lý nội dung và ảnh bài viết. File hồ sơ do quản trị viên quản lý." }, 400);
   const updates: Omit<Partial<typeof posts.$inferInsert>, "audience" | "content"> & { audience?: string | SQL; content?: string | SQL } = {};
   let states = AUTHOR_POST_STATES;
@@ -67,7 +68,7 @@ async function mutate(request: Request, deleting: boolean) {
     }
     else return reply({ error: "Thao tác không hợp lệ." }, 400);
   } else {
-    for (const [key, max] of [["title", 120], ["content", 1200], ["location", 240], ["feeling", 80]] as const) {
+    for (const [key, max] of [["title", 120], ["content", 1200], ["specifications", 240], ["listingType", 80]] as const) {
       if (body[key] === undefined) continue;
       if (typeof body[key] !== "string" || body[key].length > max || (key === "title" && !body[key].trim())) return reply({ error: "Nội dung hoặc độ dài không hợp lệ." }, 400);
       updates[key] = body[key].trim();
@@ -100,7 +101,7 @@ async function mutate(request: Request, deleting: boolean) {
         if (attached) return reply({ error: "Ảnh đang thuộc bài khác hoặc là file hồ sơ được bảo vệ." }, 400);
         const object = await env.BUCKET?.head(key);
         const type = object?.httpMetadata?.contentType || "";
-        if (!object || object.customMetadata?.ownerUserId !== userId || object.customMetadata?.accessType !== "public" || !imageTypes.includes(type) || object.size < 1 || object.size > 25 * 1024 * 1024) return reply({ error: "Ảnh không thuộc bạn hoặc không đúng định dạng cho phép." }, 400);
+        if (!object || object.customMetadata?.ownerUserId !== userId || object.customMetadata?.accessType !== "public" || !isOptimizedImageObject(object)) return reply({ error: "Ảnh không thuộc bạn hoặc chưa được nén và chuyển sang WebP. Vui lòng tải lại ảnh." }, 400);
         let name = "Ảnh bài viết";
         try { name = decodeURIComponent(object.customMetadata.fileName || name).slice(0, 255); } catch { /* Use fallback. */ }
         images.push({ key, name, type, size: object.size });
@@ -110,17 +111,20 @@ async function mutate(request: Request, deleting: boolean) {
       const results = await db.batch([update,
         db.delete(postAttachments).where(and(eq(postAttachments.postId, body.id), eq(postAttachments.accessType, "public"),
           inArray(postAttachments.mimeType, imageTypes), sql`exists (select 1 from ${posts} where ${condition})`)),
-        ...images.map(image => db.run(sql`insert into post_attachments (post_id, object_key, file_name, mime_type, size, access_type, created_at)
-          select ${body.id}, ${image.key}, ${image.name}, ${image.type}, ${image.size}, 'public', ${new Date().toISOString()}
-          from ${posts} where ${condition}`)),
+        ...images.map(image => db.insert(postAttachments).select(db.select({
+          id: sql<number>`null`.as("id"), postId: sql<number>`${body.id}`.as("postId"), objectKey: sql<string>`${image.key}`.as("objectKey"),
+          fileName: sql<string>`${image.name}`.as("fileName"), mimeType: sql<string>`${image.type}`.as("mimeType"), size: sql<number>`${image.size}`.as("size"),
+          accessType: sql<string>`'public'`.as("accessType"), createdAt: sql<string>`${new Date().toISOString()}`.as("createdAt"),
+        }).from(posts).where(condition))),
       ]);
       changed = results[0];
     } else changed = await update;
     const [post] = changed;
     if (!post) return reply({ error: "Bài viết không thuộc bạn hoặc không thể thực hiện thao tác này." }, 404);
-    return reply({ post: { ...post, images: await postImages([post.id]) } });
+    return reply({ post: { ...postWithLegacyMetadata(post), images: await postImages([post.id]) } });
   } catch { return reply({ error: "Chưa thể cập nhật bài viết." }, 500); }
 }
 
 export async function PATCH(request: Request) { return mutate(request, false); }
 export async function DELETE(request: Request) { return mutate(request, true); }
+import { isOptimizedImageObject } from "@/lib/image-upload-policy";

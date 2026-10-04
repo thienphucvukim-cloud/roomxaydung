@@ -47,7 +47,7 @@ async function load(specifier, referencing) {
     : !path.startsWith("@/") ? await import(path) : null;
   const mod = namespace ? new SyntheticModule(Object.keys(namespace), function () {
     for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
-  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + ".ts", "utf8"), {
+  }, { context }) : new SourceTextModule(ts.transpileModule(readFileSync(path.slice(2) + (path.endsWith(".ts") ? "" : ".ts"), "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
   }).outputText, { context, identifier: path });
   cache.set(path, mod);
@@ -96,9 +96,9 @@ try {
   await read({ id: "oops" }, 400);
   await change({ id: own, title: "Cross origin" }, 403, "PATCH", "https://attacker.example");
   for (const method of ["PATCH", "DELETE"]) await change(method === "PATCH" ? { id: other, title: "Attack" } : { id: other }, 404, method);
-  for (const fields of [{ attachments: [] }, { paidFiles: [] }, { userId: "other" }, { audience: "Công khai" }, { category: "New" }, { pollQuestion: "100000" }]) await change({ id: own, ...fields }, 400);
-  for (const body of [null, [], { id: "1" }, { id: own, title: " " }, { id: own, content: "x".repeat(1201) }, { id: own, location: 123 }, { id: own, action: "unknown" }, { id: own, action: "hide", title: "No" }]) await change(body, 400);
-  assert.equal((await change({ id: own, title: " Updated ", content: "New text", location: "5x20", feeling: "Hiện đại" })).post.title, "Updated");
+  for (const fields of [{ attachments: [] }, { paidFiles: [] }, { userId: "other" }, { audience: "Công khai" }, { category: "New" }, { priceLabel: "100000" }]) await change({ id: own, ...fields }, 400);
+  for (const body of [null, [], { id: "1" }, { id: own, title: " " }, { id: own, content: "x".repeat(1201) }, { id: own, specifications: 123 }, { id: own, action: "unknown" }, { id: own, action: "hide", title: "No" }]) await change(body, 400);
+  assert.equal((await change({ id: own, title: " Updated ", content: "New text", specifications: "5x20", listingType: "Hiện đại" })).post.title, "Updated");
   await change({ id: own, action: "hide" });
   userId = "other";
   assert.equal((await comments.namespace.GET(new Request(`http://localhost/api/comments?postId=${own}`))).status, 404);
@@ -135,7 +135,7 @@ try {
   assert.deepEqual(sqlite.prepare("SELECT * FROM post_comments").all(), commentsBefore);
   userId = "author";
   const keys = ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "cccccccc-cccc-cccc-cccc-cccccccccccc", "dddddddd-dddd-dddd-dddd-dddddddddddd"];
-  for (const [index, key] of keys.entries()) objects.set(key, { size: 100 + index, httpMetadata: { contentType: "image/webp" }, customMetadata: { ownerUserId: "author", accessType: "public", fileName: encodeURIComponent(`Ảnh ${index}.webp`) } });
+  for (const [index, key] of keys.entries()) objects.set(key, { size: 100 + index, httpMetadata: { contentType: "image/webp" }, customMetadata: { ownerUserId: "author", accessType: "public", imageOptimized: "webp-v1", imageMaxEdge: "1600", fileName: encodeURIComponent(`Ảnh ${index}.webp`) } });
   const imagesFor = () => sqlite.prepare("SELECT object_key FROM post_attachments WHERE post_id = ? AND access_type = 'public' ORDER BY id").all(own).map(row => row.object_key);
   const edited = await change({ id: own, title: "With photos", imageKeys: keys.slice(0, 2) });
   assert.deepEqual(edited.post.images.map(image => image.key), keys.slice(0, 2));

@@ -1,5 +1,7 @@
 "use client";
 
+import { SITE_SECTIONS } from "@/lib/site-sections";
+import { SITE_EVENTS } from "@/lib/site-events";
 import { FormEvent, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Calculator, ChevronDown, CircleHelp, DraftingCompass, Heart, LogIn, LogOut, Menu, House, Search, ShieldCheck, Sofa, UserRound, WalletCards, Handshake } from "lucide-react";
@@ -14,12 +16,12 @@ import { RequestActionButton } from "@/components/interactive-actions";
 import { CurrentMemberAvatar } from "@/components/member-avatar";
 
 const nav = [
-  ["Bảng tin", "/", House],
-  ["Mẫu nhà đẹp", "/kho-mau-nha-dep-chat", HouseGalleryIcon],
-  ["Kho bản vẽ", "/file-ban-ve-nha-dep-chat", DraftingCompass],
-  ["Nội thất", "/noi-that", Sofa],
-  ["Thuê thiết kế", "/thue-thiet-ke", Handshake],
-  ["Tính vật tư", "/tinh-vat-tu-nha-dep-chat", Calculator],
+  [SITE_SECTIONS.news.label, SITE_SECTIONS.news.path, House],
+  [SITE_SECTIONS.houseModels.label, SITE_SECTIONS.houseModels.path, HouseGalleryIcon],
+  [SITE_SECTIONS.drawings.label, SITE_SECTIONS.drawings.path, DraftingCompass],
+  [SITE_SECTIONS.interiors.label, SITE_SECTIONS.interiors.path, Sofa],
+  [SITE_SECTIONS.designMarketplace.label, SITE_SECTIONS.designMarketplace.path, Handshake],
+  [SITE_SECTIONS.materials.label, SITE_SECTIONS.materials.path, Calculator],
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -45,9 +47,9 @@ export function ExploreHeader() {
     const refresh = () => fetch("/api/messages", { signal: controller.signal, cache: "no-store" }).then(response => response.json() as Promise<{ messages?: { id: number; subject: string; content?: string; readAt?: string | null }[] }>).then(data => setNotifications(data.messages ?? [])).catch(() => {});
     void refresh();
     const onMessageChange = () => void refresh();
-    window.addEventListener("tipook-messages-changed", onMessageChange);
+    window.addEventListener(SITE_EVENTS.messagesChanged, onMessageChange);
     const timer = window.setInterval(() => void refresh(), 30_000);
-    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("tipook-messages-changed", onMessageChange); };
+    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener(SITE_EVENTS.messagesChanged, onMessageChange); };
   }, [pathname]);
   const unread = notifications.filter(message => !message.readAt);
 

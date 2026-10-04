@@ -36,7 +36,7 @@ async function load(name, reference) {
   const namespace = fixtures[id] || (!id.startsWith("@/") ? await import(id) : null);
   const vmModule = namespace ? new SyntheticModule(Object.keys(namespace), function () {
     for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
-  }, { context, identifier: id }) : new SourceTextModule(ts.transpileModule(readFileSync(id.slice(2) + ".ts", "utf8"), {
+  }, { context, identifier: id }) : new SourceTextModule(ts.transpileModule(readFileSync(id.slice(2) + (id.endsWith(".ts") ? "" : ".ts"), "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
   }).outputText, { context, identifier: id });
   cache.set(id, vmModule);

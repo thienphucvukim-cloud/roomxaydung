@@ -1,3 +1,4 @@
+import { isSystemMessageSender } from "@/lib/legacy-contracts";
 import { memberAccessResponse } from "@/lib/member-access";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "../../../db";
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     const peerId = typeof body.peerId === "string" ? body.peerId.trim().slice(0, 180) : "";
     const content = typeof body.content === "string" ? body.content.trim() : "";
     const attachmentKey = typeof body.attachmentKey === "string" ? body.attachmentKey.trim() : "";
-    if (!peerId || !content || content.length > 2000 || peerId === userId || peerId.startsWith("tipook-")) return Response.json({ error: "Tin nhắn hoặc người nhận không hợp lệ." }, { status: 400 });
+    if (!peerId || !content || content.length > 2000 || peerId === userId || isSystemMessageSender(peerId)) return Response.json({ error: "Tin nhắn hoặc người nhận không hợp lệ." }, { status: 400 });
     const db = getDb();
     const [previous] = await db.select({ id: directMessages.id }).from(directMessages).where(conversationCondition(userId, peerId)).limit(1);
     const [profile] = await db.select({ id: memberProfiles.userId }).from(memberProfiles).where(eq(memberProfiles.userId, peerId)).limit(1);

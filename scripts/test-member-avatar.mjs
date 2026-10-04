@@ -7,6 +7,7 @@ import ts from "typescript";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import * as schema from "../db/schema.ts";
 import { avatarInitial, memberAvatarUrl } from "../lib/member-avatar.ts";
+import * as imagePolicy from "../lib/image-upload-policy.ts";
 
 assert.equal(avatarInitial("  Nguyễn Văn An"), "N");
 assert.equal(avatarInitial("đức"), "Đ");
@@ -35,6 +36,7 @@ const namespaces = {
   "cloudflare:workers": { env }, "@/db": { getDb: () => db }, "@/db/schema": schema,
   "@/lib/website-auth": { getAuthenticatedIdentity: async () => identity, validOrigin: request => request.headers.get("origin") !== "https://attacker.test" },
   "@/lib/member-avatar": { memberAvatarUrl },
+  "@/lib/image-upload-policy": imagePolicy,
 };
 const route = new SourceTextModule(ts.transpileModule(readFileSync("app/api/avatar/route.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText, { context });
 await route.link(async name => {
@@ -49,16 +51,17 @@ const upload = (file, headers = {}) => {
   if (file) body.append("file", file);
   return POST(new Request(origin, { method: "POST", body, headers }));
 };
-const image = new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], "avatar.png", { type: "image/png" });
+const image = new File([readFileSync("scripts/fixtures/upload.webp")], "avatar.webp", { type: "image/webp" });
 try {
   identity = null;
   assert.equal((await upload(image)).status, 401);
   assert.equal((await DELETE(new Request(origin, { method: "DELETE" }))).status, 401);
   identity = { userId: "member-a", displayName: "An", email: "an@example.test" };
   assert.equal((await upload(image, { origin: "https://attacker.test" })).status, 403);
-  assert.equal((await upload(new File(["<svg/>"], "avatar.svg", { type: "image/svg+xml" }))).status, 400);
-  assert.equal((await upload(new File([], "avatar.png", { type: "image/png" }))).status, 400);
-  assert.equal((await upload(new File([new Uint8Array(5 * 1024 * 1024 + 1)], "large.png", { type: "image/png" }))).status, 400);
+  assert.equal((await upload(new File(["<svg/>"], "avatar.svg", { type: "image/svg+xml" }))).status, 415);
+  assert.equal((await upload(new File([], "avatar.webp", { type: "image/webp" }))).status, 413);
+  assert.equal((await upload(new File(["invalid"], "fake.webp", { type: "image/webp" }))).status, 400);
+  assert.equal((await upload(new File([new Uint8Array(96 * 1024 + 1)], "large.webp", { type: "image/webp" }))).status, 413);
   assert.equal(objects.size, 0);
   sqlite.prepare("INSERT INTO member_profiles (user_id, display_name, google_avatar_url, updated_at) VALUES (?, ?, ?, ?)").run("member-b", "Bình", "https://google.test/b", "now");
   const saved = await upload(image);

@@ -7,6 +7,7 @@ import ts from "typescript";
 import * as orm from "drizzle-orm";
 import * as sqliteCore from "drizzle-orm/sqlite-core";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
+import * as legacyContracts from "../lib/legacy-contracts.ts";
 
 const sqlite = new DatabaseSync(":memory:");
 const files = readdirSync("drizzle").filter(file => file.endsWith(".sql")).sort();
@@ -63,12 +64,16 @@ function synthetic(namespace) {
 }
 const schema = compile("db/schema.ts");
 await schema.link(specifier => {
+  if (specifier === "../lib/legacy-contracts.ts") return synthetic(legacyContracts);
   assert.equal(specifier, "drizzle-orm/sqlite-core");
   return synthetic(sqliteCore);
 });
 await schema.evaluate();
 const promotionHelpers = compile("lib/catalog-promotions.ts");
-await promotionHelpers.link(() => { throw new Error("Unexpected promotion helper import"); });
+await promotionHelpers.link(specifier => {
+  assert.equal(specifier, "./legacy-contracts.ts");
+  return synthetic(legacyContracts);
+});
 await promotionHelpers.evaluate();
 const namespaces = {
   "cloudflare:workers": { env: { DB: database } },
