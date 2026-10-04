@@ -113,6 +113,22 @@ const avatar = sqlite.prepare("SELECT avatar_key, google_avatar_url FROM member_
 assert.equal(avatar.avatar_key, "custom-avatar", "Google login must preserve the user's custom avatar");
 assert.equal(avatar.google_avatar_url, "https://lh3.googleusercontent.com/updated-avatar");
 
+// Google leaves the website for consent, but the callback must still land on
+// the exact post/model with the original catalog filters and hash intact.
+loginClaims = {};
+for (const returnTo of [
+  "/bai-viet/2#post-2",
+  "/file-ban-ve-nha-dep-chat?q=Nh%C3%A0&sort=views&postId=2#post-2",
+  "/noi-that?q=B%E1%BA%BFp&sort=downloads&postId=3#post-3",
+  "/kho-mau-nha-dep-chat?q=Nh%C3%A0&sort=views#model-Nh%C3%A0",
+]) {
+  sqlite.prepare("DELETE FROM auth_rate_limits").run();
+  const result = await complete(await start(returnTo));
+  assert.equal(hasSession(result), true);
+  assert.equal(result.headers.get("Location"), returnTo, "Google callback must preserve exact action return URL");
+}
+sqlite.prepare("DELETE FROM auth_rate_limits").run();
+
 const expired = await start();
 sqlite.prepare("UPDATE auth_google_requests SET expires_at = 0 WHERE state_hash = ?").run(digest(expired));
 const countBefore = exchanges;
@@ -153,4 +169,4 @@ env.GOOGLE_CLIENT_SECRET = "";
 const unconfigured = await beginGoogleLogin(new Request(base + "/api/auth/google"));
 assert.ok(new URL(unconfigured.headers.get("Location"), base).searchParams.get("auth_error").includes("chưa được cấu hình"));
 sqlite.close();
-console.log("PASS: complete Google login, stable account IDs, PKCE exchange, browser binding, expiry, replay, cancellation, token rejection, email collision and owner TOTP protection.");
+console.log("PASS: complete Google login, exact post/catalog return URLs, stable account IDs, PKCE exchange, browser binding, expiry, replay, cancellation, token rejection, email collision and owner TOTP protection.");

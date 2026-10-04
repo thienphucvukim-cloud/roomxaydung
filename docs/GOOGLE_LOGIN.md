@@ -37,6 +37,17 @@ Người dùng cần liên hệ người vận hành website để xác minh và
    corepack pnpm exec wrangler secret put GOOGLE_CLIENT_ID --config wrangler.jsonc
    corepack pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.jsonc
    ```
+   Nếu hai giá trị đã có trong `.dev.vars`, có thể kiểm tra rồi chuyển trực tiếp
+   qua stdin vào Cloudflare Secrets bằng công cụ cấu hình:
+   ```bash
+   node scripts/configure-google-login.mjs
+   node scripts/configure-google-login.mjs --apply
+   ```
+   Lệnh đầu chỉ kiểm tra cấu hình. Lệnh `--apply` gửi đúng hai giá trị Google
+   tới Worker `tipook-web`; không in giá trị, không xuất file chứa secrets,
+   không gửi các biến local khác và không đưa secrets vào GitHub.
+   Chỉ chạy `--apply` khi người vận hành đã cho phép chuyển thông tin OAuth
+   tới Cloudflare. Lưu trong `.dev.vars` không tự cấu hình Worker production.
 5. Áp dụng migration `0018_member_username_google.sql` trước khi triển khai:
    `corepack pnpm db:migrate:cloudflare`. Dev server tự áp dụng migration local.
 
