@@ -3,6 +3,6 @@ export function memberAvatarUrl(profile?: { avatarKey?: string | null; googleAva
 }
 
 export function avatarInitial(name: string) {
-  const trimmed = name.trim().normalize("NFC");
-  return Array.from(trimmed)[0]?.toLocaleUpperCase("vi-VN") || "?";
+  const givenName = name.trim().normalize("NFC").split(/\s+/).pop() || "";
+  return Array.from(givenName)[0]?.toLocaleUpperCase("vi-VN") || "?";
 }

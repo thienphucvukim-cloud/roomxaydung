@@ -45,7 +45,7 @@ try {
   assert.ok(publicPosts.length, 'Local review database needs a public post');
   const fixtureId = publicPosts[0].id;
   const fixture = {
-    id: fixtureId, userId: 'review-author', authorName: 'Người chia sẻ', avatarUrl: null, category: 'Bản vẽ cộng đồng',
+    id: fixtureId, userId: 'review-author', authorName: 'Thành viên Tipook', avatarUrl: null, category: 'Bản vẽ cộng đồng',
     title: 'Nhà phố 5 × 20m', content: 'Giá bán: 150000đ\nChi phí 125000000 VND\nLiên hệ 0912345678', specifications: '5 × 20m', listingType: null, priceLabel: '150000', comments: 1,
     createdAt: '2026-10-03T08:00:00.000Z', sourceHref: `/file-ban-ve-nha-dep-chat?postId=${fixtureId}#post-${fixtureId}`, sourceLabel: 'Kho bản vẽ',
     images: Array.from({ length: 7 }, (_, index) => ({ url: index % 2 ? '/mat-bang-5x20.png' : '/community-house.png', name: `Ảnh ${index + 1}` })),
@@ -61,7 +61,7 @@ try {
       const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
       const method = init.method || 'GET';
       const json = (value, status = 200) => Promise.resolve(new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } }));
-      if (url.pathname === '/api/me') return json({ user: { id: 'review-user', name: 'Người kiểm tra', authenticated: true, avatarUrl: null } });
+      if (url.pathname === '/api/me') return json({ user: { id: 'review-user', name: 'Người kiểm tra', authenticated: true, avatarUrl: null, isAdmin: new URLSearchParams(location.search).has('review-admin') } });
       if (url.pathname === '/api/news-feed') {
         const category = window.review.sourceCategory || post.category;
         const sourcePath = category === 'Bộ sưu tập ảnh' ? '/kho-mau-nha-dep-chat' : category === 'Nội thất cộng đồng' ? '/noi-that' : '/file-ban-ve-nha-dep-chat';
@@ -235,7 +235,36 @@ try {
     assert.equal(await evaluate(`document.querySelectorAll('article[id^="post-"]').length`), 1);
     assert.ok(await evaluate(`document.getElementById('post-${fixtureId}').textContent.includes('Nhà phố 5 × 20m')`));
   }
+  await send('Page.navigate', { url: origin + '/?review-admin=1' });
+  await waitFor(`document.querySelector('article header .admin-post-controls')`, 'admin feed controls');
+  const checkAdminHeader = async selector => {
+    const layout = await evaluate(`(() => {
+      const header = document.querySelector(${JSON.stringify(selector)});
+      const info = header.querySelector(':scope > div');
+      const controls = header.querySelector('.admin-post-controls');
+      const rect = element => { const value = element.getBoundingClientRect(); return { left: value.left, right: value.right, top: value.top, bottom: value.bottom, width: value.width, height: value.height }; };
+      return { header: rect(header), info: rect(info), name: rect(info.firstElementChild), time: rect(info.querySelector('time')), controls: rect(controls), buttons: [...controls.querySelectorAll('button')].map(rect) };
+    })()`);
+    assert.ok(layout.info.width >= 140, 'Admin controls must leave room for the author and date: ' + JSON.stringify(layout));
+    assert.ok(layout.name.height <= 48 && layout.time.height <= 32, 'Author and date must not wrap one character per line');
+    assert.ok(layout.controls.top >= layout.info.bottom, 'Admin controls must appear below the author details');
+    assert.equal(layout.buttons.length, 3, 'Edit, hide and delete must remain available');
+    assert.ok(layout.buttons.every(button => button.left >= layout.header.left && button.right <= layout.header.right), 'Admin buttons must fit inside the post header');
+  };
+  for (const width of [320, 375, 390, 430, 768, 1023, 1440]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width < 1024 });
+    await pause(100);
+    await checkAdminHeader('article header');
+    if (width === 390 || width === 1440) {
+      await evaluate(`document.querySelector('article').scrollIntoView({ block: 'center' })`);
+      writeFileSync(path.join(dir, `admin-feed-${width}.png`), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+    }
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await evaluate(`document.querySelector('article button[aria-haspopup="dialog"]').click()`);
+  await waitFor(`document.querySelector('[role="dialog"] header .admin-post-controls')`, 'admin photo viewer controls');
+  await checkAdminHeader('[role="dialog"] header');
   assert.deepEqual(exceptions, []);
-  console.log('PASS: feed fits 320–1023px with scrollable categories; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in House Models, Drawings and Interiors.');
+  console.log('PASS: feed fits 320–1023px; admin author/date and all three controls fit 320–1440px and the mobile photo viewer; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in House Models, Drawings and Interiors.');
   console.log('Screenshots: ' + dir);
 } finally { socket?.close(); chrome.kill(); }

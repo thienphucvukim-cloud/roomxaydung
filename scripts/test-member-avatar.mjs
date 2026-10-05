@@ -9,10 +9,15 @@ import * as schema from "../db/schema.ts";
 import { avatarInitial, memberAvatarUrl } from "../lib/member-avatar.ts";
 import * as imagePolicy from "../lib/image-upload-policy.ts";
 
-assert.equal(avatarInitial("  Nguyễn Văn An"), "N");
+assert.equal(avatarInitial("  Nguyễn Văn An"), "A");
+assert.equal(avatarInitial("Ks. phan thức"), "T");
+assert.equal(avatarInitial("kts. phan thanh tùng"), "T");
+assert.equal(avatarInitial("  Nguyễn\tVăn   Bình  "), "B");
 assert.equal(avatarInitial("đức"), "Đ");
 assert.equal(avatarInitial("e\u0301"), "É");
+assert.equal(avatarInitial("Nguyễn Văn e\u0301"), "É");
 assert.equal(avatarInitial(""), "?");
+assert.equal(avatarInitial("   "), "?");
 assert.equal(memberAvatarUrl(), null);
 assert.equal(memberAvatarUrl({ googleAvatarUrl: "https://google.test/avatar" }), "https://google.test/avatar");
 assert.equal(memberAvatarUrl({ avatarKey: "custom", googleAvatarUrl: "https://google.test/avatar" }), "/api/files?key=custom");

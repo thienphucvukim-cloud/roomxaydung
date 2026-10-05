@@ -131,7 +131,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
     photoTrigger.current = trigger; setGallery({ photos, index }); setCommentsOpen(true);
   };
 
-  const postHeader = <header className="flex items-start gap-3 px-4 pb-3 pt-4">
+  const postHeader = <header className="flex flex-wrap items-start gap-3 px-4 pb-3 pt-4">
     <ClientNavigationLink href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} aria-label={`Trang cá nhân của ${post.authorName}`} className="shrink-0 rounded-full">
       <MemberAvatar name={post.authorName} src={post.avatarUrl} className="size-11 text-sm" decorative />
     </ClientNavigationLink>
