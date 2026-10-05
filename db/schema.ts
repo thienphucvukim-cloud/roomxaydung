@@ -60,7 +60,8 @@ export const postComments = sqliteTable("post_comments", {
 
 export const postAttachments = sqliteTable("post_attachments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  // Purchased private files outlive their listing; deletion cleanup is a DB trigger.
+  postId: integer("post_id").notNull(),
   objectKey: text("object_key").notNull().unique(),
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull(),

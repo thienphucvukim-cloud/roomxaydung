@@ -32,18 +32,18 @@ const db = drizzle(async (...args) => execute(...args), async queries => {
 });
 const objects = new Map();
 let userId = "author";
-const context = createContext({ URL, URLSearchParams, Response, Request, console });
+const context = createContext({ URL, URLSearchParams, Response, Request, Headers, TextEncoder, Uint8Array, crypto, console });
 const cache = new Map();
 async function load(specifier, referencing) {
   const path = specifier.startsWith(".") ? posix.normalize(posix.join(posix.dirname(referencing.identifier), specifier)) : specifier;
   if (cache.has(path)) return cache.get(path);
   const namespace = path === "@/db" ? { getDb: () => db }
-    : path === "cloudflare:workers" ? { env: { BUCKET: { head: async key => objects.get(key) || null } } }
+    : path === "cloudflare:workers" ? { env: { DOWNLOAD_LINK_SECRET: "local-deletion-test", BUCKET: { head: async key => objects.get(key) || null, get: async key => key === "paid-file" ? { body: "Purchased PDF", size: 13, writeHttpMetadata: h => h.set("content-type", "application/pdf") } : null } } }
     : path === "@/db/schema" ? schema
     : path === "@/lib/payment-identity" ? { getPaymentBuyerId: async () => userId }
     : path === "@/lib/member-identity" ? { currentMember: async () => ({ userId, authorName: "Author" }) }
     : path === "@/lib/admin-auth" ? { requireAdmin: async () => ({ userId: "admin" }) }
-    : path === "@/lib/website-auth" ? { getAuthenticatedIdentity: async () => userId ? { userId } : null, validOrigin: request => request.headers.get("sec-fetch-site") !== "cross-site" && (!request.headers.get("origin") || request.headers.get("origin") === new URL(request.url).origin) }
+    : path === "@/lib/website-auth" ? { getAuthenticatedIdentity: async () => userId ? { userId } : null, isAdminIdentity: identity => identity?.userId === "admin", validOrigin: request => request.headers.get("sec-fetch-site") !== "cross-site" && (!request.headers.get("origin") || request.headers.get("origin") === new URL(request.url).origin) }
     : !path.startsWith("@/") ? await import(path) : null;
   const mod = namespace ? new SyntheticModule(Object.keys(namespace), function () {
     for (const [key, value] of Object.entries(namespace)) this.setExport(key, value);
@@ -61,6 +61,9 @@ const comments = await load("@/app/api/comments/route");
 await comments.link(load); await comments.evaluate();
 const admin = await load("@/app/api/admin/manage/[resource]/route");
 await admin.link(load); await admin.evaluate();
+const downloads = await load("@/app/api/downloads/drawing/route");
+await downloads.link(load); await downloads.evaluate();
+const signatures = await load("@/lib/download-links");
 const insert = sqlite.prepare("INSERT INTO posts (user_id, author_name, category, title, content, audience, created_at) VALUES (?, 'Author', ?, 'Original', 'Content', ?, '2026-10-02') RETURNING id");
 const add = (owner = "author", audience = "Công khai", category = "Bộ sưu tập ảnh") => insert.get(owner, category, audience).id;
 const own = add();
@@ -111,23 +114,14 @@ try {
   assert.equal((await read({ id: String(own) })).posts[0].audience, "Chỉ mình tôi");
   await change({ id: own, title: "Edited while hidden" });
   await change({ id: own, action: "publish" }); assert.ok((await publicIds()).includes(own));
-  await change({ id: own }, 200, "DELETE"); assert.ok(!(await publicIds()).includes(own));
-  assert.equal((await read({ id: String(own) })).posts.length, 0);
-  assert.equal((await read({ trash: "true" })).posts[0].id, own);
-  const adminTrash = await admin.namespace.GET(new Request("http://localhost/api/admin/manage/posts?filter=deleted"), { params: Promise.resolve({ resource: "posts" }) });
-  assert.ok((await adminTrash.json()).items.some(post => post.id === own));
-  await change({ id: own, title: "Deleted edit" }, 404);
-  await change({ id: own, action: "publish" }, 404);
-  await change({ id: own, action: "restore" });
-  assert.equal((await read({ id: String(own) })).posts[0].audience, "Chỉ mình tôi");
-  await change({ id: own, action: "publish" });
+  await read({ trash: "true" }, 400);
   await change({ id: moderated, title: "Moderated edit" });
   await change({ id: moderated, action: "publish" }, 404);
   await change({ id: moderated }, 200, "DELETE");
-  await change({ id: moderated, action: "restore" });
-  assert.equal((await read({ id: String(moderated) })).posts[0].audience, "Ẩn bởi quản trị");
+  assert.equal(sqlite.prepare("SELECT audience FROM posts WHERE id = ?").get(moderated).audience, "Tác giả xóa bài bị quản trị ẩn");
+  await change({ id: moderated, action: "restore" }, 400);
   await change({ id: moderated, action: "publish" }, 404);
-  await change({ id: adminDeleted, action: "restore" }, 404);
+  await change({ id: adminDeleted, action: "restore" }, 400);
   await change({ id: commentPost, title: "Comment attack" }, 404);
   userId = "other"; assert.equal((await read({ id: String(own) })).posts.length, 0);
   await change({ id: own, action: "hide" }, 404);
@@ -187,5 +181,52 @@ try {
   await change({ id: feedPost, content: "Unauthorized" }, 404);
   userId = "author";
   await change({ id: feedPost }, 200, "DELETE");
-  console.log("PASS: post ownership and privacy, photo add/replace/remove/cover order, upload validation, atomic rollback, moderation races, protected files and comments.");
+  assert.equal(sqlite.prepare("SELECT audience FROM posts WHERE id = ?").get(feedPost).audience, "Đã xóa bởi tác giả");
+  // A purchased file remains downloadable even though its listing cannot be restored.
+  sqlite.prepare("INSERT INTO wallet_transactions (user_id, kind, amount, order_code, reference, target_type, target_id, description, created_at) VALUES ('buyer', 'purchase', -100000, 12345, 'deletion-test', 'post', ?, 'Purchased plan', '2026-10-05')").run(String(own));
+  const ledgerBefore = sqlite.prepare("SELECT * FROM wallet_transactions").all();
+  sqlite.prepare("INSERT INTO post_attachments (post_id, object_key, file_name, mime_type, size, access_type, created_at) VALUES (?, 'cover', 'cover.webp', 'image/webp', 100, 'public', '2026-10-05')").run(own);
+  sqlite.prepare("INSERT INTO user_actions (user_id, action_type, target_type, target_id, created_at) VALUES ('reader', 'save', 'post', ?, '2026-10-05')").run(String(own));
+  await change({ id: own }, 200, "DELETE");
+  assert.equal(sqlite.prepare("SELECT audience FROM posts WHERE id = ?").get(own).audience, "Đã xóa bởi tác giả");
+  assert.deepEqual(sqlite.prepare("SELECT * FROM post_comments").all(), commentsBefore);
+  assert.equal((await read({ id: String(own) })).posts.length, 0);
+  const adminContext = { params: Promise.resolve({ resource: "posts" }) };
+  const retainedList = await admin.namespace.GET(new Request("http://localhost/api/admin/manage/posts?filter=deleted"), adminContext);
+  assert.ok((await retainedList.json()).items.some(post => post.id === own));
+  const adminRequest = (method, body) => new Request("http://localhost/api/admin/manage/posts", { method, headers: { "Content-Type": "application/json", origin: "http://localhost" }, body: JSON.stringify(body) });
+  assert.equal((await admin.namespace.PATCH(adminRequest("PATCH", { id: own, audience: "Công khai" }), adminContext)).status, 404);
+  assert.equal((await admin.namespace.DELETE(adminRequest("DELETE", { id: own }), adminContext)).status, 200);
+  assert.equal(sqlite.prepare("SELECT id FROM posts WHERE id = ?").get(own), undefined);
+  assert.equal((await read({ id: String(own) })).posts.length, 0);
+  assert.ok(!(await publicIds()).includes(own));
+  assert.equal(sqlite.prepare("SELECT count(*) n FROM post_comments WHERE post_id = ?").get(own).n, 0);
+  assert.equal(sqlite.prepare("SELECT count(*) n FROM user_actions WHERE target_type = 'post' AND target_id = ?").get(String(own)).n, 0);
+  assert.deepEqual(sqlite.prepare("SELECT * FROM post_attachments WHERE post_id = ?").all(own), filesBefore);
+  assert.deepEqual(sqlite.prepare("SELECT * FROM wallet_transactions").all(), ledgerBefore);
+  await change({ id: own }, 404, "DELETE");
+  await change({ id: own, title: "Deleted edit" }, 404);
+  await change({ id: own, action: "restore" }, 400);
+  const expires = Math.floor(Date.now() / 1000) + 3600;
+  const token = await signatures.namespace.createDownloadToken(12345, filesBefore[0].id, expires, "buyer");
+  const url = `http://localhost/api/downloads/drawing?order=12345&file=${filesBefore[0].id}&expires=${expires}&token=${token}`;
+  userId = "buyer";
+  const download = await downloads.namespace.GET(new Request(url));
+  assert.equal(download.status, 200); assert.equal(await download.text(), "Purchased PDF");
+  userId = "other";
+  assert.equal((await downloads.namespace.GET(new Request(url))).status, 403);
+  // Admin deletion also removes hidden content, with no restore endpoint.
+  const adminPost = add("other", "Chỉ mình tôi");
+  sqlite.prepare("INSERT INTO post_attachments (post_id, object_key, file_name, mime_type, size, access_type, created_at) VALUES (?, 'unsold-file', 'unsold.pdf', 'application/pdf', 100, 'private', '2026-10-05')").run(adminPost);
+  assert.equal((await admin.namespace.DELETE(adminRequest("DELETE", { id: adminPost }), adminContext)).status, 200);
+  assert.equal(sqlite.prepare("SELECT id FROM posts WHERE id = ?").get(adminPost), undefined);
+  assert.equal(sqlite.prepare("SELECT id FROM post_attachments WHERE object_key = 'unsold-file'").get(), undefined);
+  assert.equal((await admin.namespace.PATCH(adminRequest("PATCH", { id: adminPost, action: "restore" }), adminContext)).status, 400);
+  assert.equal((await admin.namespace.DELETE(adminRequest("DELETE", { id: other, ignored: true }), { params: Promise.resolve({ resource: "members" }) })).status, 404);
+  userId = "admin";
+  const adminOwnPost = add("admin");
+  assert.equal((await read({ id: String(adminOwnPost) })).isAdmin, true);
+  await change({ id: adminOwnPost }, 200, "DELETE");
+  assert.equal(sqlite.prepare("SELECT id FROM posts WHERE id = ?").get(adminOwnPost), undefined);
+  console.log("PASS: author deletion retained only in admin, permanent admin deletion (including own profile), hide/show, cleanup, ownership/privacy, unchanged ledger and purchased downloads, atomic photo editing.");
 } finally { sqlite.close(); }

@@ -14,9 +14,12 @@ export async function PUT(request: Request) {
     const body = await request.json() as { changes?: { key: string; content: ContentValue | null }[] };
     if (!Array.isArray(body.changes) || !body.changes.length || body.changes.length > 100) return Response.json({ error: "Chọn từ 1 đến 100 mục để lưu." }, { status: 400 });
     const seen = new Set<string>();
+    const current = await getSiteContent();
     for (const change of body.changes) {
       if (!change || typeof change.key !== "string" || !/^[a-zA-Z0-9._-]{1,200}$/.test(change.key) || seen.has(change.key)) return Response.json({ error: "Mục chỉnh sửa không hợp lệ." }, { status: 400 });
       seen.add(change.key);
+      const prefix = change.key.match(/^(facade|house|drawing|interior)\.[\w-]+\./)?.[0];
+      if (prefix && current[`${prefix}visibility`]?.value === "deleted") return Response.json({ error: "Bài demo đã xóa vĩnh viễn, không thể chỉnh sửa hoặc khôi phục." }, { status: 409 });
       if (change.content === null) continue;
       const content = change.content;
       if (!content || !["text", "image", "color"].includes(content.kind) || typeof content.value !== "string" || content.value.length > 5000) return Response.json({ error: "Nội dung không hợp lệ hoặc quá dài." }, { status: 400 });
@@ -31,9 +34,11 @@ export async function PUT(request: Request) {
       }
     }
     const now = new Date().toISOString();
-    await env.DB!.batch(body.changes.map(change => change.content === null
-      ? env.DB!.prepare("DELETE FROM website_content WHERE key = ?").bind(change.key)
-      : env.DB!.prepare("INSERT INTO website_content (key, kind, value, updated_by, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET kind=excluded.kind, value=excluded.value, updated_by=excluded.updated_by, updated_at=excluded.updated_at").bind(change.key, change.content.kind, change.content.value, admin.userId!, now)));
+    const deletedPrefixes = body.changes.filter(change => change.key.endsWith(".visibility") && change.content?.value === "deleted").map(change => change.key.slice(0, -10));
+    const changes = body.changes.filter(change => !deletedPrefixes.some(prefix => change.key.startsWith(prefix) && change.key !== `${prefix}visibility`));
+    await env.DB!.batch([...deletedPrefixes.map(prefix => env.DB!.prepare("DELETE FROM website_content WHERE substr(key, 1, ?) = ? AND key != ?").bind(prefix.length, prefix, `${prefix}visibility`)), ...changes.map(change => change.content === null
+      ? env.DB!.prepare("DELETE FROM website_content WHERE key = ? AND NOT (key LIKE '%.visibility' AND value = 'deleted')").bind(change.key)
+      : env.DB!.prepare("INSERT INTO website_content (key, kind, value, updated_by, updated_at) SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM website_content marker WHERE marker.value = 'deleted' AND marker.key LIKE '%.visibility' AND substr(?, 1, length(marker.key) - 10) = substr(marker.key, 1, length(marker.key) - 10)) ON CONFLICT(key) DO UPDATE SET kind=excluded.kind, value=excluded.value, updated_by=excluded.updated_by, updated_at=excluded.updated_at").bind(change.key, change.content.kind, change.content.value, admin.userId!, now, change.key))]);
     return Response.json({ ok: true, content: await getSiteContent() }, { headers: { "Cache-Control": "no-store" } });
   } catch { return Response.json({ error: "Chưa thể lưu website. Vui lòng thử lại." }, { status: 500 }); }
 }

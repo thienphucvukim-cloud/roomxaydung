@@ -6,5 +6,7 @@ export function demoPostState(content: SiteContent, prefix: string) {
 }
 
 export function demoPostVisible(content: SiteContent, prefix?: string, isAdmin = false) {
-  return !prefix || isAdmin || demoPostState(content, prefix) === "public";
+  if (!prefix) return true;
+  const state = demoPostState(content, prefix);
+  return state === "public" || (isAdmin && state === "hidden");
 }

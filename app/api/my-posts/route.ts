@@ -4,7 +4,7 @@ import { env } from "cloudflare:workers";
 import { getDb } from "@/db";
 import { postAttachments, posts } from "@/db/schema";
 import { getPaymentBuyerId } from "@/lib/payment-identity";
-import { validOrigin } from "@/lib/website-auth";
+import { getAuthenticatedIdentity, isAdminIdentity, validOrigin } from "@/lib/website-auth";
 import { AUTHOR_DELETED_STATES, AUTHOR_POST_STATES, MANAGED_POST_CATEGORIES, OWN_POST_DELETED, OWN_POST_HIDDEN, OWN_POST_MODERATED_DELETED } from "@/lib/post-ownership";
 
 const headers = { "Cache-Control": "private, no-store" };
@@ -26,9 +26,9 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(page) || page < 1 || page > 100000) return reply({ error: "Số trang không hợp lệ." }, 400);
   const id = params.has("id") ? Number(params.get("id")) : undefined;
   if (id !== undefined && (!Number.isSafeInteger(id) || id < 1)) return reply({ error: "Mã bài không hợp lệ." }, 400);
-  const trash = params.get("trash") === "true";
+  if (params.get("trash") === "true") return reply({ error: "Bài bạn đã xóa được lưu trong quản trị." }, 400);
   const condition = and(eq(posts.userId, userId), inArray(posts.category, MANAGED_POST_CATEGORIES),
-    trash ? inArray(posts.audience, AUTHOR_DELETED_STATES) : notInArray(posts.audience, [...AUTHOR_DELETED_STATES, "Đã xóa bởi quản trị"]),
+    notInArray(posts.audience, [...AUTHOR_DELETED_STATES, "Đã xóa bởi quản trị"]),
     id === undefined ? undefined : eq(posts.id, id));
   try {
     const db = getDb();
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       db.select({ value: count() }).from(posts).where(condition),
     ]);
     const images = await postImages(items.map(post => post.id));
-    return reply({ posts: items.map(post => ({ ...postWithLegacyMetadata(post), images: images.filter(image => image.postId === post.id) })), total: total.value, totalPages: Math.max(1, Math.ceil(total.value / 20)) });
+    return reply({ posts: items.map(post => ({ ...postWithLegacyMetadata(post), images: images.filter(image => image.postId === post.id) })), total: total.value, totalPages: Math.max(1, Math.ceil(total.value / 20)), isAdmin: isAdminIdentity(await getAuthenticatedIdentity()) });
   } catch { return reply({ error: "Chưa thể tải bài viết của bạn." }, 500); }
 }
 
@@ -56,16 +56,19 @@ async function mutate(request: Request, deleting: boolean) {
   const updates: Omit<Partial<typeof posts.$inferInsert>, "audience" | "content"> & { audience?: string | SQL; content?: string | SQL } = {};
   let states = AUTHOR_POST_STATES;
   if (deleting) {
-    updates.audience = sql`case when ${posts.audience} = 'Ẩn bởi quản trị' then ${OWN_POST_MODERATED_DELETED} else ${OWN_POST_DELETED} end`;
-    states = [...AUTHOR_POST_STATES, "Ẩn bởi quản trị"];
+    try {
+      const db = getDb();
+      const condition = and(eq(posts.id, body.id), eq(posts.userId, userId), inArray(posts.category, MANAGED_POST_CATEGORIES), inArray(posts.audience, [...AUTHOR_POST_STATES, "Ẩn bởi quản trị"]));
+      const rows = isAdminIdentity(await getAuthenticatedIdentity())
+        ? await db.delete(posts).where(condition).returning({ id: posts.id })
+        : await db.update(posts).set({ audience: sql`case when ${posts.audience} = 'Ẩn bởi quản trị' then ${OWN_POST_MODERATED_DELETED} else ${OWN_POST_DELETED} end` }).where(condition).returning({ id: posts.id });
+      if (!rows.length) return reply({ error: "Bài viết không thuộc bạn hoặc đã bị xóa." }, 404);
+      return reply({ ok: true, id: rows[0].id });
+    } catch { return reply({ error: "Chưa thể xóa bài viết." }, 500); }
   } else if (body.action !== undefined) {
     if (Object.keys(body).some(key => key !== "id" && key !== "action")) return reply({ error: "Thao tác không hợp lệ." }, 400);
     if (body.action === "hide") { updates.audience = OWN_POST_HIDDEN; states = ["Công khai"]; }
     else if (body.action === "publish") { updates.audience = "Công khai"; states = [OWN_POST_HIDDEN]; }
-    else if (body.action === "restore") {
-      updates.audience = sql`case when ${posts.audience} = ${OWN_POST_MODERATED_DELETED} then 'Ẩn bởi quản trị' else ${OWN_POST_HIDDEN} end`;
-      states = AUTHOR_DELETED_STATES;
-    }
     else return reply({ error: "Thao tác không hợp lệ." }, 400);
   } else {
     for (const [key, max] of [["title", 120], ["content", 1200], ["specifications", 240], ["listingType", 80]] as const) {
@@ -82,7 +85,6 @@ async function mutate(request: Request, deleting: boolean) {
     if (!Object.keys(updates).length) return reply({ error: "Chưa có nội dung cần thay đổi." }, 400);
   }
   try {
-    // Soft deletion preserves files, comments and existing purchase records.
     // Ownership and allowed state are checked in the same atomic update.
     const db = getDb();
     const condition = and(eq(posts.id, body.id), eq(posts.userId, userId), inArray(posts.category, MANAGED_POST_CATEGORIES), inArray(posts.audience, states));

@@ -7,11 +7,11 @@ import { EyeOff, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 export function AdminPostControls({ postId, onEdit }: { postId: number; onEdit: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [removed, setRemoved] = useState(false);
+  const [removed, setRemoved] = useState("");
 
   async function update(deleting: boolean) {
     if (busy) return;
-    if (deleting && !window.confirm("Chuyển bài viết này vào thùng rác? Bạn có thể khôi phục lại trong mục Quản lý.")) return;
+    if (deleting && !window.confirm("Xóa vĩnh viễn bài viết này? Bài đã xóa không thể khôi phục.")) return;
     setBusy(true);
     setError("");
     try {
@@ -22,7 +22,7 @@ export function AdminPostControls({ postId, onEdit }: { postId: number; onEdit: 
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Chưa thể cập nhật bài viết.");
-      setRemoved(true);
+      setRemoved(deleting ? "Đã xóa vĩnh viễn bài viết." : "Đã ẩn bài viết.");
       window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chưa thể cập nhật bài viết.");
@@ -32,7 +32,7 @@ export function AdminPostControls({ postId, onEdit }: { postId: number; onEdit: 
   }
 
   return <span className="admin-post-controls" role="group" aria-label="Quản trị bài viết">
-    {removed ? <span role="status">Đã gỡ bài viết khỏi nội dung công khai.</span> : <>
+    {removed ? <span role="status">{removed}</span> : <>
       <button type="button" onClick={onEdit} disabled={busy}><Pencil size={14} aria-hidden="true"/>Chỉnh sửa</button>
       <button type="button" onClick={() => void update(false)} disabled={busy}><EyeOff size={14} aria-hidden="true"/>Ẩn</button>
       <button type="button" className="danger" onClick={() => void update(true)} disabled={busy}><Trash2 size={14} aria-hidden="true"/>Xóa</button>

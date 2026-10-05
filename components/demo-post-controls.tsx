@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Eye, EyeOff, LoaderCircle, Pencil, Trash2, Undo2 } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 import { useSiteEditor } from "@/components/site-editor";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { demoPostState } from "@/lib/demo-posts";
@@ -15,6 +15,7 @@ export function DemoPostControls({ prefix, title, style, image, meta }: { prefix
   const [notice, setNotice] = useState("");
   if (!editor.isOwner) return null;
   const state = demoPostState(editor.content, prefix);
+  if (state === "deleted") return null;
   const currentTitle = editor.content[`${prefix}.title`]?.value ?? title;
 
   async function save(changes: Record<string, ContentValue>, message: string) {
@@ -30,7 +31,7 @@ export function DemoPostControls({ prefix, title, style, image, meta }: { prefix
 
   function visibility(next: "public" | "hidden" | "deleted") {
     if (busy) return;
-    if (next === "deleted" && !window.confirm(`Xóa bài demo “${currentTitle}”? Bài sẽ được gỡ khỏi website. Bạn có thể khôi phục bằng tài khoản quản trị.`)) return;
+    if (next === "deleted" && !window.confirm(`Xóa bài demo “${currentTitle}”? Bài sẽ bị xóa vĩnh viễn và không thể khôi phục.`)) return;
     void save({ [`${prefix}.visibility`]: { kind: "text", value: next } }, next === "deleted" ? "Đã xóa bài demo khỏi website." : next === "hidden" ? "Đã ẩn bài demo với khách truy cập." : "Đã hiển thị lại bài demo.");
   }
 
@@ -46,12 +47,12 @@ export function DemoPostControls({ prefix, title, style, image, meta }: { prefix
 
   return <>
     <span className="admin-post-controls" role="group" aria-label="Quản trị bài demo">
-      {state !== "public" && <span className="basis-full text-[#667085]">{state === "deleted" ? "Đã xóa · Chỉ quản trị viên thấy" : "Đã ẩn · Chỉ quản trị viên thấy"}</span>}
-      {state === "deleted" ? <button type="button" disabled={busy} onClick={() => visibility("hidden")}><Undo2 size={14}/>Khôi phục</button> : <>
+      {state !== "public" && <span className="basis-full text-[#667085]">Đã ẩn · Chỉ quản trị viên thấy</span>}
+      <>
         <button type="button" disabled={busy} onClick={() => { setError(""); setNotice(""); setOpen(true); }}><Pencil size={14}/>Chỉnh sửa</button>
         <button type="button" disabled={busy} onClick={() => visibility(state === "public" ? "hidden" : "public")}>{state === "public" ? <EyeOff size={14}/> : <Eye size={14}/>} {state === "public" ? "Ẩn" : "Hiện lại"}</button>
         <button type="button" className="danger" disabled={busy} onClick={() => visibility("deleted")}><Trash2 size={14}/>Xóa</button>
-      </>}
+      </>
       {busy && <LoaderCircle size={14} className="animate-spin" aria-label="Đang lưu"/>}
       {error && !open && <span role="alert" className="admin-post-error">{error}</span>}
       {notice && <span role="status" className="basis-full text-xs font-normal">{notice}</span>}
