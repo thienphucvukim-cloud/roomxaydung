@@ -123,7 +123,7 @@ export function ChatThread({ peerId, targetType, targetId, subject = "Tin nhắn
         const own = message.senderUserId === identity.userId;
         return <div key={message.id} className={`flex ${own ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${own ? "rounded-br-sm bg-[#229ed9] text-white" : "rounded-bl-sm bg-white text-[#344054]"}`}>
           {message.subject !== "Tin nhắn" && <p className={`mb-1 text-xs font-semibold ${own ? "text-white/80" : "text-[#168ac0]"}`}>{message.subject}</p>}
-          <p className="whitespace-pre-wrap break-words leading-6">{message.content.split(/(https?:\/\/[^\s]+|\/thue-thiet-ke\/[0-9a-f-]{36})/gi).map((part, index) => /^(https?:\/\/|\/thue-thiet-ke\/)/i.test(part) ? <a key={index} href={part} target="_blank" rel="noreferrer" className="break-all underline">{part}</a> : part)}</p>
+          <p className="whitespace-pre-wrap break-words leading-6">{message.content.split(/(https?:\/\/[^\s]+|\/thue-thiet-ke\/[0-9a-f-]{36}(?:\?[^\s]+)?)/gi).map((part, index) => /^(https?:\/\/|\/thue-thiet-ke\/)/i.test(part) ? <a key={index} href={part} target="_blank" rel="noreferrer" className="break-all underline">{part}</a> : part)}</p>
           {message.attachmentKey && <a href={`/api/files?key=${encodeURIComponent(message.attachmentKey)}&download=1`} className="mt-2 inline-flex items-center gap-1 underline"><Download size={14}/>Tệp đính kèm</a>}
           <p className={`mt-1 text-right text-[10px] ${own ? "text-white/75" : "text-[#98a2b3]"}`}>{new Date(message.createdAt).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}{own ? message.readAt ? " · Đã đọc" : " · Đã gửi" : ""}</p>
         </div></div>;

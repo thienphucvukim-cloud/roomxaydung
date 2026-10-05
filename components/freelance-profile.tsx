@@ -3,7 +3,7 @@
 
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { ClientNavigationLink as Link } from '@/components/client-navigation-link';
 import { ArrowLeft, ArrowUpRight, BriefcaseBusiness, CircleCheck, ExternalLink, FileText, Layers3, LoaderCircle, MapPin, PencilRuler } from 'lucide-react';
 import { MemberAvatar } from '@/components/member-avatar';
 import { RequestActionButton } from '@/components/interactive-actions';

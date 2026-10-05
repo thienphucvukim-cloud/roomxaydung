@@ -173,6 +173,7 @@ export function RequestActionButton({
   iconCount,
   onSuccess,
   recipientUserId,
+  defaultOpen = false,
 }: {
   requestType: string;
   targetType: string;
@@ -186,12 +187,13 @@ export function RequestActionButton({
   iconCount?: number;
   onSuccess?: () => void;
   recipientUserId?: string;
+  defaultOpen?: boolean;
 }) {
   const fieldId = useId();
   const internalOnly = requestType === "expert-question";
   const fileRequest = requestType === "drawing-file-request";
   const adminHelp = requestType === "admin-help";
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [subject, setSubject] = useState(title);
   const [content, setContent] = useState("");
   const [contact, setContact] = useState("");
@@ -258,7 +260,7 @@ export function RequestActionButton({
       <DialogContent showCloseButton={false} className="max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-[520px] gap-0 overflow-y-auto rounded-2xl border-0 bg-white p-0 shadow-2xl">
         <DialogHeader className="relative border-b border-[#e4e6eb] px-14 py-5 text-center sm:text-center">
           <DialogTitle className="text-xl font-bold text-[#050505]">{title}</DialogTitle>
-          <DialogClose className="absolute right-4 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-[#e4e6eb] text-[#606770]"><X size={21}/></DialogClose>
+          <DialogClose aria-label="Đóng cuộc trò chuyện" className="absolute right-4 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-[#e4e6eb] text-[#606770]"><X size={21}/></DialogClose>
         </DialogHeader>
         {internalOnly || requestType === "direct-message" ? (open && <ChatThread key={`${targetType}:${targetId}`} peerId={recipientUserId} targetType={targetType} targetId={targetId} subject={title} description={description} onSent={onSuccess} allowFile={allowFile}/>) : <div className="space-y-4 p-4">
           {(fileRequest || description) && <p className="text-sm leading-6 text-[#536273]">{fileRequest ? "Chúng tôi sẽ nhận yêu cầu và liên hệ với bạn để cung cấp file." : description}</p>}

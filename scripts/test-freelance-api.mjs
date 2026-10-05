@@ -4,6 +4,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 import ts from 'typescript';
+import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import * as schema from '../db/schema.ts';
+import * as operators from 'drizzle-orm';
 
 const sqlite = new DatabaseSync(':memory:');
 for (const file of readdirSync('drizzle').filter(file => file.endsWith('.sql')).sort()) sqlite.exec(readFileSync('drizzle/' + file,'utf8'));
@@ -15,12 +18,27 @@ const db = { prepare(sql) { let args = []; const statement = {
   async run() { if (beforeRun) { const fn = beforeRun; beforeRun = null; fn(sql); } return { meta: { changes: Number(sqlite.prepare(sql).run(...args).changes) } }; },
 }; return statement; } };
 const objects = new Map();
+const chatDb = drizzle(async (sql, params, method) => {
+  const statement = sqlite.prepare(sql);
+  if (method === 'run') return { rows: [], ...statement.run(...params) };
+  statement.setReturnArrays(true);
+  return { rows: method === 'get' ? statement.get(...params) : statement.all(...params) };
+});
 const bucket = { async put(key,data) { objects.set(key,data); }, async delete(key) { objects.delete(key); }, async get(key) { return objects.has(key) ? { body: objects.get(key) } : null; } };
 const buyer = { userId:'buyer',displayName:'Gia chủ' }, expert = { userId:'expert',displayName:'KTS. An' }, other = { userId:'other',displayName:'KS. Bình' }, stranger = { userId:'stranger',displayName:'Người xem' };
 for (const actor of [buyer,expert,other,stranger]) sqlite.prepare("INSERT INTO member_profiles(user_id,display_name,account_type,updated_at) VALUES(?,?,'user',?)").run(actor.userId,actor.displayName,new Date().toISOString());
 const context = createContext({ Request,Response,Headers,FormData,File,URL,URLSearchParams,crypto,console });
 const cache = new Map();
 const stubs = { 'cloudflare:workers': { env: { DB:db,BUCKET:bucket } }, '@/lib/website-auth': { getAuthenticatedIdentity: async () => identity, validOrigin: request => request.headers.get('origin') === new URL(request.url).origin } };
+Object.assign(stubs, {
+  'drizzle-orm': operators,
+  '../../../db': { getDb: () => chatDb }, '../db': { getDb: () => chatDb },
+  '../../../db/schema': schema, '../db/schema': schema,
+  '../../../lib/payment-identity': { getPaymentBuyerId: async () => identity?.userId || null },
+  '../../../lib/member-identity': { currentMember: async () => ({ userId: identity?.userId, authorName: identity?.displayName }) },
+  '@/lib/member-access': { memberAccessResponse: async () => identity ? null : Response.json({ error: 'Đăng nhập để nhắn tin.' }, { status: 401 }) },
+  './house-models': { houseModels: [] },
+});
 async function load(name,parent) {
   const file = name.startsWith('@/') ? name.slice(2) : name.startsWith('.') ? new URL(name + (name.endsWith('.ts') ? '' : '.ts'),'file:///' + parent.identifier).pathname.slice(1).replace(/\.ts$/,'') : name;
   if (cache.has(file)) return cache.get(file);
@@ -31,9 +49,11 @@ async function load(name,parent) {
 }
 async function api(file) { const vmModule = await load('@/app/api/freelance/' + file); await vmModule.link(load); await vmModule.evaluate(); return vmModule.namespace; }
 const listing = await api('route'), profiles = await api('profiles/route'), projects = await api('projects/route'), files = await api('files/route');
-async function post(api,actor,body,status=200,origin='http://local.test') {
+const chatModule = await load('@/app/api/messages/route'); await chatModule.link(load); await chatModule.evaluate();
+const chat = chatModule.namespace;
+async function post(api,actor,body,status=200,origin='http://local.test',method='POST') {
   identity = actor;
-  const response = await api.POST(new Request('http://local.test/api/freelance',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}));
+  const response = await api[method](new Request('http://local.test/api/freelance',{method,headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}));
   const result = await response.json(); assert.equal(response.status,status,JSON.stringify(result)); return result;
 }
 async function get(api,actor,query='',status=200) { identity = actor; const response = await api.GET(new Request('http://local.test/api/freelance?' + query)); assert.equal(response.status,status,await response.clone().text()); return response.json(); }
@@ -72,11 +92,26 @@ await post(projects,buyer,creation);
 assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM freelance_projects').get().n,1);
 await post(projects,other,creation,409);
 const act = (actor,action,fields={},status=200) => post(projects,actor,{id,action,...fields},status);
+await post(chat,null,{peerId:'buyer',content:'Khách chưa đăng nhập'},401);
+await post(chat,expert,{peerId:'buyer',content:'Cho tôi hỏi yêu cầu hồ sơ trước khi báo giá.'},201);
+assert.equal((await get(chat,buyer,'peerId=expert')).messages.length,1,'The owner receives contact before selecting a freelancer');
+await post(chat,buyer,{peerId:'expert',content:'Tôi cần kiến trúc và kết cấu.'},201);
+const privateThread = await get(chat,expert,'peerId=buyer');
+assert.deepEqual(privateThread.messages.map(message => message.senderUserId),['expert','buyer']);
+assert.equal((await get(chat,stranger,'peerId=buyer')).messages.length,0,'A competing viewer cannot read pre-hire conversations');
+await post(chat,stranger,{ids:[privateThread.messages.at(-1).id]},404,'http://local.test','PATCH');
 await act(buyer,'propose',{requestId:crypto.randomUUID(),price:12000000,days:20,content:'Tự báo giá'},409);
 await act(stranger,'propose',{requestId:crypto.randomUUID(),price:12000000,days:20,content:'Chưa có hồ sơ'},403);
 const firstProposal = crypto.randomUUID();
 await act(expert,'propose',{requestId:firstProposal,price:12000000,days:20,content:'Thiết kế kiến trúc, bàn giao PDF + DWG, hai lần chỉnh sửa.'});
+const quoteNotices = () => sqlite.prepare("SELECT * FROM direct_messages WHERE recipient_user_id='buyer' AND subject LIKE '%báo giá%' COLLATE NOCASE").all();
+assert.equal(quoteNotices().length,1);
+assert.equal(quoteNotices()[0].sender_user_id,'expert');
+assert.ok(quoteNotices()[0].content.includes('/thue-thiet-ke/'+id));
+await act(expert,'propose',{requestId:firstProposal,price:12000000,days:20,content:'Thiết kế kiến trúc, bàn giao PDF + DWG, hai lần chỉnh sửa.'});
+assert.equal(quoteNotices().length,1,'Retrying an identical quote must not duplicate inbox notices');
 await act(expert,'propose',{requestId:crypto.randomUUID(),price:11000000,days:18,content:'Cập nhật phạm vi: PDF + DWG, phối cảnh JPG.'});
+assert.equal(quoteNotices().length,2,'Changed quotes notify the owner');
 await act(other,'propose',{requestId:crypto.randomUUID(),price:16000000,days:25,content:'Phương án kiến trúc và kết cấu.'});
 assert.equal((await get(projects,buyer,'id='+id)).proposals.length,2);
 assert.equal((await get(projects,expert,'id='+id)).proposals.length,1);
@@ -91,7 +126,9 @@ await upload(other,id,'brief',403);
 await upload(buyer,id,'brief',400,'danger.exe');
 identity=null; assert.equal((await files.GET(new Request('http://local.test/api/freelance/files?id='+brief.id))).status,401);
 await act(buyer,'hire',{proposalId:firstProposal});
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE recipient_user_id='expert' AND subject LIKE 'Bạn được chọn%'").get().n,1);
 await act(buyer,'hire',{proposalId:firstProposal},409);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE subject LIKE 'Bạn được chọn%'").get().n,1,'Rejected hire replays must not send duplicate notices');
 await act(other,'propose',{requestId:crypto.randomUUID(),price:5000000,days:14,content:'Quá muộn'},409);
 assert.equal((await get(listing,null,'view=projects')).total,0);
 await act(expert,'deliver',{},400);
@@ -100,6 +137,7 @@ await act(stranger,'message',{requestId:crypto.randomUUID(),content:'Xâm nhập
 const msg = {requestId:crypto.randomUUID(),content:'Chốt phương án, triển khai hồ sơ.'};
 await act(buyer,'message',msg); await act(buyer,'message',msg);
 assert.equal((await get(projects,buyer,'id='+id)).messages.length,1);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE recipient_user_id='expert' AND subject LIKE 'Trao đổi dự án:%'").get().n,1,'Project messages reach the peer inbox once');
 assert.equal((await get(projects,other,'id='+id)).messages.length,0);
 assert.equal((await get(projects,other,'id='+id)).project.agreedPrice,0);
 assert.equal((await get(projects,null,'id='+id)).project.freelancerId,null);
@@ -108,6 +146,10 @@ const delivery = await upload(expert,id,'delivery');
 identity=other; assert.equal((await files.GET(new Request('http://local.test/api/freelance/files?id='+delivery.id))).status,403);
 identity=buyer; const download=await files.GET(new Request('http://local.test/api/freelance/files?id='+delivery.id));assert.equal(download.status,200);assert.match(download.headers.get('content-disposition'),/^attachment/);
 await act(expert,'deliver'); await act(expert,'complete',{},403); await act(buyer,'revise'); await act(expert,'deliver'); await act(buyer,'complete');
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE recipient_user_id='buyer' AND subject LIKE 'Hồ sơ chờ nghiệm thu:%'").get().n,2);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE recipient_user_id='expert' AND subject LIKE 'Yêu cầu điều chỉnh:%'").get().n,1);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE recipient_user_id='expert' AND subject LIKE 'Dự án đã hoàn thành:%'").get().n,1);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM direct_messages WHERE recipient_user_id='stranger'").get().n,0,'Unrelated viewers receive no project notices');
 assert.equal((await get(profiles,null,'id=expert')).profile.completedCount,1);
 assert.equal((await get(projects,buyer,'id='+id)).project.status,'completed');
 await act(buyer,'message',{requestId:crypto.randomUUID(),content:'Đã hoàn thành'},403);
@@ -123,5 +165,5 @@ const objectsBefore=objects.size;
 beforeRun=sql=>{assert.match(sql,/INSERT INTO freelance_files/);sqlite.prepare("UPDATE freelance_projects SET status='cancelled' WHERE id=?").run(uploadRace);};
 await upload(buyer,uploadRace,'brief',409);assert.equal(objects.size,objectsBefore,'Failed uploads must be removed from R2');
 
-console.log('PASS: fresh profiles; validation/auth/origin; real filters/sorting; project creation replay; proposal privacy/update; atomic hiring; private messages; protected files; revise/deliver/complete; write races; failed-upload cleanup.');
+console.log('PASS: fresh profiles; validation/auth/origin; real filters/sorting; project creation replay; proposal privacy/update; private pre-hire contact/replies; inbox notifications without duplicate replays; atomic hiring; private messages; protected files; revise/deliver/complete; write races; failed-upload cleanup.');
 sqlite.close();
