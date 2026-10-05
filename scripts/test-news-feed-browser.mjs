@@ -93,7 +93,7 @@ try {
   await send('Page.navigate', { url: origin });
   await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed hydration');
   const browserModule = file => ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/^import .*;\s*$/gm, '').replace(/^export /gm, '');
-  await evaluate(`(() => { ${browserModule('lib/legacy-contracts.ts')} ${browserModule('lib/image-upload-policy.ts')} ${browserModule('lib/image-watermark.ts')} ${browserModule('lib/image-upload.ts')} window.optimizeUploadFixture=optimizeImageForUpload; window.optimizePostUploadFixture=optimizePostImageForUpload; window.inspectWebpFixture=inspectWebp; })()`);
+  await evaluate(`(() => { ${browserModule('lib/legacy-contracts.ts')} ${browserModule('lib/image-upload-policy.ts')} ${browserModule('lib/image-watermark.ts')} ${browserModule('lib/image-upload.ts')} window.optimizeUploadFixture=optimizeImageForUpload; window.optimizePostUploadFixture=optimizePostImageForUpload; window.inspectWebpFixture=inspectWebp; window.drawWatermarkFixture=drawImageWatermark; window.loadWatermarkLogoFixture=loadWatermarkLogo; })()`);
   const compression = await evaluate(`(async () => {
     const canvas=document.createElement('canvas'); canvas.width=2200; canvas.height=1600;
     const ctx=canvas.getContext('2d'), pixels=ctx.createImageData(canvas.width,canvas.height);
@@ -131,7 +131,7 @@ try {
     const decode = HTMLImageElement.prototype.decode;
     let logoFailureRejected = false;
     try {
-      HTMLImageElement.prototype.decode = function () { return this.src.endsWith('/nhadepchat-logo.png') ? Promise.reject(new Error('fixture')) : decode.call(this); };
+      HTMLImageElement.prototype.decode = function () { return this.src.endsWith('/nhadepchat-symbol.png?v=4') ? Promise.reject(new Error('fixture')) : decode.call(this); };
       await window.optimizePostUploadFixture(source, 'Bộ sưu tập ảnh');
     } catch { logoFailureRejected = true; } finally { HTMLImageElement.prototype.decode = decode; }
     const inspectPixels = async file => {
@@ -165,6 +165,22 @@ try {
       };
       reduced = await inspectPixels(await window.optimizePostUploadFixture(source, 'Bộ sưu tập ảnh'));
     } finally { HTMLCanvasElement.prototype.toBlob = encode; }
+    canvas.width = 1200; canvas.height = 800;
+    const logo = await window.loadWatermarkLogoFixture();
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    const labels = [];
+    try {
+      CanvasRenderingContext2D.prototype.fillText = function (label, ...args) { labels.push(label); return fillText.call(this, label, ...args); };
+      window.drawWatermarkFixture(ctx, logo);
+    } finally { CanvasRenderingContext2D.prototype.fillText = fillText; }
+    const alpha = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let left = canvas.width, right = 0, top = canvas.height, bottom = 0;
+    for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+      if (alpha[(y * canvas.width + x) * 4 + 3]) { left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y); }
+    }
+    let empty = 0;
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) if (!alpha[(y * canvas.width + x) * 4 + 3]) empty++;
+    const transparentRatio = empty / ((right - left + 1) * (bottom - top + 1));
     const samples = [];
     for (const [url, name] of [['/community-house.png', 'watermark-house.webp'], ['/mat-bang-5x20.png', 'watermark-drawing.webp']]) {
       const image = new File([await (await fetch(url)).blob()], name, { type: 'image/png' });
@@ -173,7 +189,7 @@ try {
       let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
       samples.push({ name, base64: btoa(binary) });
     }
-    return { results, reduced, attempts, qualities, logoFailureRejected, samples };
+    return { results, reduced, attempts, qualities, logoFailureRejected, logoSrc: logo.src, labels, transparentRatio, samples };
   })()`);
   assert.equal(watermark.logoFailureRejected, true, 'A missing logo must not silently upload an unmarked catalog photo');
   for (const result of [...watermark.results.slice(0, 3), watermark.reduced]) {
@@ -185,6 +201,9 @@ try {
   }
   assert.equal(watermark.reduced.width, 960, 'Logo must survive size reduction after compression retries');
   assert.deepEqual(watermark.qualities, [0.8, 0.8], 'Initial encoding and size reduction must both preserve 80% quality');
+  assert.ok(watermark.logoSrc.endsWith('/nhadepchat-symbol.png?v=4'), 'Watermark must use the same symbol as the website header');
+  assert.deepEqual(watermark.labels, ['nhadepchat.top'], 'The website address must accompany the symbol');
+  assert.ok(watermark.transparentRatio > 0.15, `The spaces around the logo and address must remain transparent without a background panel: ${watermark.transparentRatio}`);
   assert.ok(watermark.results.slice(3).every(result => result.changed === 0), 'News photos, comments and avatars must remain unmarked');
   for (const sample of watermark.samples) writeFileSync(path.join(dir, sample.name), Buffer.from(sample.base64, 'base64'));
   console.log('PASS: all three catalog categories embed a small bottom-centered logo in WebP; compression retries retain it; logo load failures retry safely; unrelated images stay unmarked.');
