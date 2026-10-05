@@ -15,11 +15,18 @@ const file=async(privateFile=false)=>{
 };
 const image=await file(),text='SEO visible content '+crypto.randomUUID().slice(0,8)+' </script><script>window.seoUnsafe=1</script>';
 const {data:{post}}=await call('/api/posts',{category:'Bảng tin',title:'SEO public fixture',content:text,attachments:[image]},cookie,'POST',201);
-const document=async(path,options={})=>{const r=await fetch(origin+path,options);return {status:r.status,headers:r.headers,html:await r.text()};};
+const document=async(path,options={})=>{const r=await fetch(origin+path,options);return {status:r.status,headers:r.headers,html:await r.text(),url:r.url};};
 const schemaOf=html=>[...html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map(match=>JSON.parse(match[1]));
 const checkShare=async(path,post,preview)=>{
  const page=await document(path,{headers:{'user-agent':'facebookexternalhit/1.1'}});
  assert.equal(page.status,200,path);
+ assert.equal(new URL(page.url).pathname,'/'+post.slug,'Every legacy entry resolves to the readable permalink');
+ if(path.includes('postId=') || path.startsWith('/bai-viet/')) for(const method of ['GET','HEAD']) {
+  const redirect=await document(path,{method,redirect:'manual'});
+  assert.equal(redirect.status,308,'Legacy links need a permanent redirect');
+  assert.equal(new URL(redirect.headers.get('location'),origin).pathname,'/'+post.slug);
+  assert.equal(new URL(redirect.headers.get('location'),origin).search,'');
+ }
  const head=page.html.slice(page.html.indexOf('<head'),page.html.indexOf('</head>'));
  assert.ok(head.includes(`property="og:title" content="${post.title} | NhàĐẹpChất"`),'Post title must be in the initial head for social crawlers: '+path);
  assert.ok(head.includes('property="og:type" content="article"'));
@@ -100,6 +107,7 @@ const publicPreview=await file(),paidFile=await file(true);
 const {data:{post:listing}}=await call('/api/posts',{category:'Bản vẽ cộng đồng',title:'SEO drawing fixture',content:'Public drawing description',priceLabel:'5000',attachments:[publicPreview],paidFiles:[paidFile]},cookie,'POST',201);
 page=await document('/file-ban-ve-nha-dep-chat?postId='+listing.id);
 assert.equal(page.status,200);assert.ok(page.html.includes('id="post-'+listing.id+'"'));assert.ok(!page.html.includes(paidFile.key));
+assert.ok(page.html.includes('aria-label="Mua file"'));assert.ok(page.html.includes("Yêu cầu file"));
 for(const path of ['/file-ban-ve-nha-dep-chat?postId=', '/kho-mau-nha-dep-chat?postId=', '/bai-viet/']) {
  const shared=await checkShare(path+listing.id,listing,publicPreview);assert.ok(!shared.html.includes(paidFile.key));
 }

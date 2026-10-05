@@ -8,12 +8,14 @@ import { ArrowUpRight, Globe2, ImagePlus, LoaderCircle, MapPin, MessageCircle, S
 import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { CurrentMemberAvatar, MemberAvatar } from "@/components/member-avatar";
 import { OwnerPostControls } from "@/components/site-editor";
-import { ShareActionButton, ToggleActionButton } from "@/components/interactive-actions";
+import { RequestActionButton, ShareActionButton, ToggleActionButton } from "@/components/interactive-actions";
+import { PurchaseActionButton } from "@/components/purchase-action-button";
 import { postHref } from "@/lib/post-url";
 import { NewsPhotoViewer } from "@/components/news-photo-viewer";
 import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
 import { optimizeImageForUpload } from "@/lib/image-upload";
 import { formatFeedPrice, formatPriceDescription } from "@/lib/price-description";
+import { parseVndPrice } from "@/lib/drawing-catalog";
 import type { NewsPost } from "@/lib/news-feed";
 
 const dateFormat = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Ho_Chi_Minh" });
@@ -48,6 +50,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
   const title = formatPriceDescription(post.title);
   const content = formatPriceDescription(post.content);
   const displayedTotal = commentTotal ?? post.comments ?? 0;
+  const hasFileActions = detail && (post.category === POST_CATEGORIES.drawings || post.category === POST_CATEGORIES.interiors);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -148,7 +151,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
   </header>;
 
   const postContent = <div className="px-4 pb-3">
-    {post.category !== POST_CATEGORIES.news && <h3 className="break-words text-[15px] font-semibold leading-6"><ClientNavigationLink href={postHref(post)}>{title}</ClientNavigationLink></h3>}
+    {detail ? <h1 className="break-words text-xl font-bold leading-7">{title}</h1> : post.category !== POST_CATEGORIES.news && <h3 className="break-words text-[15px] font-semibold leading-6"><ClientNavigationLink href={postHref(post)}>{title}</ClientNavigationLink></h3>}
     {post.content && <>
       <p className={`mt-1 whitespace-pre-wrap break-words text-[15px] leading-6 ${canExpand && !expanded && !gallery ? "line-clamp-4" : ""}`}>{content}</p>
       {canExpand && !gallery && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)} className="mt-1 text-sm font-semibold hover:underline">{expanded ? "Thu gọn" : "Xem thêm"}</button>}
@@ -162,13 +165,17 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
 
   const postLink = <div className="flex items-center justify-between gap-3 px-4 py-3">
     <span className="text-xs text-[#65676b]">{post.sourceLabel}</span>
-    <ClientNavigationLink href={post.sourceHref} className="flex min-h-9 items-center gap-1 rounded-md bg-[#e7f3ff] px-3 text-sm font-semibold text-[#1877f2] hover:bg-[#dbeaff]">Xem bài viết<ArrowUpRight size={16} /></ClientNavigationLink>
+    {!detail && <ClientNavigationLink href={postHref(post)} className="flex min-h-9 items-center gap-1 rounded-md bg-[#e7f3ff] px-3 text-sm font-semibold text-[#1877f2] hover:bg-[#dbeaff]">Xem bài viết<ArrowUpRight size={16} /></ClientNavigationLink>}
+    {hasFileActions && <div className="flex flex-wrap justify-end gap-2">
+      <RequestActionButton requestType="drawing-file-request" targetType="post" targetId={String(post.id)} recipientUserId={post.userId} label="Yêu cầu file" title={"Yêu cầu file: " + post.title} description="Tin nhắn sẽ được gửi trực tiếp đến người đăng." className="flex min-h-10 items-center gap-2 rounded-lg border border-[#cfeaf5] bg-[#f1faff] px-3 text-sm font-semibold text-[#168ac0]"/>
+      <PurchaseActionButton targetType="post" targetId={String(post.id)} title={post.title} price={post.priceLabel || "Miễn phí"} label={parseVndPrice(post.priceLabel || "") ? "Mua file" : "Tải file"} className="flex min-h-10 items-center gap-2 rounded-lg bg-[#229ed9] px-3 text-sm font-semibold text-white"/>
+    </div>}
   </div>;
 
   const actions = <div className="mx-4 grid grid-cols-3 gap-1 border-t border-[#e4e6eb] py-1">
     <ToggleActionButton actionType="like" targetType="post" targetId={String(post.id)} label="Thích" activeLabel="Đã thích" icon="heart" showCount showLabelWithCount className={actionClass} />
     <button type="button" onClick={() => { setCommentsOpen(true); window.setTimeout(() => commentInput.current?.focus(), 0); }} aria-expanded={commentsOpen} className={actionClass}><MessageCircle size={17} /><span>Bình luận{displayedTotal > 0 ? ` (${displayedTotal.toLocaleString("vi-VN")})` : ""}</span></button>
-    <ShareActionButton title={post.title} url={post.sourceHref} targetType="post" targetId={String(post.id)} className={actionClass} />
+    <ShareActionButton title={post.title} url={postHref(post)} targetType="post" targetId={String(post.id)} className={actionClass} />
   </div>;
 
   const commentThread = <section aria-label="Bình luận bài viết" className="space-y-3 border-t border-[#e4e6eb] px-4 py-3">
@@ -199,7 +206,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
     </form>
   </section>;
 
-  return <article id={`post-${post.id}`} data-auth-post-id={post.id} ref={articleRef} aria-label={title} className="scroll-mt-24 overflow-hidden rounded-xl border border-[#dddfe2] bg-white text-[#1c1e21] shadow-sm">
+  return <article id={`post-${post.id}`} data-auth-post-id={post.id} data-auth-post-href={postHref(post)} ref={articleRef} aria-label={title} className="scroll-mt-24 overflow-hidden rounded-xl border border-[#dddfe2] bg-white text-[#1c1e21] shadow-sm">
     {postHeader}{postContent}
     {images.length > 0 && <div className={`grid gap-0.5 bg-[#f0f2f5] ${images.length === 1 ? "grid-cols-1" : images.length === 2 ? "h-[clamp(240px,48vw,480px)] grid-cols-2" : `h-[clamp(320px,75vw,640px)] grid-rows-2 ${images.length <= 4 ? "grid-cols-2" : "grid-cols-6"}`}`}>
       {images.map((photo, index) => <button key={`${photo.url}:${index}`} type="button" onClick={event => openPhoto(post.images, index, event.currentTarget)} aria-haspopup="dialog" aria-label={`Xem ảnh ${index + 1} của bài viết ${post.title}`} className={`relative block min-h-0 min-w-0 overflow-hidden focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-[#229ed9] ${images.length === 1 ? "" : images.length === 3 && index === 0 ? "row-span-2" : images.length === 5 ? index < 2 ? "col-span-3" : "col-span-2" : ""}`}>

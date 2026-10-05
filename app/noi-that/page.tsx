@@ -3,6 +3,8 @@ import { publicCatalogPost } from "@/lib/seo-data";
 import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { parseFileCatalogSort } from "@/lib/file-catalog-sort";
 import { InteriorPage } from "@/components/interior-page";
+import { permanentRedirect } from "next/navigation";
+import { postHref } from "@/lib/post-url";
 
 type Search = { q?: string | string[]; sort?: string | string[]; postId?: string | string[]; page?: string | string[] };
 export async function generateMetadata({ searchParams }: { searchParams: Promise<Search> }) {
@@ -15,6 +17,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 
 export default async function Page({ searchParams }: { searchParams: Promise<Search> }) {
   const { q, postId, sort, page } = await searchParams;
-  await publicCatalogPost(postId, POST_CATEGORIES.interiors);
+  const post = await publicCatalogPost(postId, POST_CATEGORIES.interiors);
+  if (post) permanentRedirect(postHref(post));
   return <InteriorPage page={seoCatalogPage(page)} sort={parseFileCatalogSort(sort)} query={typeof q === "string" ? q.trim().slice(0, 120) : ""} targetPostId={typeof postId === "string" ? postId : undefined} />;
 }

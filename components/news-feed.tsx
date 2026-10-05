@@ -12,11 +12,14 @@ import { NewsPostCard } from "@/components/news-post-card";
 import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { formatPriceDescription } from "@/lib/price-description";
 import { usePostAnchor } from "@/components/use-post-anchor";
+import { useRouter } from "next/navigation";
+import { postHref } from "@/lib/post-url";
 
 const sourceIcons = [House, HouseGalleryIcon, DraftingCompass, Sofa];
 
 export function NewsFeed({ postId, postSlug, initialData }: { postId?: number; postSlug?: string; initialData?: NewsFeedResponse }) {
   const detail = Boolean(postId || postSlug);
+  const router = useRouter();
   const [composerOpen, setComposerOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [category, setCategory] = useState("");
@@ -38,6 +41,13 @@ export function NewsFeed({ postId, postSlug, initialData }: { postId?: number; p
   const featuredPosts = [...(data?.posts ?? [])]
     .sort((a, b) => b.comments - a.comments || b.createdAt.localeCompare(a.createdAt) || b.id - a.id)
     .slice(0, 5);
+
+  // Numeric links loaded through an RSC shell resolve to their permanent URL.
+  const resolvedPost = detail ? data?.posts[0] : undefined;
+  const resolvedHref = resolvedPost?.slug ? postHref(resolvedPost) : undefined;
+  useEffect(() => {
+    if (resolvedHref && (/^\/bai-viet\/[1-9]\d*$/.test(window.location.pathname) || /^#post-\d+$/.test(window.location.hash))) router.replace(resolvedHref);
+  }, [resolvedHref, router]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -155,7 +165,7 @@ export function NewsFeed({ postId, postSlug, initialData }: { postId?: number; p
           {loading && <p role="status" className="mt-4 flex items-center gap-2 px-2 text-xs text-[#667085]"><LoaderCircle size={16} className="animate-spin" />Đang tải tin nổi bật...</p>}
           {!loading && featuredPosts.length === 0 && <p className="mt-4 px-2 text-xs leading-5 text-[#667085]">{error ? "Chưa thể tải tin nổi bật. Hãy thử làm mới bảng tin." : "Chưa có tin nổi bật."}</p>}
           {featuredPosts.length > 0 && <div className="mt-3 space-y-2">
-            {featuredPosts.map(post => <ClientNavigationLink key={post.id} href={post.sourceHref} className="block rounded-xl p-2 transition hover:bg-[#f4f7fb] focus-visible:outline-2 focus-visible:outline-[#229ed9]">
+            {featuredPosts.map(post => <ClientNavigationLink key={post.id} href={postHref(post)} className="block rounded-xl p-2 transition hover:bg-[#f4f7fb] focus-visible:outline-2 focus-visible:outline-[#229ed9]">
               <div className="flex items-start gap-3">
                 {post.images[0] && <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-[#f0f2f5]"><Image src={post.images[0].url} alt="" fill sizes="56px" className="object-cover" /></div>}
                 <div className="min-w-0 flex-1">

@@ -75,9 +75,10 @@ try {
   assert.equal(linked.posts.length, 1);
   assert.equal(linked.posts[0].id, drawingId);
   assert.deepEqual(linked.posts[0].attachments.map(file => file.key), ["cover", "preview"]);
-  const purchaseLink = new URL(drawingPostHref(drawingId), "http://localhost");
-  assert.equal(purchaseLink.hash, `#post-${drawingId}`);
-  const source = await read({ category: "Bản vẽ cộng đồng", seed: null, page: "1", postId: purchaseLink.searchParams.get("postId") });
+  const purchaseLink = new URL(drawingPostHref(drawingId, linked.posts[0].slug), "http://localhost");
+  assert.equal(purchaseLink.pathname, `/${linked.posts[0].slug}`);
+  assert.equal(purchaseLink.hash, "");
+  const source = await read({ category: "Bản vẽ cộng đồng", seed: null, page: "1", postId: String(drawingId) });
   assert.deepEqual(source.posts.map(post => post.id), [drawingId]);
   assert.equal(source.total, 1);
   for (const postId of ["0", "oops", "99999999999999999999999"]) await read({ postId }, 400);

@@ -31,7 +31,7 @@ export function MemberAccessGate({ children }: { children: React.ReactNode }) {
     event.preventDefault();
     event.stopPropagation();
     const card = event.target.closest('[data-auth-post-id], [data-auth-model-query]');
-    setRequested({ pathname, returnTo: actionAuthReturn(window.location.href, card?.getAttribute("data-auth-post-id"), card?.getAttribute("data-auth-model-query")) });
+    setRequested({ pathname, returnTo: actionAuthReturn(window.location.href, card?.getAttribute("data-auth-post-id"), card?.getAttribute("data-auth-model-query"), card?.closest("[data-auth-post-href]")?.getAttribute("data-auth-post-href")) });
   };
   const keyCapture = (event: KeyboardEvent) => {
     if (event.key === "Tab" || event.key === "Escape" || event.key.startsWith("Arrow")) return;

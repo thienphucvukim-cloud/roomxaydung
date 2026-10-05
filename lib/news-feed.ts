@@ -1,5 +1,6 @@
 import { SITE_SECTIONS } from "./site-sections.ts";
 import { POST_CATEGORIES } from "./legacy-contracts.ts";
+import { postHref } from "./post-url.ts";
 export const NEWS_SOURCES = [
   { category: POST_CATEGORIES.news, ...SITE_SECTIONS.news },
   { category: POST_CATEGORIES.houseModels, ...SITE_SECTIONS.houseModels },
@@ -35,11 +36,11 @@ export type NewsFeedResponse = {
   totalPages: number;
 };
 
-export function newsSourceLink(category: string, postId: number) {
+export function newsSourceLink(category: string, postId: number, slug?: string | null) {
   const source = NEWS_SOURCES.find(item => item.category === category);
   if (!source) throw new Error("Unknown news source");
   return {
     sourceLabel: source.label,
-    sourceHref: category === POST_CATEGORIES.news ? `/bai-viet/${postId}` : `${source.path}?postId=${postId}#post-${postId}`,
+    sourceHref: postHref({ id: postId, slug }),
   };
 }

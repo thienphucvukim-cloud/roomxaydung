@@ -62,7 +62,7 @@ export async function GET(request: Request) {
         id: post.id, userId: post.userId, authorName: post.authorName, avatarUrl: avatars.get(post.userId) ?? null, category: post.category,
         title: post.title, slug: post.slug, content: post.content, specifications: post.specifications, listingType: post.listingType,
         priceLabel: post.priceLabel, createdAt: post.createdAt, comments: post.comments,
-        ...newsSourceLink(post.category, post.id),
+        ...newsSourceLink(post.category, post.id, post.slug),
         images: imagesByPost.get(post.id) ?? [],
       })),
       total: totals[0].value,

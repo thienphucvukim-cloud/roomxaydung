@@ -33,7 +33,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   for (const attachment of attachments) if (attachment.mimeType.startsWith("image/") && !firstImage.has(attachment.postId)) firstImage.set(attachment.postId, attachment);
 
   return Response.json({ displayName, avatarUrl, profession, bio, location, own: currentUserId === userId,
-    authoredPosts: authoredPosts.map(post => ({id:post.id,userId:post.userId,title:post.title,category:post.category,content:post.content,
+    authoredPosts: authoredPosts.map(post => ({id:post.id,slug:post.slug,userId:post.userId,title:post.title,category:post.category,content:post.content,
       imageUrl: firstImage.has(post.id) ? '/api/files?key=' + encodeURIComponent(firstImage.get(post.id)!.objectKey) : null})) },
     { headers: { 'Cache-Control': 'private, no-store' } });
 }

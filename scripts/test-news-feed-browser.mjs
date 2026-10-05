@@ -47,7 +47,7 @@ try {
   const fixture = {
     id: fixtureId, slug: publicPosts[0].slug, userId: 'review-author', authorName: 'Thành viên Tipook', avatarUrl: null, category: 'Bản vẽ cộng đồng',
     title: 'Nhà phố 5 × 20m', content: 'Giá bán: 150000đ\nChi phí 125000000 VND\nLiên hệ 0912345678', specifications: '5 × 20m', listingType: null, priceLabel: '150000', comments: 1,
-    createdAt: '2026-10-03T08:00:00.000Z', sourceHref: `/file-ban-ve-nha-dep-chat?postId=${fixtureId}#post-${fixtureId}`, sourceLabel: 'Kho bản vẽ',
+    createdAt: '2026-10-03T08:00:00.000Z', sourceHref: '/' + publicPosts[0].slug, sourceLabel: 'Kho bản vẽ',
     images: Array.from({ length: 7 }, (_, index) => ({ url: index % 2 ? '/mat-bang-5x20.png' : '/community-house.png', name: `Ảnh ${index + 1}` })),
   };
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
@@ -70,7 +70,7 @@ try {
       if (url.pathname === '/api/news-feed') {
         const category = window.review.sourceCategory || post.category;
         const sourcePath = category === 'Bộ sưu tập ảnh' ? '/kho-mau-nha-dep-chat' : category === 'Nội thất cộng đồng' ? '/noi-that' : '/file-ban-ve-nha-dep-chat';
-        const original = { ...post, category, sourceHref: sourcePath + '?postId=' + post.id + '#post-' + post.id, comments: window.review.comments.length };
+        const original = { ...post, category, sourceHref: '/' + post.slug, comments: window.review.comments.length };
         const second = { ...post, id: 900002, title: 'Bài viết tiếp theo', content: 'Nội dung bài đăng tiếp theo', category: 'Bảng tin', sourceLabel: 'Bảng tin', sourceHref: '/bai-viet/900002', images: [], comments: 0, createdAt: '2026-10-02T08:00:00.000Z' };
         const items = [original, second].filter(item => (!url.searchParams.get('slug') || item.slug === url.searchParams.get('slug')) && (!url.searchParams.get('category') || item.category === url.searchParams.get('category')) && (!url.searchParams.get('postId') || item.id === Number(url.searchParams.get('postId'))) && (!url.searchParams.get('q') || (item.title + item.content).includes(url.searchParams.get('q'))));
         const page = Number(url.searchParams.get('page') || 1);
@@ -78,10 +78,11 @@ try {
         if (page === 2 && window.review.failMore) { window.review.failMore = false; return json({ error: 'Lỗi tải thêm thử nghiệm.' }, 503); }
         return json({ posts: items.slice(page - 1, page), total: items.length, page, totalPages: Math.max(1, items.length) });
       }
-      if (url.pathname === '/api/posts' && url.searchParams.get('postId')) {
+      if (url.pathname === '/api/posts' && method === 'GET') {
         const target = { ...post, category: url.searchParams.get('category'), attachments: post.images.map((image, index) => ({ key: 'review-' + index, name: image.name, type: 'image/png', size: 100, url: image.url })) };
-        return json({ posts: url.searchParams.get('postId') === String(post.id) ? [target] : [], total: 1, nextCursor: null });
+        return json({ posts: !url.searchParams.get('postId') || url.searchParams.get('postId') === String(post.id) ? [target] : [], total: 1, seed: 4321, nextCursor: null, catalogOrder: ['post:' + post.id] });
       }
+      if (url.pathname === '/api/wallet' && method === 'GET') return json({balance:200000});
       if (url.pathname === '/api/actions') { if (method === 'POST' && JSON.parse(init.body).actionType === 'share') return json({ created: true }); if (method !== 'GET') window.review.liked = method === 'POST'; return json({ actions: window.review.liked ? [{}] : [], count: window.review.liked ? 1 : 0 }); }
       if (url.pathname === '/api/files' && method === 'POST') { const file = init.body.get('file'); window.review.uploads.push({ name: file.name, size: file.size, type: file.type }); return json({ attachment: { key: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', url: '/community-house.png', name: file.name } }, 201); }
       if (url.pathname === '/api/comments') {
@@ -311,6 +312,12 @@ try {
   await send('Page.navigate', { url: origin + '/bai-viet/' + fixtureId });
   await waitFor(`document.querySelector('textarea[aria-label="Nội dung bình luận"]')`, 'detail page automatically loads comments');
   assert.equal(await evaluate('location.pathname'), '/' + fixture.slug);
+  // Browser redirects inherit old fragments; the detail page clears them.
+  const legacyBase={'Bản vẽ cộng đồng':'/file-ban-ve-nha-dep-chat','Bộ sưu tập ảnh':'/kho-mau-nha-dep-chat','Nội thất cộng đồng':'/noi-that'}[publicPosts[0].category];
+  for(const legacy of ['/bai-viet/'+fixtureId,...(legacyBase?[legacyBase+'?postId='+fixtureId]:[])]) {
+    await send('Page.navigate',{url:origin+legacy+'#post-'+fixtureId});
+    await waitFor(`location.pathname===${JSON.stringify('/'+fixture.slug)} && location.search==='' && location.hash==='' && document.querySelector('textarea[aria-label="Nội dung bình luận"]')`,'old links finish on a clean readable URL');
+  }
   const checkShareButton = async () => {
     await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share button ready');
     await evaluate(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').scrollIntoView({block:'center',behavior:'instant'})`);
@@ -334,11 +341,12 @@ try {
     await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed for source navigation');
     await evaluate(`window.review.sourceCategory = ${JSON.stringify(category)}; window.dispatchEvent(new Event('nhadepchat-content-changed'))`);
     await pause(350);
-    await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify(sourcePath + '?postId=' + fixtureId + '#post-' + fixtureId)})`, 'original source link');
+    await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify('/' + fixture.slug)})`, 'readable source link');
     await checkShareButton();
     await evaluate(`Array.from(document.querySelector('article').querySelectorAll('a')).find(link => link.textContent.includes('Xem bài viết')).click()`);
-    await waitFor(`location.pathname === ${JSON.stringify(sourcePath)} && new URLSearchParams(location.search).get('postId') === '${fixtureId}' && document.getElementById('post-${fixtureId}')`, 'opens original post in ' + sourcePath);
-    assert.equal(await evaluate('location.hash'), '#post-' + fixtureId);
+    await waitFor(`location.pathname === ${JSON.stringify('/' + fixture.slug)} && document.querySelector('textarea[aria-label="Nội dung bình luận"]') && document.getElementById('post-${fixtureId}')`, 'opens original post in ' + sourcePath);
+    assert.equal(await evaluate('location.hash'), '');
+    assert.equal(await evaluate('location.search'), '');
     assert.equal(await evaluate(`document.querySelectorAll('article[id^="post-"]').length`), 1);
     assert.ok(await evaluate(`document.getElementById('post-${fixtureId}').textContent.includes('Nhà phố 5 × 20m')`));
     await checkShareButton();
@@ -347,6 +355,26 @@ try {
       await evaluate(`window.review.clipboardFail=true; document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').click()`);
       await waitFor(`document.querySelector('input[aria-label="Liên kết chia sẻ"]')`, 'manual copy fallback');
       assert.equal(await evaluate(`document.querySelector('input[aria-label="Liên kết chia sẻ"]').value`), origin + '/' + fixture.slug);
+    }
+  }
+  // Cards in every catalog use the same permalink and retain file actions.
+  for(const [category,sourcePath] of [['Bản vẽ cộng đồng','/file-ban-ve-nha-dep-chat'],['Bộ sưu tập ảnh','/kho-mau-nha-dep-chat'],['Nội thất cộng đồng','/noi-that']]) {
+    await send('Page.navigate',{url:origin+sourcePath});
+    await waitFor(`document.querySelector('#post-${fixtureId} .catalog-card-title a')?.textContent.includes('Nhà phố 5 × 20m')`,'catalog title link');
+    assert.equal(await evaluate(`document.querySelector('#post-${fixtureId} .catalog-card-title a').getAttribute('href')`),'/'+fixture.slug);
+    await checkShareButton();
+    // RSC navigation preserves the selected fixture category in this browser.
+    await evaluate(`window.review.sourceCategory=${JSON.stringify(category)};document.querySelector('#post-${fixtureId} .catalog-card-title a').click()`);
+    await waitFor(`location.pathname===${JSON.stringify('/'+fixture.slug)} && document.querySelector('article h1') && document.querySelector('textarea[aria-label="Nội dung bình luận"]')`,'catalog title opens its exact post');
+    assert.equal(await evaluate('location.search+location.hash'),'');
+    if(category!=='Bộ sưu tập ảnh') {
+      await waitFor(`document.querySelector('article button[aria-label="Mua file"]')`,'file purchase remains available on the permalink');
+      await evaluate(`document.querySelector('article button[aria-label="Mua file"]').click()`);
+      await waitFor(`document.querySelector('[role="dialog"]')?.textContent.includes('150.000đ')`,'purchase dialog displays this post and price');
+      await evaluate(`document.querySelector('[role="dialog"] button[aria-label="Đóng"]').click()`);
+      await evaluate(`document.querySelector('article button[aria-label="Yêu cầu file"]').click()`);
+      await waitFor(`document.querySelector('[role="dialog"]')?.textContent.includes('Yêu cầu file: Nhà phố 5 × 20m')`,'file request opens for this post');
+      await evaluate(`document.querySelector('button[aria-label="Đóng cuộc trò chuyện"]').click()`);
     }
   }
   await send('Page.navigate', { url: origin + '/?review-admin=1' });
@@ -379,6 +407,6 @@ try {
   await waitFor(`document.querySelector('[role="dialog"] header .admin-post-controls')`, 'admin photo viewer controls');
   await checkAdminHeader('[role="dialog"] header');
   assert.deepEqual(exceptions, []);
-  console.log('PASS: feed and admin controls fit mobile/desktop; photos, comments, retries, likes and infinite scroll; View post opens the original catalog post; native share clicks copy its dedicated URL from detail/feed/all three catalogs, including manual-copy fallback.');
+  console.log('PASS: feed and admin controls fit mobile/desktop; photos, comments, retries, likes and infinite scroll; all catalog titles and View post open clean readable permalinks; legacy redirects clear old fragments; file purchase/request dialogs remain available; share buttons copy the same URL, including manual fallback.');
   console.log('Screenshots: ' + dir);
 } finally { socket?.close(); chrome.kill(); }

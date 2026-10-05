@@ -4,12 +4,14 @@ import ts from 'typescript';
 import { safeAuthReturn } from '../lib/auth-return.ts';
 const source = ts.transpileModule(readFileSync(new URL('../lib/action-auth-return.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText.replace('"./auth-return"', JSON.stringify(new URL('../lib/auth-return.ts', import.meta.url).href));
 const { actionAuthReturn, authActionTarget, modelAuthAnchor } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
-assert.equal(actionAuthReturn('https://nhadepchat.top/', '42'), '/bai-viet/42#post-42');
-assert.equal(actionAuthReturn('/bai-viet/42', '42'), '/bai-viet/42#post-42');
+assert.equal(actionAuthReturn('https://nhadepchat.top/', '42'), '/bai-viet/42');
+assert.equal(actionAuthReturn('/bai-viet/42', '42'), '/bai-viet/42');
 for(const base of ['/kho-mau-nha-dep-chat','/file-ban-ve-nha-dep-chat','/noi-that']){
   const result=actionAuthReturn(base+'?q=house&sort=views&page=4#old','42');
-  assert.equal(result,base+'?q=house&sort=views&postId=42#post-42');
-  assert.equal(actionAuthReturn(base+'/page/4','42'),base+'?postId=42#post-42');
+  assert.equal(result,'/bai-viet/42');
+  assert.equal(actionAuthReturn(base,'42',null,'/nha-pho-2-tang'),'/nha-pho-2-tang');
+  assert.equal(actionAuthReturn(base,'42',null,'//foreign.example'),'/bai-viet/42');
+  assert.equal(actionAuthReturn(base+'/page/4','42'),'/bai-viet/42');
 }
 assert.equal(actionAuthReturn('/kho-mau-nha-dep-chat?sort=views&postId=1&page=2',null,'Nhà phố'),'/kho-mau-nha-dep-chat?sort=views&q=Nh%C3%A0+ph%E1%BB%91#model-Nh%C3%A0%20ph%E1%BB%91');
 assert.equal(actionAuthReturn('/tai-khoan?section=saved#items'),'/tai-khoan?section=saved#items');

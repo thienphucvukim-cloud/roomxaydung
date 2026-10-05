@@ -1,4 +1,7 @@
 "use client";
+import { postHref } from "@/lib/post-url";
+import { ClientNavigationLink } from "@/components/client-navigation-link";
+import { NEWS_SOURCES } from "@/lib/news-feed";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, FileText, Info, Mail, MapPin } from "lucide-react";
 import { MyPosts } from "@/components/my-posts";
@@ -33,7 +36,7 @@ export function PublicProfile({ id: userId, initialProfile }: { id: string; init
     </section>
 
     {own && <MyPosts/>}
-    <section className="mt-6"><h1 className="text-xl font-extrabold text-[#0b2e59]">Bài viết của {displayName}</h1>{authoredPosts.length ? <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{authoredPosts.map((post) => { const image = post.imageUrl; return <article key={post.id} className="overflow-hidden rounded-2xl border border-[#e3eaf2] bg-white shadow-sm">{image ? <img src={image} alt={post.title} className="aspect-[4/3] w-full object-cover"/> : <div className="grid aspect-[4/3] place-items-center bg-[#f3f6f9] text-[#8aa0b5]"><FileText size={38}/></div>}<div className="p-4"><p className="text-xs font-bold text-[#168ac0]">{post.category}</p><OwnerPostControls postId={post.id} authorId={post.userId}/><h2 className="mt-1 line-clamp-2 font-extrabold text-[#182230]">{post.title}</h2><p className="mt-2 line-clamp-3 text-sm leading-6 text-[#667085]">{post.content}</p></div></article>; })}</div> : <div className="mt-4 rounded-2xl border border-dashed border-[#d0d5dd] bg-white py-14 text-center text-sm text-[#667085]">Người dùng này chưa có bài đăng công khai.</div>}</section>
+    <section className="mt-6"><h1 className="text-xl font-extrabold text-[#0b2e59]">Bài viết của {displayName}</h1>{authoredPosts.length ? <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{authoredPosts.map((post) => { const image = post.imageUrl; return <article key={post.id} className="overflow-hidden rounded-2xl border border-[#e3eaf2] bg-white shadow-sm">{image ? <img src={image} alt={post.title} className="aspect-[4/3] w-full object-cover"/> : <div className="grid aspect-[4/3] place-items-center bg-[#f3f6f9] text-[#8aa0b5]"><FileText size={38}/></div>}<div className="p-4"><p className="text-xs font-bold text-[#168ac0]">{post.category}</p><OwnerPostControls postId={post.id} authorId={post.userId}/><h2 className="mt-1 line-clamp-2 font-extrabold text-[#182230]">{NEWS_SOURCES.some(source => source.category === post.category) ? <ClientNavigationLink href={postHref(post)} className="hover:text-[#168ac0] hover:underline">{post.title}</ClientNavigationLink> : post.title}</h2><p className="mt-2 line-clamp-3 text-sm leading-6 text-[#667085]">{post.content}</p></div></article>; })}</div> : <div className="mt-4 rounded-2xl border border-dashed border-[#d0d5dd] bg-white py-14 text-center text-sm text-[#667085]">Người dùng này chưa có bài đăng công khai.</div>}</section>
   </main>;
 }
 

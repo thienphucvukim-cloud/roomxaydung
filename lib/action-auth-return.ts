@@ -10,15 +10,11 @@ export function authActionTarget(targetType?: string, targetId?: string) {
 export function modelAuthAnchor(title: string) { return "model-" + encodeURIComponent(title); }
 
 /** Resolve the card that triggered the account prompt, including portal content. */
-export function actionAuthReturn(href: string, postId?: string | null, modelQuery?: string | null) {
+export function actionAuthReturn(href: string, postId?: string | null, modelQuery?: string | null, postPath?: string | null) {
   const current = new URL(href, "https://nhadepchat.local");
   const catalog = current.pathname.match(/^\/(kho-mau-nha-dep-chat|file-ban-ve-nha-dep-chat|noi-that)(?:\/page\/\d+)?$/);
   if (postId && /^[1-9]\d*$/.test(postId) && Number.isSafeInteger(Number(postId))) {
-    if (!catalog) return `/bai-viet/${postId}#post-${postId}`;
-    current.pathname = "/" + catalog[1];
-    current.searchParams.delete("page");
-    current.searchParams.set("postId", postId);
-    current.hash = `post-${postId}`;
+    return safeAuthReturn(postPath, `/bai-viet/${postId}`);
   } else if (modelQuery && catalog) {
     current.pathname = "/" + catalog[1];
     current.searchParams.delete("page");

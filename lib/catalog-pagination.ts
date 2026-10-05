@@ -1,7 +1,9 @@
+import { postHref } from "./post-url.ts";
+
 export const CATALOG_PAGE_SIZE = 20;
 
-export function drawingPostHref(postId: number) {
-  return `/file-ban-ve-nha-dep-chat?postId=${postId}#post-${postId}`;
+export function drawingPostHref(postId: number, slug?: string | null) {
+  return postHref({ id: postId, slug });
 }
 
 export function catalogPageHref(basePath: string, page: number, query = "", sort = "latest") {

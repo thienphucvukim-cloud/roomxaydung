@@ -113,20 +113,22 @@ try {
   assert.equal(new Set([...first.posts, ...second.posts].map(post => post.id)).size, 24);
   const filtered = await read({ category: "Bộ sưu tập ảnh", q: "Mặt tiền cũ" });
   assert.equal(filtered.total, 1);
-  assert.equal(filtered.posts[0].sourceHref, `/kho-mau-nha-dep-chat?postId=${oldest}#post-${oldest}`, "Source links address the original post independently of pagination and search.");
+  assert.equal(filtered.posts[0].sourceHref, `/${filtered.posts[0].slug}`, "Source links address the original post independently of pagination and search.");
   assert.equal((await read({ q: "Người chia sẻ" })).total, 24);
-  assert.equal((await read({ category: "Bản vẽ cộng đồng" })).posts[0].sourceHref, `/file-ban-ve-nha-dep-chat?postId=${drawing}#post-${drawing}`);
-  assert.equal(first.posts[0].sourceHref, `/noi-that?postId=${interior}#post-${interior}`);
+  assert.equal((await read({ category: "Bản vẽ cộng đồng" })).posts[0].sourceHref, `/${first.posts[1].slug}`);
+  assert.equal(first.posts[0].sourceHref, `/${first.posts[0].slug}`);
   for (const item of [filtered.posts[0], first.posts[1], first.posts[0]]) {
     const sourceUrl = new URL(item.sourceHref, "http://localhost");
-    const params = new URLSearchParams({ category: item.category, postId: sourceUrl.searchParams.get("postId") });
+    const params = new URLSearchParams({ category: item.category, postId: String(item.id) });
     if (item.category === "Bộ sưu tập ảnh") params.set("seed", "4321");
     else params.set("page", "1");
     const sourceResponse = await publishing.namespace.GET(new Request("http://localhost/api/posts?" + params));
     assert.equal(sourceResponse.status, 200);
     const sourcePayload = await sourceResponse.json();
     assert.deepEqual(sourcePayload.posts.map(post => post.id), [item.id], "The source catalog must return exactly the original post, including older posts outside its first page.");
-    assert.equal(sourceUrl.hash, `#post-${item.id}`);
+    assert.equal(sourceUrl.hash, "");
+    assert.equal(sourceUrl.search, "");
+    assert.deepEqual((await read({ slug: item.slug })).posts.map(post => post.id), [item.id], "Readable links resolve the exact post across categories");
   }
   assert.equal((await read({ q: "không có" })).total, 0);
   for (const page of ["0", "-1", "1.5", "NaN", "1000001"]) await read({ page }, 400);
@@ -140,7 +142,7 @@ try {
   const direct = add("Bảng tin", "Bài đăng trực tiếp", "2026-05-01T00:00:00.000Z");
   const directFeed = await read({ category: "Bảng tin" });
   assert.equal(directFeed.posts[0].id, direct);
-  assert.equal(directFeed.posts[0].sourceHref, `/bai-viet/${direct}`);
+  assert.equal(directFeed.posts[0].sourceHref, `/${directFeed.posts[0].slug}`);
   assert.equal((await read({ postId: String(direct) })).posts.length, 1);
   assert.equal((await read({ postId: String(direct) })).posts[0].id, direct);
   sqlite.prepare("UPDATE posts SET audience = 'Chỉ mình tôi' WHERE id = ?").run(direct);

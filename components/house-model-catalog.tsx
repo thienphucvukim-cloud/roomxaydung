@@ -10,6 +10,8 @@ import { FileSearch, Image as ImageIcon, Images, LoaderCircle, Maximize2, Send, 
 import { useRouter } from "next/navigation";
 import { houseModelHref } from "@/lib/house-model-links";
 import { drawingPostHref } from "@/lib/catalog-pagination";
+import { postHref } from "@/lib/post-url";
+import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { parseVndPrice } from "@/lib/drawing-catalog";
 import { HOUSE_MODEL_RANDOM_MODULUS, parseHouseModelSort, shuffleHouseModels, type HouseModelSort } from "@/lib/house-model-feed";
 import { optimizeImageForUpload, optimizePostImageForUpload } from "@/lib/image-upload";
@@ -22,7 +24,7 @@ import { ProjectGallery } from "@/components/project-gallery";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useCatalogLocation } from "@/components/use-catalog-location";
 type Attachment={key:string;name:string;type:string;size:number;url:string};
-type Post={id:number;userId:string;authorName:string;title:string;content:string;category:string;comments:number;sortScore?:number;expertQuestions?:number;specifications?:string|null;listingType?:string|null;priceLabel?:string|null;attachments?:Attachment[]};
+type Post={slug?:string|null;id:number;userId:string;authorName:string;title:string;content:string;category:string;comments:number;sortScore?:number;expertQuestions?:number;specifications?:string|null;listingType?:string|null;priceLabel?:string|null;attachments?:Attachment[]};
 type Picked={file:File;preview:string};
 type Comment={id:number;authorName:string;content:string;imageKey?:string|null;imageUrl?:string|null};
 const category=POST_CATEGORIES.houseModels;
@@ -78,6 +80,7 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
    .then(data => {
     if (controller.signal.aborted) return;
     const batch = data.posts ?? [];
+    if (targetPostId && batch[0]?.slug) { router.replace(postHref(batch[0])); return; }
     setPosts(current => requestCursor ? [...current, ...batch.filter(post => !current.some(item => item.id === post.id))] : batch);
     const keys = data.catalogOrder ?? batch.map(post => `post:${post.id}`);
     setServerOrder(Boolean(data.catalogOrder));
@@ -88,7 +91,7 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
    .catch(() => { if (!controller.signal.aborted) setLoadError(true); })
    .finally(() => { if (!controller.signal.aborted) setLoading(false); });
   return () => controller.abort();
- }, [requestCursor, searchQuery, refresh, sort, targetPostId, location.ready, modelKeys]);
+ }, [requestCursor, searchQuery, refresh, sort, targetPostId, location.ready, modelKeys, router]);
  useEffect(() => {
   if (loading || loadError || !nextCursor || !loadMoreRef.current || !window.IntersectionObserver) return;
   const anchor = window.location.hash.match(/^#post-(\d+)$/);
@@ -151,7 +154,7 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
     const photos=post.attachments?.filter(a=>a.type.startsWith("image/"))??[];
     const cover=photos[0];
     const drawingPrice = parseVndPrice(post.priceLabel);
-    return <article key={post.id} data-auth-post-id={post.id} id={`post-${post.id}`} className="group motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:-translate-y-[3px] flex min-w-0 scroll-mt-24 flex-col overflow-hidden rounded-[22px] border border-[#e3eaf2] bg-white shadow-[0_5px_20px_rgba(24,49,39,.045)]">
+    return <article key={post.id} data-auth-post-id={post.id} data-auth-post-href={postHref(post)} id={`post-${post.id}`} className="group motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:-translate-y-[3px] flex min-w-0 scroll-mt-24 flex-col overflow-hidden rounded-[22px] border border-[#e3eaf2] bg-white shadow-[0_5px_20px_rgba(24,49,39,.045)]">
      <div className="relative aspect-[5/4] shrink-0 overflow-hidden bg-[#eef2f6]">
       {cover ? <>
        <img src={cover.url} alt={post.title} loading="lazy" className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.02]"/>
@@ -161,11 +164,11 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
       {post.listingType&&<span className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-1.5rem)] truncate rounded-lg bg-white/90 px-2.5 py-1.5 text-xs font-bold text-[#0b2e59] backdrop-blur">{post.listingType}</span>}
      </div>
      <div className="flex flex-1 flex-col px-3 py-2.5">
-      <div className="flex items-start gap-2"><h3 className="catalog-card-title min-w-0 flex-1 text-base font-extrabold tracking-[-.02em]">{post.title}</h3>{post.category === POST_CATEGORIES.drawings && <a href={drawingPostHref(post.id)} aria-label={`Xem file: ${post.title}`} title="Xem file trong kho bản vẽ" className="grid size-9 shrink-0 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"><FileSearch size={18}/></a>}</div>
+      <div className="flex items-start gap-2"><h3 className="catalog-card-title min-w-0 flex-1 text-base font-extrabold tracking-[-.02em]"><ClientNavigationLink href={postHref(post)} className="hover:text-[#168ac0] hover:underline">{post.title}</ClientNavigationLink></h3>{post.category === POST_CATEGORIES.drawings && <a href={drawingPostHref(post.id, post.slug)} aria-label={`Xem file: ${post.title}`} title="Xem file trong kho bản vẽ" className="grid size-9 shrink-0 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"><FileSearch size={18}/></a>}</div>
       <p className="mt-1 flex min-h-5 items-center gap-2 text-sm font-medium text-[#3f5064]"><Maximize2 size={15} className="shrink-0"/>{post.specifications||"Chưa cập nhật kích thước"}</p>
       <p className="catalog-card-author mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs text-[#66778a]"><span className="shrink-0">Đăng bởi</span> <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="min-w-0 truncate font-semibold text-[#0b2e59] hover:text-[#229ed9] hover:underline">{post.authorName}</a><OwnerPostControls postId={post.id} authorId={post.userId}/><CatalogQualityButton targetType="post" targetId={String(post.id)}/></p>
       {post.content&&<p className="mt-1 line-clamp-1 text-sm text-[#667085]">{post.content}</p>}
-      {post.category === POST_CATEGORIES.drawings && <a href={drawingPostHref(post.id)} className="mt-1 w-fit text-xs font-semibold text-[#3f5064] hover:text-[#229ed9] hover:underline">File bản vẽ : {drawingPrice ? `${drawingPrice.toLocaleString("vi-VN")}đ` : "Miễn phí"}</a>}
+      {post.category === POST_CATEGORIES.drawings && <a href={drawingPostHref(post.id, post.slug)} className="mt-1 w-fit text-xs font-semibold text-[#3f5064] hover:text-[#229ed9] hover:underline">File bản vẽ : {drawingPrice ? `${drawingPrice.toLocaleString("vi-VN")}đ` : "Miễn phí"}</a>}
       <div className="mt-auto"><ModelCardFooter title={post.title} meta={post.specifications||"Chưa cập nhật kích thước"} targetType="post" targetId={String(post.id)} recipientUserId={post.userId} comments={post.comments??0} expertQuestions={post.expertQuestions??0} commentOpen={Boolean(commentOpen[post.id])} onToggleComments={()=>void toggleComments(post)} onQuestionSent={refreshGallery}/></div>
      </div><PostCommentPanel postId={post.id} open={Boolean(commentOpen[post.id])} onOpenChange={next=>setCommentOpen(current=>({...current,[post.id]:next}))} title={post.title} image={cover?.url} meta={`Đăng bởi ${post.authorName} · ${post.specifications||"Chưa cập nhật kích thước"}`} content={post.content}>{commentErrors[post.id]&&<p role="alert" className="text-xs font-semibold text-rose-600">{commentErrors[post.id]}</p>}{threads[post.id]?.map(comment=><div key={comment.id} className="rounded-2xl bg-[#eef1f4] px-3 py-2"><b className="block text-xs text-[#182230]">{comment.authorName}</b>{comment.content&&<p className="mt-0.5 whitespace-pre-wrap text-sm text-[#344054]">{comment.content}</p>}{comment.imageUrl&&<img src={comment.imageUrl} onError={(event) => { event.currentTarget.hidden = true; }} alt="Ảnh trong bình luận" className="mt-2 max-h-64 max-w-full rounded-xl object-contain"/>}</div>)}{threads[post.id]===undefined&&<p className="text-center text-xs text-[#667085]">Đang tải bình luận...</p>}{threads[post.id]?.length===0&&<p className="text-center text-xs text-[#667085]">Chưa có bình luận.</p>}<div data-requires-account className="flex items-start gap-2"><CurrentMemberAvatar className="size-8"/><div className="min-w-0 flex-1">{commentImages[post.id]&&<div className="relative mb-2 w-fit"><img src={commentImages[post.id]?.url} alt="Ảnh chuẩn bị gửi" className="max-h-28 rounded-xl object-contain"/><button type="button" onClick={()=>setCommentImages(current=>({...current,[post.id]:undefined}))} className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-[#344054] text-white" aria-label="Bỏ ảnh"><X size={14}/></button></div>}<div className="flex items-center rounded-full bg-[#eef1f4] pl-3 pr-1"><input value={drafts[post.id]??""} onChange={event=>setDrafts(current=>({...current,[post.id]:event.target.value}))} onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();void sendComment(post);}}} maxLength={600} className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Viết bình luận..."/><label className="grid size-8 shrink-0 cursor-pointer place-items-center text-[#229ed9]" aria-label="Thêm ảnh" title="Thêm ảnh">{commentUploading[post.id]?<LoaderCircle size={17} className="animate-spin"/>:<ImageIcon size={17}/>}<input type="file" accept="image/*" className="sr-only" disabled={commentBusy[post.id]||commentUploading[post.id]} onChange={event=>void chooseCommentImage(post.id,event)}/></label><button type="button" onClick={()=>void sendComment(post)} disabled={commentBusy[post.id]||commentUploading[post.id]||(!(drafts[post.id]??"").trim()&&!commentImages[post.id])} className="grid size-8 shrink-0 place-items-center text-[#229ed9] disabled:text-[#bcc0c4]" aria-label="Gửi bình luận"><Send size={16}/></button></div></div></div></PostCommentPanel></article>})}
   </section>
