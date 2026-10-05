@@ -18,6 +18,10 @@ export function canonicalUrl(pathname: string) {
   const url = new URL(pathname, SITE_ORIGIN);
   if (url.origin !== SITE_ORIGIN || url.username || url.password) throw new Error("Invalid canonical URL");
   const page = url.searchParams.get("page");
+  const postId = url.searchParams.get("postId");
+  if (["/kho-mau-nha-dep-chat", "/file-ban-ve-nha-dep-chat", "/noi-that"].includes(url.pathname) && postId && /^[1-9]\d*$/.test(postId) && Number.isSafeInteger(Number(postId))) {
+    url.pathname = `/bai-viet/${postId}`;
+  }
   url.hash = ""; url.search = "";
   if (["/file-ban-ve-nha-dep-chat", "/noi-that"].includes(url.pathname) && page && /^[1-9]\d*$/.test(page) && Number(page) > 1 && Number(page) <= 1000000) url.searchParams.set("page", page);
   return url.href;

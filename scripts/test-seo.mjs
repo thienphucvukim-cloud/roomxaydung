@@ -4,6 +4,10 @@ import { robotsResponse } from '../lib/seo-robots.ts';
 assert.equal(canonicalUrl('/bai-viet/12?return_to=x#post-12'), 'https://nhadepchat.top/bai-viet/12');
 assert.equal(canonicalUrl('/noi-that?page=2&q=abc'), 'https://nhadepchat.top/noi-that?page=2');
 assert.equal(canonicalUrl('/noi-that?page=0'), 'https://nhadepchat.top/noi-that');
+for (const path of ['/noi-that', '/file-ban-ve-nha-dep-chat', '/kho-mau-nha-dep-chat']) {
+  assert.equal(canonicalUrl(path+'?postId=8&page=2#post-8'), 'https://nhadepchat.top/bai-viet/8');
+  assert.ok(!canonicalUrl(path+'?postId=9007199254740992').includes('/bai-viet/'));
+}
 assert.throws(() => canonicalUrl('//foreign.example/post'));
 assert.throws(() => canonicalUrl('https://foreign.example/post'));
 assert.equal(seoCatalogPage(['2','3']), 1);

@@ -123,7 +123,8 @@ export function ShareActionButton({ title, url, iconOnly = false, className = ""
   useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
   const share = async () => {
     if (busy) return;
-    const link = new URL(url ?? window.location.href, window.location.origin).href;
+    const postPath = targetType === "post" && targetId && /^[1-9]\d*$/.test(targetId) && Number.isSafeInteger(Number(targetId)) ? `/bai-viet/${targetId}` : undefined;
+    const link = new URL(postPath ?? url ?? window.location.href, window.location.origin).href;
     setBusy(true);
     try {
       await navigator.clipboard.writeText(link);

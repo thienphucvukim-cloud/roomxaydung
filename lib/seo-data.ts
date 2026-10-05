@@ -8,6 +8,7 @@ import { getDb } from "@/db";
 import { eq } from "drizzle-orm";
 import { virtualProfiles } from "@/db/schema";
 import { SITE_ORIGIN } from "./seo";
+import { notFound } from "next/navigation";
 import type { PublicProfileData } from "./public-profile-data";
 
 // These readers use the same public visibility/file rules as the existing APIs.
@@ -18,6 +19,16 @@ export const publicFeed = cache(async (postId?: number): Promise<NewsFeedRespons
   if (!response.ok) throw new Error("Public feed unavailable");
   return response.json();
 });
+// Legacy catalog share links must expose the same public post as its detail URL.
+export async function publicCatalogPost(postId: string | string[] | undefined, category: string | string[]) {
+  if (postId === undefined) return undefined;
+  if (typeof postId !== "string" || !/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId))) notFound();
+  const feed = await publicFeed(Number(postId));
+  if (!feed) return undefined; // secret-free shell generation
+  const post = feed.posts[0];
+  if (!post || !(Array.isArray(category) ? category.includes(post.category) : post.category === category)) notFound();
+  return post;
+}
 export const publicProfile = cache(async (id: string): Promise<{ profile: PublicProfileData; indexable: boolean } | null | undefined> => {
   if (!env.DB) return undefined;
   const response = await readProfile(new Request(SITE_ORIGIN + "/api/public-profile/" + encodeURIComponent(id)), { params: Promise.resolve({ id }) });

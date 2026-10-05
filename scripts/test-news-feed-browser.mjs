@@ -57,6 +57,11 @@ try {
     window.addEventListener('error', event => { if (event.message) window.reviewErrors.push(event.message); });
     window.review = { comments: [{ id: 1, userId: 'review-reader', authorName: 'Người đọc', content: 'Bình luận có ảnh', imageUrl: '/community-house.png', createdAt: '2026-10-03T08:01:00.000Z' }], liked: false, uploads: [], failSend: false, failMore: true };
     window.review.feedRequests = [];
+    window.review.copiedLinks = [];
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async link => {
+      if (window.review.clipboardFail) throw new Error('Clipboard unavailable');
+      window.review.copiedLinks.push(link);
+    } } });
     window.fetch = async (input, init = {}) => {
       const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
       const method = init.method || 'GET';
@@ -77,7 +82,7 @@ try {
         const target = { ...post, category: url.searchParams.get('category'), attachments: post.images.map((image, index) => ({ key: 'review-' + index, name: image.name, type: 'image/png', size: 100, url: image.url })) };
         return json({ posts: url.searchParams.get('postId') === String(post.id) ? [target] : [], total: 1, nextCursor: null });
       }
-      if (url.pathname === '/api/actions') { if (method !== 'GET') window.review.liked = method === 'POST'; return json({ actions: window.review.liked ? [{}] : [], count: window.review.liked ? 1 : 0 }); }
+      if (url.pathname === '/api/actions') { if (method === 'POST' && JSON.parse(init.body).actionType === 'share') return json({ created: true }); if (method !== 'GET') window.review.liked = method === 'POST'; return json({ actions: window.review.liked ? [{}] : [], count: window.review.liked ? 1 : 0 }); }
       if (url.pathname === '/api/files' && method === 'POST') { const file = init.body.get('file'); window.review.uploads.push({ name: file.name, size: file.size, type: file.type }); return json({ attachment: { key: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', url: '/community-house.png', name: file.name } }, 201); }
       if (url.pathname === '/api/comments') {
         if (method === 'GET') return json({ comments: window.review.comments, total: window.review.comments.length, nextCursor: null });
@@ -306,17 +311,37 @@ try {
   await send('Page.navigate', { url: origin + '/bai-viet/' + fixtureId });
   await waitFor(`document.querySelector('textarea[aria-label="Nội dung bình luận"]')`, 'detail page automatically loads comments');
   assert.equal(await evaluate('location.pathname'), '/bai-viet/' + fixtureId);
+  const checkShareButton = async () => {
+    await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share button ready');
+    await evaluate(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').scrollIntoView({block:'center',behavior:'instant'})`);
+    await pause(150);
+    const point = await evaluate(`(() => { const button = document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]'); const r = button.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    await send('Input.dispatchMouseEvent', {type:'mousePressed',button:'left',clickCount:1,...point});
+    await send('Input.dispatchMouseEvent', {type:'mouseReleased',button:'left',clickCount:1,...point});
+    await waitFor(`window.review.copiedLinks.length`, 'link copied by share button');
+    assert.equal(await evaluate('window.review.copiedLinks.at(-1)'), origin + '/bai-viet/' + fixtureId, 'Share buttons must use the dedicated post URL');
+    await evaluate('window.review.copiedLinks=[]');
+  };
+  await checkShareButton();
   for (const [category, sourcePath] of [['Bản vẽ cộng đồng', '/file-ban-ve-nha-dep-chat'], ['Bộ sưu tập ảnh', '/kho-mau-nha-dep-chat'], ['Nội thất cộng đồng', '/noi-that']]) {
     await send('Page.navigate', { url: origin });
     await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed for source navigation');
     await evaluate(`window.review.sourceCategory = ${JSON.stringify(category)}; window.dispatchEvent(new Event('nhadepchat-content-changed'))`);
     await pause(350);
     await waitFor(`Array.from(document.querySelectorAll('article a')).some(link => link.getAttribute('href') === ${JSON.stringify(sourcePath + '?postId=' + fixtureId + '#post-' + fixtureId)})`, 'original source link');
+    await checkShareButton();
     await evaluate(`Array.from(document.querySelector('article').querySelectorAll('a')).find(link => link.textContent.includes('Xem bài viết')).click()`);
     await waitFor(`location.pathname === ${JSON.stringify(sourcePath)} && new URLSearchParams(location.search).get('postId') === '${fixtureId}' && document.getElementById('post-${fixtureId}')`, 'opens original post in ' + sourcePath);
     assert.equal(await evaluate('location.hash'), '#post-' + fixtureId);
     assert.equal(await evaluate(`document.querySelectorAll('article[id^="post-"]').length`), 1);
     assert.ok(await evaluate(`document.getElementById('post-${fixtureId}').textContent.includes('Nhà phố 5 × 20m')`));
+    await checkShareButton();
+    if (category === 'Nội thất cộng đồng') {
+      await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share reset');
+      await evaluate(`window.review.clipboardFail=true; document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').click()`);
+      await waitFor(`document.querySelector('input[aria-label="Liên kết chia sẻ"]')`, 'manual copy fallback');
+      assert.equal(await evaluate(`document.querySelector('input[aria-label="Liên kết chia sẻ"]').value`), origin + '/bai-viet/' + fixtureId);
+    }
   }
   await send('Page.navigate', { url: origin + '/?review-admin=1' });
   await waitFor(`document.querySelector('article header .admin-post-controls')`, 'admin feed controls');
@@ -348,6 +373,6 @@ try {
   await waitFor(`document.querySelector('[role="dialog"] header .admin-post-controls')`, 'admin photo viewer controls');
   await checkAdminHeader('[role="dialog"] header');
   assert.deepEqual(exceptions, []);
-  console.log('PASS: feed fits 320–1023px; admin author/date and all three controls fit 320–1440px and the mobile photo viewer; desktop/mobile photos and comments; retries, likes, prices, infinite scroll; View post navigates to the exact original post in House Models, Drawings and Interiors.');
+  console.log('PASS: feed and admin controls fit mobile/desktop; photos, comments, retries, likes and infinite scroll; View post opens the original catalog post; native share clicks copy its dedicated URL from detail/feed/all three catalogs, including manual-copy fallback.');
   console.log('Screenshots: ' + dir);
 } finally { socket?.close(); chrome.kill(); }
