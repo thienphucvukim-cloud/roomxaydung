@@ -1,3 +1,5 @@
+import { getSiteContent } from "@/lib/site-content";
+import { demoPostVisible } from "@/lib/demo-posts";
 import { houseModelContentKey } from "@/lib/legacy-contracts";
 import { EditableImage, EditableText } from "@/components/site-editor";
 import { DemoPostBadge } from "@/components/demo-post-badge";
@@ -20,6 +22,8 @@ export async function HouseModelsPage({ query = "", sort = "random", targetPostI
   const seed = crypto.getRandomValues(new Uint32Array(1))[0] % (HOUSE_MODEL_RANDOM_MODULUS - 1) + 1;
   const params = new URLSearchParams({ category: POST_CATEGORIES.houseModels, seed: String(seed), q: query, sort });
   if (targetPostId) params.set("postId", targetPostId);
+  const content = await getSiteContent(), normalized = query.toLocaleLowerCase("vi");
+  params.set("modelKeys", JSON.stringify(targetPostId ? [] : models.filter((model, index) => demoPostVisible(content, houseModelContentKey(index)) && (!normalized || [model.title, model.meta, model.style, model.tags, model.authorName, ...Object.entries(content).filter(([key]) => key.startsWith(houseModelContentKey(index) + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized))).map(model => model.title)));
   const data = await publicCatalog<Omit<HouseModelInitialData, "seed">>(params);
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-[#0b2e59]">

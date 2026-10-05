@@ -12,8 +12,8 @@ import { MyPostControls } from "@/components/my-posts";
 import { AdminPostControls } from "@/components/admin-post-controls";
 
 type Selection = { key: string; kind: ContentValue["kind"]; fallback: string; label: string };
-type EditorContext = { content: SiteContent; editing: boolean; isOwner: boolean; accountSwitchBlocked: boolean; memberId?: string; select: (selection: Selection) => void; manage: (tab: string, id?: number) => void; saveContent: (changes: Record<string, ContentValue>) => Promise<void> };
-const Editor = createContext<EditorContext>({ content: {}, editing: false, isOwner: false, accountSwitchBlocked: false, select: () => {}, manage: () => {}, saveContent: async () => { throw new Error("Chưa thể lưu nội dung."); } });
+type EditorContext = { qualityFlags: Record<string, boolean>; qualityReady: boolean; qualityError: string; reloadQuality: () => void; saveQuality: (targetType: "post" | "demo", targetId: string, lowQuality: boolean) => Promise<void>; content: SiteContent; editing: boolean; isOwner: boolean; accountSwitchBlocked: boolean; memberId?: string; select: (selection: Selection) => void; manage: (tab: string, id?: number) => void; saveContent: (changes: Record<string, ContentValue>) => Promise<void> };
+const Editor = createContext<EditorContext>({ qualityFlags: {}, qualityReady: false, qualityError: "", reloadQuality: () => {}, saveQuality: async () => { throw new Error("Chưa thể lưu đánh giá ngầm."); }, content: {}, editing: false, isOwner: false, accountSwitchBlocked: false, select: () => {}, manage: () => {}, saveContent: async () => { throw new Error("Chưa thể lưu nội dung."); } });
 export function useSiteEditor() { return useContext(Editor); }
 export function OwnerPostControls({ postId, authorId }: { postId: number; authorId?: string }) {
   const editor = useSiteEditor();
@@ -37,6 +37,27 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
   const [drafts, setDrafts] = useState<Record<string, ContentValue | null>>({});
   const [editing, setEditing] = useState(false);
   const [owner, setOwner] = useState<{ name: string; isAdmin?: boolean } | null>(null);
+  const [qualityFlags, setQualityFlags] = useState<Record<string, boolean>>({});
+  const [qualityReady, setQualityReady] = useState(false), [qualityError, setQualityError] = useState("");
+  const [qualityRevision, setQualityRevision] = useState(0);
+  const reloadQuality = () => setQualityRevision(value => value + 1);
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!owner?.isAdmin) return;
+    fetch("/api/admin/catalog-quality", { cache: "no-store", signal: controller.signal }).then(async response => {
+      const data = await response.json() as { flags?: { targetType: string; targetId: string }[]; error?: string };
+      if (!response.ok) throw new Error(data.error || "Chưa thể tải đánh giá ngầm.");
+      if (!controller.signal.aborted) { setQualityFlags(Object.fromEntries((data.flags ?? []).map(flag => [`${flag.targetType}:${flag.targetId}`, true]))); setQualityReady(true); setQualityError(""); }
+    }).catch(cause => { if (!controller.signal.aborted) { setQualityReady(false); setQualityError(cause instanceof Error ? cause.message : "Chưa thể tải đánh giá ngầm."); } });
+    return () => controller.abort();
+  }, [owner?.isAdmin, qualityRevision]);
+  async function saveQuality(targetType: "post" | "demo", targetId: string, lowQuality: boolean) {
+    const response = await fetch("/api/admin/catalog-quality", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetType, targetId, lowQuality }) });
+    const data = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(data.error || "Chưa thể lưu đánh giá ngầm.");
+    setQualityFlags(current => ({ ...current, [`${targetType}:${targetId}`]: lowQuality }));
+    window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
+  }
   const [memberId, setMemberId] = useState<string>();
   const [selection, setSelection] = useState<Selection | null>(null);
   const [input, setInput] = useState("");
@@ -117,7 +138,7 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
     window.dispatchEvent(new Event(SITE_EVENTS.contentChanged));
   }
   const isOwner = Boolean(owner?.isAdmin);
-  return <Editor.Provider value={{ content, editing: editing && isOwner && !authPage, isOwner, accountSwitchBlocked: saving || count > 0, memberId: authPage ? undefined : memberId, select, manage, saveContent }}><div className={`owner-site ${isOwner && !authPage ? "has-owner-toolbar" : ""}`} style={{ "--site-accent": content["global.accent"]?.value || "#229ed9" } as React.CSSProperties}>
+  return <Editor.Provider value={{ qualityFlags, qualityReady, qualityError, reloadQuality, saveQuality, content, editing: editing && isOwner && !authPage, isOwner, accountSwitchBlocked: saving || count > 0, memberId: authPage ? undefined : memberId, select, manage, saveContent }}><div className={`owner-site ${isOwner && !authPage ? "has-owner-toolbar" : ""}`} style={{ "--site-accent": content["global.accent"]?.value || "#229ed9" } as React.CSSProperties}>
     {isOwner && !authPage && <div className="owner-toolbar" role="region" aria-label="Công cụ chủ website"><div className="owner-toolbar-inner"><span className="owner-identity"><ShieldCheck size={17}/><strong>Website của bạn</strong></span><span className="owner-toolbar-divider"/>
       <button type="button" className={editing ? "owner-tool active" : "owner-tool"} onClick={() => setEditing(!editing)} disabled={saving}>{editing ? <Eye size={16}/> : <Pencil size={16}/>}<span>{editing ? "Xem trước" : "Chỉnh sửa"}</span></button>
       <button type="button" className="owner-tool" onClick={() => manage("noi-dung")} disabled={saving}><SlidersHorizontal size={16}/><span>Quản lý</span></button>

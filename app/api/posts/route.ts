@@ -13,6 +13,8 @@ import { HOUSE_MODEL_RANDOM_MODULUS, houseModelOrderKey, parseHouseModelSort } f
 import { AUTHOR_POST_STATES } from "@/lib/post-ownership";
 import { parseFileCatalogSort } from "@/lib/file-catalog-sort";
 import { fileCatalogRanking } from "@/lib/file-catalog-ranking";
+import { postQualityOrder } from "@/lib/catalog-quality";
+import { houseCatalogCursor, houseCatalogRanking } from "@/lib/house-catalog-ranking";
 
 type AttachmentInput = {
   key?: string;
@@ -40,19 +42,20 @@ export async function GET(request: Request) {
     const houseModelFeed = category === POST_CATEGORIES.houseModels;
     const randomFeed = category === POST_CATEGORIES.houseModels && params.has("seed");
     const sort = parseHouseModelSort(params.get("sort"));
+    const combinedHouseFeed = randomFeed && params.has("modelKeys");
     const rankedFeed = randomFeed && sort !== "random";
     const seed = Number(params.get("seed"));
     const cursor = params.get("cursor");
     const cursorParts = cursor?.split(":").map(Number);
     if (randomFeed && (!Number.isSafeInteger(seed) || seed < 1 || seed >= HOUSE_MODEL_RANDOM_MODULUS ||
-      (cursor !== null && (!/^\d+:\d+:\d+$/.test(cursor) || cursorParts?.some(value => !Number.isSafeInteger(value)) || cursorParts?.length !== 3 || (!rankedFeed && cursorParts[1] >= HOUSE_MODEL_RANDOM_MODULUS))))) {
+      (!combinedHouseFeed && cursor !== null && (!/^\d+:\d+:\d+$/.test(cursor) || cursorParts?.some(value => !Number.isSafeInteger(value)) || cursorParts?.length !== 3 || (!rankedFeed && cursorParts[1] >= HOUSE_MODEL_RANDOM_MODULUS))))) {
       return Response.json({ error: "Thứ tự tải ảnh không hợp lệ." }, { status: 400 });
     }
     const paginated = [POST_CATEGORIES.houseModels, POST_CATEGORIES.drawings, POST_CATEGORIES.interiors].includes(category ?? "") && params.has("page");
     const fileCatalog = paginated && PROMOTION_CATEGORIES.some(value => value === category);
     const fileSort = parseFileCatalogSort(params.get("sort"));
     let modelKeys: string[] = [];
-    if (fileCatalog && category === POST_CATEGORIES.drawings && params.has("modelKeys")) {
+    if ((combinedHouseFeed || fileCatalog && category === POST_CATEGORIES.drawings) && params.has("modelKeys")) {
       try {
         const keys: unknown = JSON.parse(params.get("modelKeys")!);
         if (!Array.isArray(keys) || keys.length > 50 || keys.some(key => typeof key !== "string" || key.length > 180)) throw new Error();
@@ -77,8 +80,11 @@ export async function GET(request: Request) {
       ? inArray(posts.category, [POST_CATEGORIES.houseModels, POST_CATEGORIES.drawings])
       : category ? eq(posts.category, category) : ne(posts.category, POST_CATEGORIES.modelDiscussion);
     const condition = and(eq(posts.audience, "Công khai"), categoryCondition, search, targetPostId ? eq(posts.id, Number(targetPostId)) : undefined);
+    const houseCursor = combinedHouseFeed ? houseCatalogCursor(cursor, sort) : undefined;
+    if (houseCursor === null) return Response.json({ error: "Thứ tự tải mẫu nhà không hợp lệ." }, { status: 400 });
+    const houseOrder = combinedHouseFeed ? await houseCatalogRanking(condition, sort, seed, targetPostId ? [] : modelKeys, houseCursor) : null;
     const total = paginated ? (await db.select({ value: count() }).from(posts).where(condition))[0].value : undefined;
-    const snapshot = randomFeed ? cursorParts?.[0] ?? (await db.select({ value: max(posts.id) }).from(posts).where(condition))[0].value ?? 0 : 0;
+    const snapshot = randomFeed && !combinedHouseFeed ? cursorParts?.[0] ?? (await db.select({ value: max(posts.id) }).from(posts).where(condition))[0].value ?? 0 : 0;
     const randomValue = sql`((${posts.id} * 48271 + cast(${seed} as integer)) % 2147483647)`;
     const randomOrder = sql<number>`((${randomValue} * ${randomValue}) % 2147483647)`;
     const rankScore = sort === "views"
@@ -86,14 +92,14 @@ export async function GET(request: Request) {
       : sql<number>`(select count(*) from ${userActions} where ${userActions.actionType} = 'like' and ${userActions.targetType} = 'post' and ${userActions.targetId} = cast("posts"."id" as text))`;
     const feedOrder = rankedFeed ? rankScore : randomOrder;
     const feedCondition = randomFeed ? and(condition, lte(posts.id, snapshot), cursorParts ? or(rankedFeed ? lt(feedOrder, cursorParts[1]) : gt(feedOrder, cursorParts[1]), and(eq(feedOrder, cursorParts[1]), gt(posts.id, cursorParts[2]))) : undefined) : condition;
-    const catalogOrder = fileCatalog && fileSort !== "latest" ? await fileCatalogRanking(condition, fileSort, page, targetPostId ? [] : modelKeys, promotionPosition) : null;
+    const catalogOrder = houseOrder?.entries ?? (fileCatalog ? await fileCatalogRanking(condition, fileSort, page, targetPostId ? [] : modelKeys, promotionPosition) : null);
     const selectedPostIds = catalogOrder?.flatMap(entry => entry.postId === null ? [] : [entry.postId]);
     const fetchedRows = await db.select({ ...getTableColumns(posts), promotionPosition, sortScore: rankedFeed ? rankScore : sql<number>`0`, ...(fileCatalog ? { downloads: sql<number>`(select count(*) from ${catalogDownloads} where ${catalogDownloads.targetType} = 'post' and ${catalogDownloads.targetId} = cast("posts"."id" as text))` } : {}) }).from(posts).where(catalogOrder ? and(condition, inArray(posts.id, selectedPostIds?.length ? selectedPostIds : [-1])) : feedCondition)
-      .orderBy(...(randomFeed ? [rankedFeed ? desc(feedOrder) : asc(feedOrder), asc(posts.id)] : [...(fileCatalog ? [asc(sql`coalesce(${promotionPosition}, 17)`)] : []), desc(posts.createdAt), desc(posts.id)]))
+      .orderBy(...(randomFeed ? [rankedFeed ? desc(feedOrder) : asc(feedOrder), asc(posts.id)] : [asc(postQualityOrder), ...(fileCatalog ? [asc(sql`coalesce(${promotionPosition}, 17)`)] : []), desc(posts.createdAt), desc(posts.id)]))
       .limit(randomFeed ? CATALOG_PAGE_SIZE + 1 : paginated ? pageSize : 30).offset(!catalogOrder && !randomFeed && paginated ? (page - 1) * pageSize : 0);
     const rows = randomFeed ? fetchedRows.slice(0, CATALOG_PAGE_SIZE) : fetchedRows;
     const last = rows.at(-1);
-    const nextCursor = randomFeed && fetchedRows.length > CATALOG_PAGE_SIZE && last ? `${snapshot}:${rankedFeed ? last.sortScore : houseModelOrderKey(last.id, seed)}:${last.id}` : null;
+    const nextCursor = houseOrder ? houseOrder.nextCursor : randomFeed && fetchedRows.length > CATALOG_PAGE_SIZE && last ? `${snapshot}:${rankedFeed ? last.sortScore : houseModelOrderKey(last.id, seed)}:${last.id}` : null;
     const modelScores = rankedFeed ? Object.fromEntries((sort === "views"
       ? await db.select({ key: catalogViews.targetId, score: count() }).from(catalogViews).where(eq(catalogViews.targetType, "house-model")).groupBy(catalogViews.targetId)
       : await db.select({ key: userActions.targetId, score: count() }).from(userActions).where(and(eq(userActions.targetType, "house-model"), eq(userActions.actionType, "like"))).groupBy(userActions.targetId)

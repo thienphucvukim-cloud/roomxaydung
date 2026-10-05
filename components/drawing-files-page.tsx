@@ -22,7 +22,7 @@ import { demoPostVisible } from "@/lib/demo-posts";
 export async function DrawingFilesPage({ page = 1, query = "", targetPostId, sort = "latest" }: { page?: number; query?: string; targetPostId?: string; sort?: FileCatalogSort }) {
   const params = new URLSearchParams({ category: POST_CATEGORIES.drawings, page: String(page), q: query });
   if (targetPostId) params.set("postId", targetPostId);
-  if (sort !== "latest") {
+  {
     const content = await getSiteContent(), normalized = query.toLocaleLowerCase("vi");
     const keys = targetPostId ? [] : drawings.filter((drawing, index) => {
       const prefix = `drawing.${index}`;

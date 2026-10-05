@@ -1,5 +1,5 @@
 import { POST_STORAGE_COLUMNS } from "../lib/legacy-contracts.ts";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const freelanceProfiles = sqliteTable('freelance_profiles', {
   userId: text('user_id').primaryKey(), displayName: text('display_name').notNull(), title: text('title').notNull(), specialty: text('specialty').notNull(), location: text('location').notNull().default(''), bio: text('bio').notNull().default(''), skills: text('skills').notNull().default('[]'), experience: integer('experience').notNull().default(0), rate: integer('rate').notNull().default(0), rateUnit: text('rate_unit').notNull().default('project'), available: integer('available', {mode:'boolean'}).notNull().default(true), cover: text('cover').notNull().default(''), portfolio: text('portfolio').notNull().default('[]'), updatedAt: text('updated_at').notNull(),
@@ -31,6 +31,14 @@ export const posts = sqliteTable("posts", {
   comments: integer("comments").notNull().default(0),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
 });
+
+// Internal editorial decisions are never included in public post metadata.
+export const catalogQualityFlags = sqliteTable("catalog_quality_flags", {
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id").notNull(),
+  reviewedBy: text("reviewed_by").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, table => [primaryKey({ columns: [table.targetType, table.targetId] })]);
 
 export const catalogPromotions = sqliteTable("catalog_promotions", {
   id: integer("id").primaryKey({ autoIncrement: true }),

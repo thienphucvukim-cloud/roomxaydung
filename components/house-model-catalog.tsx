@@ -1,4 +1,5 @@
 "use client";
+import { CatalogQualityButton } from "@/components/catalog-quality-button";
 import { SITE_EVENTS } from "@/lib/site-events";
 import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 import { OwnerPostControls, useSiteEditor } from "@/components/site-editor";
@@ -26,7 +27,7 @@ type Picked={file:File;preview:string};
 type Comment={id:number;authorName:string;content:string;imageKey?:string|null;imageUrl?:string|null};
 const category=POST_CATEGORIES.houseModels;
 type ModelCard = { key: string; search: string; card: ReactNode; contentPrefix?: string };
-export type HouseModelInitialData = { posts: Post[]; seed: number; nextCursor?: string | null; modelScores?: Record<string, number> };
+export type HouseModelInitialData = { posts: Post[]; seed: number; nextCursor?: string | null; modelScores?: Record<string, number>; catalogOrder?: string[] };
 export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards = [], sort: initialSort = "random", targetPostId: initialPostId, initialData }: { searchQuery?: string; modelCards?: ModelCard[]; sort?: HouseModelSort; targetPostId?: string; initialData?: HouseModelInitialData }){
  const location = useCatalogLocation({ searchQuery: initialQuery, sort: initialSort, targetPostId: initialPostId, initialReady: Boolean(initialData) });
  const { searchQuery, targetPostId } = location;
@@ -34,10 +35,13 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
  const router = useRouter();
  const editor = useSiteEditor();
  const seedRef = useRef(initialData?.seed ?? 0);
- const modelKeys = useRef(modelCards.map(model => `model:${model.key}`));
- const [cardOrder, setCardOrder] = useState<string[]>(initialData ? shuffleHouseModels([...initialData.posts.map(post => `post:${post.id}`), ...(initialPostId ? [] : modelKeys.current)], initialData.seed) : []);
+ const normalized = searchQuery.toLocaleLowerCase("vi");
+ const filteredModels = targetPostId ? [] : modelCards.filter(model => demoPostVisible(editor.content, model.contentPrefix, editor.isOwner) && (!normalized || [model.search, ...Object.entries(editor.content).filter(([key]) => model.contentPrefix && key.startsWith(model.contentPrefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized)));
+ const modelKeys = JSON.stringify(filteredModels.map(model => model.key));
+ const [cardOrder, setCardOrder] = useState<string[]>(initialData ? initialData.catalogOrder ?? shuffleHouseModels([...initialData.posts.map(post => `post:${post.id}`), ...filteredModels.map(model => `model:${model.key}`)], initialData.seed) : []);
+ const [serverOrder, setServerOrder] = useState(Boolean(initialData?.catalogOrder));
  const [modelScores, setModelScores] = useState<Record<string, number>>(initialData?.modelScores ?? {});
- const catalogScope = JSON.stringify([searchQuery, sort, targetPostId]);
+ const catalogScope = JSON.stringify([searchQuery, sort, targetPostId, modelKeys]);
  const [cursor, setCursor] = useState({ scope: "", value: "" });
  const requestCursor = cursor.scope === catalogScope ? cursor.value : "";
  const setRequestCursor = useCallback((value: string) => setCursor({ scope: catalogScope, value }), [catalogScope]);
@@ -66,24 +70,25 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
   if (!seedRef.current) seedRef.current = crypto.getRandomValues(new Uint32Array(1))[0] % (HOUSE_MODEL_RANDOM_MODULUS - 1) + 1;
   setLoading(true);
   setLoadError(false);
-  const params = new URLSearchParams({ category, seed: String(seedRef.current), q: searchQuery, sort });
+  const params = new URLSearchParams({ category, seed: String(seedRef.current), q: searchQuery, sort, modelKeys });
   if (targetPostId) params.set("postId", targetPostId);
   if (requestCursor) params.set("cursor", requestCursor);
   fetch("/api/posts?" + params, { signal: controller.signal })
-   .then(response => response.ok ? response.json() as Promise<{ posts?: Post[]; nextCursor?: string | null; modelScores?: Record<string, number> }> : Promise.reject())
+   .then(response => response.ok ? response.json() as Promise<{ posts?: Post[]; nextCursor?: string | null; modelScores?: Record<string, number>; catalogOrder?: string[] }> : Promise.reject())
    .then(data => {
     if (controller.signal.aborted) return;
     const batch = data.posts ?? [];
     setPosts(current => requestCursor ? [...current, ...batch.filter(post => !current.some(item => item.id === post.id))] : batch);
-    const keys = batch.map(post => `post:${post.id}`);
-    setCardOrder(current => requestCursor ? [...new Set([...current, ...keys])] : shuffleHouseModels([...keys, ...(targetPostId ? [] : modelKeys.current)], seedRef.current));
+    const keys = data.catalogOrder ?? batch.map(post => `post:${post.id}`);
+    setServerOrder(Boolean(data.catalogOrder));
+    setCardOrder(current => requestCursor ? [...new Set([...current, ...keys])] : data.catalogOrder ?? shuffleHouseModels([...keys, ...JSON.parse(modelKeys).map((key: string) => `model:${key}`)], seedRef.current));
     setModelScores(data.modelScores ?? {});
     setNextCursor(data.nextCursor ?? null);
    })
    .catch(() => { if (!controller.signal.aborted) setLoadError(true); })
    .finally(() => { if (!controller.signal.aborted) setLoading(false); });
   return () => controller.abort();
- }, [requestCursor, searchQuery, refresh, sort, targetPostId, location.ready]);
+ }, [requestCursor, searchQuery, refresh, sort, targetPostId, location.ready, modelKeys]);
  useEffect(() => {
   if (loading || loadError || !nextCursor || !loadMoreRef.current || !window.IntersectionObserver) return;
   const anchor = window.location.hash.match(/^#post-(\d+)$/);
@@ -98,12 +103,10 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
   return () => observer.disconnect();
  }, [loading, loadError, nextCursor, setRequestCursor]);
  const refreshGallery = () => { setRequestCursor(""); setRefresh(current => current + 1); };
- const normalized = searchQuery.toLocaleLowerCase("vi");
- const filteredModels = targetPostId ? [] : modelCards.filter(model => demoPostVisible(editor.content, model.contentPrefix, editor.isOwner) && (!normalized || [model.search, ...Object.entries(editor.content).filter(([key]) => model.contentPrefix && key.startsWith(model.contentPrefix + ".")).map(([, item]) => item.value)].join(" ").toLocaleLowerCase("vi").includes(normalized)));
  const modelsByKey = new Map(filteredModels.map(model => [`model:${model.key}`, model]));
  const postsByKey = new Map(posts.map(post => [`post:${post.id}`, post]));
  const submitSearch = (event: FormEvent) => { event.preventDefault(); router.push(houseModelHref(query, sort)); };
- const displayedOrder = sort === "random" ? cardOrder : [...cardOrder].sort((a, b) => {
+ const displayedOrder = serverOrder || sort === "random" ? cardOrder : [...cardOrder].sort((a, b) => {
   const score = (key: string) => key.startsWith("model:") ? modelScores[key.slice(6)] ?? 0 : postsByKey.get(key)?.sortScore ?? 0;
   const difference = score(b) - score(a);
   if (difference) return difference;
@@ -160,7 +163,7 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
      <div className="flex flex-1 flex-col px-3 py-2.5">
       <div className="flex items-start gap-2"><h3 className="catalog-card-title min-w-0 flex-1 text-base font-extrabold tracking-[-.02em]">{post.title}</h3>{post.category === POST_CATEGORIES.drawings && <a href={drawingPostHref(post.id)} aria-label={`Xem file: ${post.title}`} title="Xem file trong kho bản vẽ" className="grid size-9 shrink-0 place-items-center rounded-full border border-[#cfeaf5] bg-[#f1faff] text-[#168ac0] transition hover:border-[#229ed9] hover:bg-[#e2f5fc]"><FileSearch size={18}/></a>}</div>
       <p className="mt-1 flex min-h-5 items-center gap-2 text-sm font-medium text-[#3f5064]"><Maximize2 size={15} className="shrink-0"/>{post.specifications||"Chưa cập nhật kích thước"}</p>
-      <p className="catalog-card-author mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs text-[#66778a]"><span className="shrink-0">Đăng bởi</span> <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="min-w-0 truncate font-semibold text-[#0b2e59] hover:text-[#229ed9] hover:underline">{post.authorName}</a><OwnerPostControls postId={post.id} authorId={post.userId}/></p>
+      <p className="catalog-card-author mt-1 flex min-w-0 flex-wrap items-center gap-1 text-xs text-[#66778a]"><span className="shrink-0">Đăng bởi</span> <a href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="min-w-0 truncate font-semibold text-[#0b2e59] hover:text-[#229ed9] hover:underline">{post.authorName}</a><OwnerPostControls postId={post.id} authorId={post.userId}/><CatalogQualityButton targetType="post" targetId={String(post.id)}/></p>
       {post.content&&<p className="mt-1 line-clamp-1 text-sm text-[#667085]">{post.content}</p>}
       {post.category === POST_CATEGORIES.drawings && <a href={drawingPostHref(post.id)} className="mt-1 w-fit text-xs font-semibold text-[#3f5064] hover:text-[#229ed9] hover:underline">File bản vẽ : {drawingPrice ? `${drawingPrice.toLocaleString("vi-VN")}đ` : "Miễn phí"}</a>}
       <div className="mt-auto"><ModelCardFooter title={post.title} meta={post.specifications||"Chưa cập nhật kích thước"} targetType="post" targetId={String(post.id)} recipientUserId={post.userId} comments={post.comments??0} expertQuestions={post.expertQuestions??0} commentOpen={Boolean(commentOpen[post.id])} onToggleComments={()=>void toggleComments(post)} onQuestionSent={refreshGallery}/></div>

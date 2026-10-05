@@ -10,7 +10,7 @@ import { POST_CATEGORIES } from "@/lib/legacy-contracts";
 export async function InteriorPage({ page = 1, query = "", targetPostId, sort = "latest" }: { page?: number; query?: string; targetPostId?: string; sort?: FileCatalogSort }) {
   const params = new URLSearchParams({ category: POST_CATEGORIES.interiors, page: String(page), q: query });
   if (targetPostId) params.set("postId", targetPostId);
-  if (sort !== "latest") { params.set("sort", sort); params.set("modelKeys", "[]"); }
+  params.set("sort", sort); params.set("modelKeys", "[]");
   const initialData = await publicCatalog<FileCatalogInitialData>(params);
   return <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
     <FileCatalog initialData={initialData} key={`${page}:${query}:${targetPostId ?? ""}:${sort}`} variant="interior" page={page} searchQuery={query} targetPostId={targetPostId} sort={sort} />

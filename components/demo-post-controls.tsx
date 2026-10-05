@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Eye, EyeOff, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import { CatalogQualityButton } from "@/components/catalog-quality-button";
 import { useSiteEditor } from "@/components/site-editor";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { demoPostState } from "@/lib/demo-posts";
@@ -53,6 +54,7 @@ export function DemoPostControls({ prefix, title, style, image, meta }: { prefix
         <button type="button" disabled={busy} onClick={() => visibility(state === "public" ? "hidden" : "public")}>{state === "public" ? <EyeOff size={14}/> : <Eye size={14}/>} {state === "public" ? "Ẩn" : "Hiện lại"}</button>
         <button type="button" className="danger" disabled={busy} onClick={() => visibility("deleted")}><Trash2 size={14}/>Xóa</button>
       </>
+      <CatalogQualityButton targetType="demo" targetId={prefix}/>
       {busy && <LoaderCircle size={14} className="animate-spin" aria-label="Đang lưu"/>}
       {error && !open && <span role="alert" className="admin-post-error">{error}</span>}
       {notice && <span role="status" className="basis-full text-xs font-normal">{notice}</span>}
