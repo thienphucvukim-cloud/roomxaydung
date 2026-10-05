@@ -12,7 +12,7 @@ import { MemberAvatar } from "@/components/member-avatar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { AUTHOR_DELETED_STATES, AUTHOR_POST_STATES, OWN_POST_HIDDEN } from "@/lib/post-ownership";
 import { CoverImagePicker } from "@/components/cover-image-picker";
-import { optimizeImageForUpload } from "@/lib/image-upload";
+import { optimizePostImageForUpload } from "@/lib/image-upload";
 
 type PostImage = { key: string; name: string; type: string; size: number; url: string };
 type Post = { id: number; title: string; content: string; specifications: string | null; listingType: string | null; audience: string; category: string; images: PostImage[] };
@@ -50,7 +50,7 @@ export function MyPostControls({ postId, iconOnly = false }: { postId: number; i
     try {
       for (const file of files) {
         const form = new FormData();
-        form.append("file", await optimizeImageForUpload(file)); form.append("purpose", "drawing-preview");
+        form.append("file", await optimizePostImageForUpload(file, post.category)); form.append("purpose", "drawing-preview");
         const response = await fetch("/api/files", { method: "POST", body: form });
         const data = await response.json() as { attachment?: PostImage; error?: string };
         if (!response.ok || !data.attachment) throw new Error(data.error || "Chưa thể tải ảnh lên.");

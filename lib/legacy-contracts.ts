@@ -8,6 +8,11 @@ export const POST_CATEGORIES = {
 export function houseModelContentKey(index: number | string, field?: string) {
   return `facade.${index}${field ? "." + field : ""}`;
 }
+export function catalogImageCategory(contentKey: string) {
+  const match = /^(facade|drawing|interior)\.\d+\.(?:image|photo\.\d+)$/.exec(contentKey);
+  if (!match) return undefined;
+  return { facade: POST_CATEGORIES.houseModels, drawing: POST_CATEGORIES.drawings, interior: POST_CATEGORIES.interiors }[match[1] as "facade" | "drawing" | "interior"];
+}
 export const PENDING_WALLET_STORAGE = {
   manualCredit: "tipook:pending-manual-credit", sellerOperation: "tipook:pending-sales-wallet",
 } as const;

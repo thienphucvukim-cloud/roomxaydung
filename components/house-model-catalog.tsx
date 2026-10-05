@@ -11,7 +11,7 @@ import { houseModelHref } from "@/lib/house-model-links";
 import { drawingPostHref } from "@/lib/catalog-pagination";
 import { parseVndPrice } from "@/lib/drawing-catalog";
 import { HOUSE_MODEL_RANDOM_MODULUS, parseHouseModelSort, shuffleHouseModels, type HouseModelSort } from "@/lib/house-model-feed";
-import { optimizeImageForUpload } from "@/lib/image-upload";
+import { optimizeImageForUpload, optimizePostImageForUpload } from "@/lib/image-upload";
 import { PostCommentPanel } from "@/components/post-comment-panel";
 import { ModelCardFooter } from "@/components/model-card-footer";
 import { CoverImagePicker } from "@/components/cover-image-picker";
@@ -115,7 +115,7 @@ export function HouseModelCatalog({ searchQuery: initialQuery = "", modelCards =
  const publish=async(event:FormEvent)=>{
   event.preventDefault();if(saving)return;setSaving(true);setNotice("");
   try{const attachments:Attachment[]=[];
-   for(const image of images){const form=new FormData();form.append("file",await optimizeImageForUpload(image.file));const response=await fetch("/api/files",{method:"POST",body:form});const data=await response.json() as {error?:string;attachment?:Attachment};if(!response.ok||!data.attachment)throw new Error(data.error||"Không thể tải ảnh.");attachments.push(data.attachment);}
+   for(const image of images){const form=new FormData();form.append("file",await optimizePostImageForUpload(image.file,category));const response=await fetch("/api/files",{method:"POST",body:form});const data=await response.json() as {error?:string;attachment?:Attachment};if(!response.ok||!data.attachment)throw new Error(data.error||"Không thể tải ảnh.");attachments.push(data.attachment);}
    const coverIndex = Math.max(0, images.findIndex(image => image.preview === coverPreview));
    const response=await fetch("/api/posts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:title.trim(),content:content.trim(),category,audience:"Công khai",listingType:style.trim(),specifications:specs.trim(),coverImageKey:attachments[coverIndex]?.key,attachments:attachments.map(({key,name,type,size})=>({key,name,type,size}))})});
    const data=await response.json() as {error?:string;post?:Post};if(!response.ok||!data.post)throw new Error(data.error||"Chưa thể đăng bộ sưu tập.");

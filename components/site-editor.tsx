@@ -6,7 +6,8 @@ import { Check, Eye, LoaderCircle, LogOut, Pencil, RotateCcw, Save, Settings2, S
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { OwnerManagement } from "@/components/owner-management";
 import type { ContentValue, SiteContent } from "@/lib/site-content";
-import { optimizeImageForUpload } from "@/lib/image-upload";
+import { optimizePostImageForUpload } from "@/lib/image-upload";
+import { catalogImageCategory } from "@/lib/legacy-contracts";
 import { MyPostControls } from "@/components/my-posts";
 import { AdminPostControls } from "@/components/admin-post-controls";
 
@@ -90,7 +91,7 @@ export function OwnerWorkspace({ initialContent, children }: { initialContent: S
     if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 25 * 1024 * 1024) { setModalError("Chọn ảnh JPG, PNG, WebP hoặc GIF, tối đa 25 MB."); return; }
     setUploading(true); setModalError("");
     try {
-      const body = new FormData(); body.append("file", await optimizeImageForUpload(file)); body.append("purpose", "drawing-preview");
+      const body = new FormData(); body.append("file", await optimizePostImageForUpload(file, catalogImageCategory(selection?.key || "") || "")); body.append("purpose", "drawing-preview");
       const response = await fetch("/api/files", { method: "POST", body });
       const result = await response.json() as { error?: string; attachment?: { url?: string } };
       if (!response.ok || !result.attachment?.url) throw new Error(result.error || "Chưa thể tải ảnh.");

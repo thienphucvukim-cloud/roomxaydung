@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { inspectWebp, isImageUpload, validateOptimizedImage } from '../lib/image-upload-policy.ts';
+import { catalogImageCategory, POST_CATEGORIES } from '../lib/legacy-contracts.ts';
+for (const [prefix, category] of [['facade', POST_CATEGORIES.houseModels], ['drawing', POST_CATEGORIES.drawings], ['interior', POST_CATEGORIES.interiors]]) {
+  assert.equal(catalogImageCategory(`${prefix}.0.image`), category);
+  assert.equal(catalogImageCategory(`${prefix}.12.photo.3`), category);
+  assert.equal(catalogImageCategory(`${prefix}.text.0`), undefined);
+}
+assert.equal(catalogImageCategory('global.logo'), undefined);
+assert.equal(catalogImageCategory('about.image'), undefined);
 const require = createRequire(import.meta.url);
 const sharp = createRequire(require.resolve('miniflare'))('sharp');
 const fixture = readFileSync(new URL('./fixtures/upload.webp', import.meta.url));

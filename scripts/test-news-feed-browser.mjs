@@ -93,7 +93,7 @@ try {
   await send('Page.navigate', { url: origin });
   await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'feed hydration');
   const browserModule = file => ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/^import .*;\s*$/gm, '').replace(/^export /gm, '');
-  await evaluate(`(() => { ${browserModule('lib/image-upload-policy.ts')} ${browserModule('lib/image-upload.ts')} window.optimizeUploadFixture=optimizeImageForUpload; window.inspectWebpFixture=inspectWebp; })()`);
+  await evaluate(`(() => { ${browserModule('lib/legacy-contracts.ts')} ${browserModule('lib/image-upload-policy.ts')} ${browserModule('lib/image-watermark.ts')} ${browserModule('lib/image-upload.ts')} window.optimizeUploadFixture=optimizeImageForUpload; window.optimizePostUploadFixture=optimizePostImageForUpload; window.inspectWebpFixture=inspectWebp; })()`);
   const compression = await evaluate(`(async () => {
     const canvas=document.createElement('canvas'); canvas.width=2200; canvas.height=1600;
     const ctx=canvas.getContext('2d'), pixels=ctx.createImageData(canvas.width,canvas.height);
@@ -124,6 +124,67 @@ try {
   assert.ok(compression.alpha>0 && compression.alpha<255,'Preserve transparency');
   assert.equal(compression.gifType,'image/webp');assert.equal(compression.corruptRejected,true);assert.equal(compression.untouched,true);assert.equal(compression.unsupportedRejected,true);
   console.log('PASS: browser compresses large noisy PNG to bounded WebP for posts/comments/avatars; transparency, GIF, invalid images and unsupported encoder handled.');
+  const watermark = await evaluate(`(async () => {
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 800;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = '#102f49'; ctx.fillRect(0, 0, 1200, 800);
+    const source = new File([await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))], 'watermark.png', { type: 'image/png' });
+    const decode = HTMLImageElement.prototype.decode;
+    let logoFailureRejected = false;
+    try {
+      HTMLImageElement.prototype.decode = function () { return this.src.endsWith('/nhadepchat-logo.png') ? Promise.reject(new Error('fixture')) : decode.call(this); };
+      await window.optimizePostUploadFixture(source, 'Bộ sưu tập ảnh');
+    } catch { logoFailureRejected = true; } finally { HTMLImageElement.prototype.decode = decode; }
+    const inspectPixels = async file => {
+      const bitmap = await createImageBitmap(file);
+      canvas.width = bitmap.width; canvas.height = bitmap.height; ctx.drawImage(bitmap, 0, 0); bitmap.close();
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let changed = 0, left = canvas.width, right = 0, top = canvas.height, bottom = 0;
+      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+        const offset = (y * canvas.width + x) * 4;
+        if (Math.abs(data[offset] - 16) + Math.abs(data[offset + 1] - 47) + Math.abs(data[offset + 2] - 73) > 35) {
+          changed++; left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+        }
+      }
+      return { width: canvas.width, height: canvas.height, changed, left, right, top, bottom, size: file.size, type: file.type };
+    };
+    const results = [];
+    for (const category of ['Bộ sưu tập ảnh', 'Bản vẽ cộng đồng', 'Nội thất cộng đồng', 'Bảng tin']) {
+      results.push({ category, ...await inspectPixels(await window.optimizePostUploadFixture(source, category)) });
+    }
+    for (const kind of ['comment', 'avatar']) {
+      results.push({ category: kind, ...await inspectPixels(await window.optimizeUploadFixture(source, kind, { watermark: true })) });
+    }
+    const encode = HTMLCanvasElement.prototype.toBlob;
+    let attempts = 0, reduced;
+    try {
+      HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
+        if (type === 'image/webp' && ++attempts <= 3) callback(new Blob([new Uint8Array(512 * 1024 + 1)], { type }));
+        else encode.call(this, callback, type, quality);
+      };
+      reduced = await inspectPixels(await window.optimizePostUploadFixture(source, 'Bộ sưu tập ảnh'));
+    } finally { HTMLCanvasElement.prototype.toBlob = encode; }
+    const samples = [];
+    for (const [url, name] of [['/community-house.png', 'watermark-house.webp'], ['/mat-bang-5x20.png', 'watermark-drawing.webp']]) {
+      const image = new File([await (await fetch(url)).blob()], name, { type: 'image/png' });
+      const file = await window.optimizePostUploadFixture(image, 'Bộ sưu tập ảnh');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
+      samples.push({ name, base64: btoa(binary) });
+    }
+    return { results, reduced, attempts, logoFailureRejected, samples };
+  })()`);
+  assert.equal(watermark.logoFailureRejected, true, 'A missing logo must not silently upload an unmarked catalog photo');
+  for (const result of [...watermark.results.slice(0, 3), watermark.reduced]) {
+    assert.ok(result.changed > 50, 'Logo must be burned into the encoded pixels');
+    assert.ok(result.top > result.height * 0.8 && result.bottom < result.height, 'Logo must stay near the bottom');
+    assert.ok(result.right - result.left < result.width * 0.26, 'Logo must remain modest in size');
+    assert.ok(Math.abs((result.left + result.right) / 2 - result.width / 2) < 10, 'Logo must be horizontally centered');
+    assert.equal(result.type, 'image/webp'); assert.ok(result.size <= 512 * 1024);
+  }
+  assert.equal(watermark.reduced.width, 960, 'Logo must survive size reduction after compression retries');
+  assert.ok(watermark.results.slice(3).every(result => result.changed === 0), 'News photos, comments and avatars must remain unmarked');
+  for (const sample of watermark.samples) writeFileSync(path.join(dir, sample.name), Buffer.from(sample.base64, 'base64'));
+  console.log('PASS: all three catalog categories embed a small bottom-centered logo in WebP; compression retries retain it; logo load failures retry safely; unrelated images stay unmarked.');
   assert.equal(await evaluate(`Math.round(document.querySelector('main').getBoundingClientRect().width)`), 1320);
   assert.ok(await evaluate(`document.querySelector('article').innerText.includes('150.000đ') && document.querySelector('article').innerText.includes('125.000.000 VND')`));
   assert.equal(await evaluate(`document.querySelector('article time').closest('a')`), null);

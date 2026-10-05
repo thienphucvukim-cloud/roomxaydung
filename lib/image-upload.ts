@@ -1,4 +1,5 @@
 import { IMAGE_UPLOAD_LIMITS, webpFileName, type ImageUploadKind } from "./image-upload-policy";
+import { drawImageWatermark, loadWatermarkLogo, shouldWatermarkPostImages } from "./image-watermark";
 
 const MAX_SOURCE_SIZE = 25 * 1024 * 1024;
 
@@ -15,7 +16,7 @@ function encodeWebp(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
 }
 
 /** Optimize images locally before uploading; documents pass through unchanged. */
-export async function optimizeImageForUpload(file: File, kind: ImageUploadKind = "post"): Promise<File> {
+export async function optimizeImageForUpload(file: File, kind: ImageUploadKind = "post", options: { watermark?: boolean } = {}): Promise<File> {
   if (!file.type.startsWith("image/")) return file;
   if (!file.size) throw new Error("Không thể tải ảnh rỗng.");
   if (file.size > MAX_SOURCE_SIZE) throw new Error("Ảnh gốc không được vượt quá 25 MB.");
@@ -35,6 +36,7 @@ export async function optimizeImageForUpload(file: File, kind: ImageUploadKind =
 
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Không thể xử lý ảnh trên trình duyệt này.");
+    const logo = options.watermark && kind === "post" ? await loadWatermarkLogo() : null;
     let scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
     const draw = () => {
       canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -43,6 +45,7 @@ export async function optimizeImageForUpload(file: File, kind: ImageUploadKind =
       context.imageSmoothingQuality = "high";
       // The browser applies EXIF orientation. Animated images become a still image.
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      if (logo) drawImageWatermark(context, logo);
     };
     draw();
 
@@ -66,4 +69,8 @@ export async function optimizeImageForUpload(file: File, kind: ImageUploadKind =
     canvas.width = 0;
     canvas.height = 0;
   }
+}
+
+export function optimizePostImageForUpload(file: File, category: string) {
+  return optimizeImageForUpload(file, "post", { watermark: shouldWatermarkPostImages(category) });
 }

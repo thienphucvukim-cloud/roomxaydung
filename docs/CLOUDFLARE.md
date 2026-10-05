@@ -123,6 +123,11 @@ tải trang không phải CPU time. Tài liệu: [Workers limits](https://develo
 hạ dần đến 50% và giảm kích thước thêm nếu cần. Ảnh bài đăng/ảnh xem trước có
 cạnh dài tối đa 1600 px, dung lượng 512 KB; bình luận 1280 px/256 KB;
 avatar 512 px/96 KB. GIF/WebP động được chuyển thành ảnh tĩnh; giữ nền trong suốt.
+Ảnh tải mới ở Mẫu nhà đẹp, Kho bản vẽ và Nội thất được đóng logo NhàĐẹpChất
+nhỏ, bán trong suốt ở giữa mép dưới trước khi nén. Logo nằm trong tệp WebP
+lưu trên R2, kể cả khi thêm/thay ảnh qua Bài viết của tôi hoặc công cụ chỉnh
+sửa ảnh mẫu của quản trị. Ảnh đã lưu trước đó, ảnh bảng tin, bình luận,
+avatar và file hồ sơ riêng tư giữ nguyên.
 Máy chủ kiểm tra RIFF WebP, kích thước khung và dung lượng, rồi gắn metadata
 xác nhận. API đăng bài, thêm ảnh và bình luận kiểm tra metadata này, ngăn gửi
 ảnh gốc hoặc tái sử dụng ảnh cũ chưa tối ưu cho nội dung mới. Ảnh đang gắn với

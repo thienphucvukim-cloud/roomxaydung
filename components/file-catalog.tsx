@@ -14,7 +14,7 @@ import { CatalogPagination } from "@/components/catalog-pagination";
 import { CatalogToolbar } from "@/components/catalog-toolbar";
 import { CatalogEngagementStats } from "@/components/catalog-engagement";
 import { catalogPageHref, catalogPageWindow } from "@/lib/catalog-pagination";
-import { optimizeImageForUpload } from "@/lib/image-upload";
+import { optimizePostImageForUpload } from "@/lib/image-upload";
 import { CoverImagePicker } from "@/components/cover-image-picker";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { RequestActionButton, ShareActionButton, ToggleActionButton } from "@/components/interactive-actions";
@@ -129,7 +129,7 @@ export function FileCatalog({ variant = "drawing", page: initialPage = 1, search
     setUploading(true); setNotice("");
     try {
       for (const file of selected) {
-        const form = new FormData(); form.append("file", await optimizeImageForUpload(file)); form.append("purpose", "drawing-preview");
+        const form = new FormData(); form.append("file", await optimizePostImageForUpload(file, category)); form.append("purpose", "drawing-preview");
         const response = await fetch("/api/files", { method: "POST", body: form });
         const data = await response.json() as { error?: string; attachment?: Attachment };
         if (!response.ok || !data.attachment) throw new Error(data.error || "Không thể tải tệp.");
