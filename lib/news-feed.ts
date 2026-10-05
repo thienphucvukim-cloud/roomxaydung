@@ -10,6 +10,7 @@ export const NEWS_SOURCES = [
 export const NEWS_PAGE_SIZE = 20;
 
 export type NewsPost = {
+  slug?: string | null;
   id: number;
   userId: string;
   authorName: string;

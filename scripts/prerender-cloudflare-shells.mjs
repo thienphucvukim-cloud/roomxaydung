@@ -24,7 +24,7 @@ export async function prerenderCloudflareShells() {
   function findModules(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
       const file = path.join(directory, entry.name);
-      return entry.isDirectory() ? findModules(file) : entry.name.endsWith(".js") ? [{ type: "ESModule", path: file }] : [];
+      return entry.isDirectory() ? findModules(file) : entry.name.endsWith(".js") ? [{ type: "ESModule", path: file }] : entry.name.endsWith(".wasm") ? [{ type: "CompiledWasm", path: file }] : [];
     });
   }
   const modules = [{ type: "ESModule", path: main }, ...findModules(server).filter(module => module.path !== main)];

@@ -45,7 +45,7 @@ try {
   assert.ok(publicPosts.length, 'Local review database needs a public post');
   const fixtureId = publicPosts[0].id;
   const fixture = {
-    id: fixtureId, userId: 'review-author', authorName: 'Thành viên Tipook', avatarUrl: null, category: 'Bản vẽ cộng đồng',
+    id: fixtureId, slug: publicPosts[0].slug, userId: 'review-author', authorName: 'Thành viên Tipook', avatarUrl: null, category: 'Bản vẽ cộng đồng',
     title: 'Nhà phố 5 × 20m', content: 'Giá bán: 150000đ\nChi phí 125000000 VND\nLiên hệ 0912345678', specifications: '5 × 20m', listingType: null, priceLabel: '150000', comments: 1,
     createdAt: '2026-10-03T08:00:00.000Z', sourceHref: `/file-ban-ve-nha-dep-chat?postId=${fixtureId}#post-${fixtureId}`, sourceLabel: 'Kho bản vẽ',
     images: Array.from({ length: 7 }, (_, index) => ({ url: index % 2 ? '/mat-bang-5x20.png' : '/community-house.png', name: `Ảnh ${index + 1}` })),
@@ -72,7 +72,7 @@ try {
         const sourcePath = category === 'Bộ sưu tập ảnh' ? '/kho-mau-nha-dep-chat' : category === 'Nội thất cộng đồng' ? '/noi-that' : '/file-ban-ve-nha-dep-chat';
         const original = { ...post, category, sourceHref: sourcePath + '?postId=' + post.id + '#post-' + post.id, comments: window.review.comments.length };
         const second = { ...post, id: 900002, title: 'Bài viết tiếp theo', content: 'Nội dung bài đăng tiếp theo', category: 'Bảng tin', sourceLabel: 'Bảng tin', sourceHref: '/bai-viet/900002', images: [], comments: 0, createdAt: '2026-10-02T08:00:00.000Z' };
-        const items = [original, second].filter(item => (!url.searchParams.get('category') || item.category === url.searchParams.get('category')) && (!url.searchParams.get('postId') || item.id === Number(url.searchParams.get('postId'))) && (!url.searchParams.get('q') || (item.title + item.content).includes(url.searchParams.get('q'))));
+        const items = [original, second].filter(item => (!url.searchParams.get('slug') || item.slug === url.searchParams.get('slug')) && (!url.searchParams.get('category') || item.category === url.searchParams.get('category')) && (!url.searchParams.get('postId') || item.id === Number(url.searchParams.get('postId'))) && (!url.searchParams.get('q') || (item.title + item.content).includes(url.searchParams.get('q'))));
         const page = Number(url.searchParams.get('page') || 1);
         window.review.feedRequests.push(page);
         if (page === 2 && window.review.failMore) { window.review.failMore = false; return json({ error: 'Lỗi tải thêm thử nghiệm.' }, 503); }
@@ -310,7 +310,7 @@ try {
   await waitFor(`document.querySelector('button[aria-label="Xem ảnh 1 của bài viết Nhà phố 5 × 20m"]')`, 'reset category');
   await send('Page.navigate', { url: origin + '/bai-viet/' + fixtureId });
   await waitFor(`document.querySelector('textarea[aria-label="Nội dung bình luận"]')`, 'detail page automatically loads comments');
-  assert.equal(await evaluate('location.pathname'), '/bai-viet/' + fixtureId);
+  assert.equal(await evaluate('location.pathname'), '/' + fixture.slug);
   const checkShareButton = async () => {
     await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share button ready');
     await evaluate(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').scrollIntoView({block:'center',behavior:'instant'})`);
@@ -319,9 +319,15 @@ try {
     await send('Input.dispatchMouseEvent', {type:'mousePressed',button:'left',clickCount:1,...point});
     await send('Input.dispatchMouseEvent', {type:'mouseReleased',button:'left',clickCount:1,...point});
     await waitFor(`window.review.copiedLinks.length`, 'link copied by share button');
-    assert.equal(await evaluate('window.review.copiedLinks.at(-1)'), origin + '/bai-viet/' + fixtureId, 'Share buttons must use the dedicated post URL');
+    assert.equal(await evaluate('window.review.copiedLinks.at(-1)'), origin + '/' + fixture.slug, 'Share buttons must use the dedicated post URL');
     await evaluate('window.review.copiedLinks=[]');
   };
+  await checkShareButton();
+  await send('Page.navigate', {url: origin});
+  await waitFor(`document.querySelector('article time a')`, 'feed article link');
+  await evaluate(`document.querySelector('article time a').click()`);
+  await waitFor(`location.pathname === ${JSON.stringify('/' + fixture.slug)} && document.querySelector('textarea[aria-label="Nội dung bình luận"]')`, 'slug navigation hydrates the dedicated post shell');
+  assert.equal(await evaluate(`document.querySelectorAll('article[id^="post-"]').length`),1);
   await checkShareButton();
   for (const [category, sourcePath] of [['Bản vẽ cộng đồng', '/file-ban-ve-nha-dep-chat'], ['Bộ sưu tập ảnh', '/kho-mau-nha-dep-chat'], ['Nội thất cộng đồng', '/noi-that']]) {
     await send('Page.navigate', { url: origin });
@@ -340,7 +346,7 @@ try {
       await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share reset');
       await evaluate(`window.review.clipboardFail=true; document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').click()`);
       await waitFor(`document.querySelector('input[aria-label="Liên kết chia sẻ"]')`, 'manual copy fallback');
-      assert.equal(await evaluate(`document.querySelector('input[aria-label="Liên kết chia sẻ"]').value`), origin + '/bai-viet/' + fixtureId);
+      assert.equal(await evaluate(`document.querySelector('input[aria-label="Liên kết chia sẻ"]').value`), origin + '/' + fixture.slug);
     }
   }
   await send('Page.navigate', { url: origin + '/?review-admin=1' });

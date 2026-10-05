@@ -6,7 +6,7 @@ import { GET as readCatalog } from "@/app/api/posts/route";
 import type { NewsFeedResponse } from "./news-feed";
 import { getDb } from "@/db";
 import { eq } from "drizzle-orm";
-import { virtualProfiles } from "@/db/schema";
+import { posts, virtualProfiles } from "@/db/schema";
 import { SITE_ORIGIN } from "./seo";
 import { notFound } from "next/navigation";
 import type { PublicProfileData } from "./public-profile-data";
@@ -18,6 +18,14 @@ export const publicFeed = cache(async (postId?: number): Promise<NewsFeedRespons
   const response = await readNewsFeed(new Request(SITE_ORIGIN + "/api/news-feed" + (postId ? "?postId=" + postId : "")));
   if (!response.ok) throw new Error("Public feed unavailable");
   return response.json();
+});
+export const publicSlugFeed = cache(async (slug: string) => {
+  if (!env.DB) return undefined;
+  const [post] = await getDb().select({ id: posts.id }).from(posts).where(eq(posts.slug, slug)).limit(1);
+  if (!post) notFound();
+  const feed = await publicFeed(post.id);
+  if (!feed?.posts.length) notFound();
+  return feed;
 });
 // Legacy catalog share links must expose the same public post as its detail URL.
 export async function publicCatalogPost(postId: string | string[] | undefined, category: string | string[]) {

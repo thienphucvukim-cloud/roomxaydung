@@ -12,7 +12,7 @@ const modules=new Map();
 async function load(id) {
  if(modules.has(id))return modules.get(id);
  const mod=id==='cloudflare:workers'?new vm.SyntheticModule(['env'],function(){this.setExport('env',env);},{context}):new vm.SourceTextModule(ts.transpileModule(readFileSync(new URL(id),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText,{context,identifier:id});
- modules.set(id,mod); await mod.link((specifier,ref)=>load(specifier==='cloudflare:workers'?specifier:new URL(specifier+'.ts',ref.identifier).href)); return mod;
+ modules.set(id,mod); await mod.link((specifier,ref)=>load(specifier==='cloudflare:workers'?specifier:new URL(specifier.endsWith('.ts')?specifier:specifier+'.ts',ref.identifier).href)); return mod;
 }
 const entry=await load(new URL('../lib/seo-sitemap.ts',import.meta.url).href);await entry.evaluate();
 const response=entry.namespace.sitemapResponse;
@@ -36,15 +36,16 @@ addFile.run(publicId,'private-image','Private.webp','image/webp',10,'private');
 addFile.run(publicId,'private-doc','Private.pdf','application/pdf',10,'private');
 addFile.run(hiddenId,'hidden-image','Hidden.webp','image/webp',10,'public');
 let xml=await(await response('/sitemaps/posts-1.xml')).text();
-assert.ok(xml.includes('/bai-viet/'+publicId+'<'));
-for(const id of [hiddenId,deletedId,discussionId])assert.ok(!xml.includes('/bai-viet/'+id+'<'));
+const slugOf=id=>sqlite.prepare('SELECT slug FROM posts WHERE id=?').get(id).slug;
+assert.ok(xml.includes('/'+slugOf(publicId)+'<'));
+for(const id of [hiddenId,deletedId,discussionId])assert.ok(!xml.includes('/'+slugOf(id)+'<'));
 assert.ok(xml.includes('public%26image'));
 for(const key of ['private-image','private-doc','hidden-image','lastmod'])assert.ok(!xml.includes(key));
 xml=await(await response('/sitemaps/profiles-1.xml')).text();
 assert.ok(xml.includes('/nguoi-dung/public_member'));
 for(const id of ['empty_member','disabled_member','virtual_architect_01'])assert.ok(!xml.includes('/nguoi-dung/'+id));
 sqlite.prepare("UPDATE posts SET audience='Ẩn bởi tác giả' WHERE id=?").run(publicId);
-assert.ok(!(await(await response('/sitemaps/posts-1.xml')).text()).includes('/bai-viet/'+publicId+'<'), 'Visibility must update without cache expiry');
+assert.ok(!(await(await response('/sitemaps/posts-1.xml')).text()).includes('/'+slugOf(publicId)+'<'), 'Visibility must update without cache expiry');
 assert.ok(!(await(await response('/sitemaps/profiles-1.xml')).text()).includes('/nguoi-dung/public_member'), 'Profiles leave sitemap when their last eligible public post disappears');
 sqlite.prepare("UPDATE posts SET audience='Công khai' WHERE id=?").run(publicId);
 assert.ok((await(await response('/sitemaps/profiles-1.xml')).text()).includes('/nguoi-dung/public_member'), 'Publishing automatically restores eligible profile URL');

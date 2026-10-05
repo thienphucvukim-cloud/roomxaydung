@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { NewsPost } from "./news-feed";
+import { isPostSlug, postHref, postShareImage, SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH } from "./post-url.ts";
 
 export const SITE_ORIGIN = "https://nhadepchat.top";
 export const SITE_NAME = "NhàĐẹpChất";
@@ -9,7 +10,7 @@ export const DEFAULT_DESCRIPTION = "Chia sẻ mẫu nhà, bản vẽ, nội th�
 export const PUBLIC_SEO_PATHS = ["/", "/kho-mau-nha-dep-chat", "/file-ban-ve-nha-dep-chat", "/noi-that", "/thue-thiet-ke", "/cam-nang", "/nhat-ky-xay-nha", "/mat-bang-cong-nang", "/hoi-chuyen-gia", "/tinh-vat-tu-nha-dep-chat", "/gioi-thieu", "/privacy"] as const;
 
 export function isPublicSeoPage(pathname: string) {
-  return PUBLIC_SEO_PATHS.some(path => path === pathname) || /^\/bai-viet\/[1-9]\d*$/.test(pathname) || /^\/nguoi-dung\/[A-Za-z0-9_-]{1,180}$/.test(pathname);
+  return PUBLIC_SEO_PATHS.some(path => path === pathname) || /^\/bai-viet\/[1-9]\d*$/.test(pathname) || /^\/nguoi-dung\/[A-Za-z0-9_-]{1,180}$/.test(pathname) || (pathname.startsWith("/") && isPostSlug(pathname.slice(1)));
 }
 export function isSitemapPath(path: string) { return path === "/sitemap.xml" || path.startsWith("/sitemaps/"); }
 export function seoText(value: string, limit = 160) { return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit); }
@@ -44,14 +45,16 @@ export function sitePageStructuredData(path: "/" | "/gioi-thieu") {
 }
 export function postMetadata(post: NewsPost): Metadata {
   const description = [post.content, post.specifications, post.listingType, post.priceLabel, post.sourceLabel].filter(Boolean).join(" · ");
-  return { ...pageMetadata(post.title, description, `/bai-viet/${post.id}`, post.images.slice(0, 4).map(image => image.url)),
-    openGraph: { title: `${post.title} | ${SITE_NAME}`, description: seoText(description), url: canonicalUrl(`/bai-viet/${post.id}`), type: "article", locale: "vi_VN", siteName: SITE_NAME,
-      publishedTime: post.createdAt, authors: [canonicalUrl(`/nguoi-dung/${encodeURIComponent(post.userId)}`)], images: post.images.slice(0, 4).map(image => ({ url: new URL(image.url, SITE_ORIGIN).href, alt: post.title })) },
+  const image = postShareImage(post);
+  const preview = new URL(image || SITE_IMAGE, SITE_ORIGIN).href;
+  return { ...pageMetadata(post.title, description, postHref(post), [preview]),
+    openGraph: { title: `${post.title} | ${SITE_NAME}`, description: seoText(description), url: canonicalUrl(postHref(post)), type: "article", locale: "vi_VN", siteName: SITE_NAME,
+      publishedTime: post.createdAt, authors: [canonicalUrl(`/nguoi-dung/${encodeURIComponent(post.userId)}`)], images: [{ url: preview, secureUrl: preview, alt: post.title, ...(image?.startsWith("/api/share-image/") ? { type: "image/jpeg", width: SHARE_IMAGE_WIDTH, height: SHARE_IMAGE_HEIGHT } : {}) }] },
   };
 }
 export function postStructuredData(post: NewsPost) {
-  return { "@context": "https://schema.org", "@type": "SocialMediaPosting", "@id": canonicalUrl(`/bai-viet/${post.id}`) + "#posting",
-    url: canonicalUrl(`/bai-viet/${post.id}`), mainEntityOfPage: canonicalUrl(`/bai-viet/${post.id}`), headline: post.title,
+  return { "@context": "https://schema.org", "@type": "SocialMediaPosting", "@id": canonicalUrl(postHref(post)) + "#posting",
+    url: canonicalUrl(postHref(post)), mainEntityOfPage: canonicalUrl(postHref(post)), headline: post.title,
     ...(post.content ? { text: post.content } : {}), datePublished: post.createdAt,
     author: { "@type": "Person", name: post.authorName, url: canonicalUrl(`/nguoi-dung/${encodeURIComponent(post.userId)}`) },
     ...(post.images.length ? { image: post.images.map(image => new URL(image.url, SITE_ORIGIN).href) } : {}),

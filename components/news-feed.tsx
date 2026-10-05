@@ -15,7 +15,8 @@ import { usePostAnchor } from "@/components/use-post-anchor";
 
 const sourceIcons = [House, HouseGalleryIcon, DraftingCompass, Sofa];
 
-export function NewsFeed({ postId, initialData }: { postId?: number; initialData?: NewsFeedResponse }) {
+export function NewsFeed({ postId, postSlug, initialData }: { postId?: number; postSlug?: string; initialData?: NewsFeedResponse }) {
+  const detail = Boolean(postId || postSlug);
   const [composerOpen, setComposerOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [category, setCategory] = useState("");
@@ -23,7 +24,7 @@ export function NewsFeed({ postId, initialData }: { postId?: number; initialData
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
-  const scope = JSON.stringify([postId ?? null, category, search]);
+  const scope = JSON.stringify([postId ?? postSlug ?? null, category, search]);
   const selection = `${scope}:${page}`;
   const [result, setResult] = useState<{ selection: string; scope: string; data?: NewsFeedResponse; error?: string }>(initialData ? { selection, scope, data: initialData } : { selection: "", scope: "" });
   const [refreshing, setRefreshing] = useState(false);
@@ -49,6 +50,7 @@ export function NewsFeed({ postId, initialData }: { postId?: number; initialData
         const readPage = async (number: number) => {
           const params = new URLSearchParams({ page: String(number), category, q: search });
           if (postId) params.set("postId", String(postId));
+          else if (postSlug) params.set("slug", postSlug);
           const response = await fetch(`/api/news-feed?${params}`, { signal: controller.signal, cache: "no-store" });
           const payload = await response.json() as NewsFeedResponse & { error?: string };
           if (!response.ok) throw new Error(payload.error || "Chưa thể tải bảng tin.");
@@ -102,7 +104,7 @@ export function NewsFeed({ postId, initialData }: { postId?: number; initialData
       window.removeEventListener(SITE_EVENTS.contentChanged, updateContent);
       window.removeEventListener(SITE_EVENTS.avatarChanged, updateContent);
     };
-  }, [category, search, page, selection, scope, revision, postId]);
+  }, [category, search, page, selection, scope, revision, postId, postSlug]);
 
   useEffect(() => {
     if (!current || refreshing || error || !data || page >= data.totalPages || !loadMoreRef.current || !window.IntersectionObserver) return;
@@ -119,8 +121,8 @@ export function NewsFeed({ postId, initialData }: { postId?: number; initialData
   return <div className="min-h-screen bg-[#f0f2f5] text-[#1c1e21]">
     <main className="mx-auto max-w-[1320px] px-4 py-5 lg:px-8">
       <h1 className="sr-only">Bảng tin</h1>
-      <div className={`grid grid-cols-1 items-start gap-6 ${postId ? "" : "lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[240px_minmax(0,1fr)_240px]"}`}>
-        {!postId && <aside className="min-w-0 rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24">
+      <div className={`grid grid-cols-1 items-start gap-6 ${detail ? "" : "lg:grid-cols-[220px_minmax(0,1fr)_220px] xl:grid-cols-[240px_minmax(0,1fr)_240px]"}`}>
+        {!detail && <aside className="min-w-0 rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24">
           <h2 className="px-2 text-sm font-extrabold">Khám phá bảng tin</h2>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:flex-col" role="group" aria-label="Lọc bảng tin">
             {[{ category: "", label: "Tất cả", Icon: House }, ...NEWS_SOURCES.map((source, index) => ({ ...source, Icon: sourceIcons[index] }))].map(item =>
@@ -131,23 +133,23 @@ export function NewsFeed({ postId, initialData }: { postId?: number; initialData
         </aside>}
 
         <section aria-label="Bài đăng mới" className="min-w-0">
-          {postId && <ClientNavigationLink href="/" className="text-sm font-semibold text-[#168ac0] hover:underline">Quay lại bảng tin</ClientNavigationLink>}
-          {!postId && <CatalogToolbar query={query} onQueryChange={setQuery} onSearch={submitSearch} onClear={() => { setQuery(""); setSearch(""); setPage(1); }} onPublish={() => setComposerOpen(true)} publishLabel="Đăng bài" publishTitle="Đăng bài lên bảng tin" searchLabel="Tìm bài trên bảng tin" placeholder="Tìm bài đăng, người chia sẻ..." />}
+          {detail && <ClientNavigationLink href="/" className="text-sm font-semibold text-[#168ac0] hover:underline">Quay lại bảng tin</ClientNavigationLink>}
+          {!detail && <CatalogToolbar query={query} onQueryChange={setQuery} onSearch={submitSearch} onClear={() => { setQuery(""); setSearch(""); setPage(1); }} onPublish={() => setComposerOpen(true)} publishLabel="Đăng bài" publishTitle="Đăng bài lên bảng tin" searchLabel="Tìm bài trên bảng tin" placeholder="Tìm bài đăng, người chia sẻ..." />}
           {notice && <p role="status" className="mt-3 text-sm text-[#168ac0]">{notice}</p>}
           <div className="my-4 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold">{postId ? "Bài viết" : search ? `Kết quả cho “${search}”` : "Bài đăng mới nhất"}{data && !postId ? <span className="ml-2 font-normal text-[#667085]">({data.total})</span> : null}</h2>
+            <h2 className="text-sm font-bold">{detail ? "Bài viết" : search ? `Kết quả cho “${search}”` : "Bài đăng mới nhất"}{data && !detail ? <span className="ml-2 font-normal text-[#667085]">({data.total})</span> : null}</h2>
             <button type="button" disabled={refreshing} onClick={() => setRevision(value => value + 1)} className="flex shrink-0 items-center gap-1.5 text-xs font-bold text-[#168ac0] disabled:opacity-60"><RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />Làm mới</button>
           </div>
           {error && <div role="alert" className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}<button type="button" onClick={() => setRevision(value => value + 1)} className="ml-2 font-bold underline">Thử lại</button></div>}
           {loading && <p role="status" className="flex justify-center gap-2 py-12 text-sm text-[#667085]"><LoaderCircle size={18} className="animate-spin" />Đang tải bảng tin...</p>}
           {data?.posts.length === 0 && <div className="rounded-2xl border border-dashed border-[#cfdeea] bg-white p-9 text-center"><House className="mx-auto text-[#8aa0b5]" size={36} /><h3 className="mt-4 font-extrabold">{search ? "Không tìm thấy bài đăng" : "Chưa có bài đăng"}</h3><p className="mt-2 text-sm leading-6 text-[#667085]">{search ? "Thử từ khóa khác hoặc xem tất cả danh mục." : "Khi có bài công khai mới, nội dung sẽ xuất hiện trên bảng tin."}</p>{(search || category) && <button type="button" onClick={() => { setQuery(""); setSearch(""); filter(""); }} className="mt-4 text-sm font-bold text-[#168ac0]">Xem tất cả</button>}</div>}
-          <div className="space-y-4">{data?.posts.map(post => <NewsPostCard key={post.id} post={post} detail={Boolean(postId)} onFilter={postId ? undefined : filter} />)}</div>
-          {data && !postId && <div ref={loadMoreRef} className="mt-6 flex flex-col items-center gap-3 py-4">
+          <div className="space-y-4">{data?.posts.map(post => <NewsPostCard key={post.id} post={post} detail={Boolean(detail)} onFilter={detail ? undefined : filter} />)}</div>
+          {data && !detail && <div ref={loadMoreRef} className="mt-6 flex flex-col items-center gap-3 py-4">
             {refreshing && !current && <p role="status" className="flex items-center gap-2 text-sm text-[#667085]"><LoaderCircle size={18} className="animate-spin" />Đang tải thêm bài đăng...</p>}
             {data.page < data.totalPages ? <button type="button" disabled={refreshing || !current} onClick={() => { if (error || page > data.page) setRevision(value => value + 1); else setPage(value => value + 1); }} className="rounded-xl border bg-white px-5 py-2 text-sm font-semibold disabled:opacity-40">{error ? "Thử tải thêm bài đăng" : "Xem thêm bài đăng"}</button> : data.posts.length > 0 && <p className="text-xs text-[#667085]">Bạn đã xem hết bài đăng{search || category ? " phù hợp" : " hiện tại"}.</p>}
           </div>}
         </section>
-        {!postId && <aside aria-labelledby="featured-news-heading" className="hidden rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
+        {!detail && <aside aria-labelledby="featured-news-heading" className="hidden rounded-2xl border border-[#e3eaf2] bg-white p-4 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
           <h2 id="featured-news-heading" className="flex items-center gap-2 px-2 text-sm font-extrabold"><Flame size={18} className="shrink-0 text-[#168ac0]" aria-hidden="true" />Tin nổi bật</h2>
           <p className="mt-2 px-2 text-xs leading-5 text-[#667085]">Những bài đăng được thảo luận nhiều trên bảng tin.</p>
           {loading && <p role="status" className="mt-4 flex items-center gap-2 px-2 text-xs text-[#667085]"><LoaderCircle size={16} className="animate-spin" />Đang tải tin nổi bật...</p>}

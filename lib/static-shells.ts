@@ -13,6 +13,7 @@ export const STATIC_SHELL_TEMPLATES = [
   { prefix: "/thue-thiet-ke/freelancer/", marker: "__nhadepchat_shell_id__", numeric: false },
   { prefix: "/thue-thiet-ke/", marker: "__nhadepchat_shell_id__", numeric: false },
   { prefix: "/nguoi-dung/", marker: "__nhadepchat_shell_id__", numeric: false },
+  { prefix: "/", marker: "nhadepchat-shared-post-shell", numeric: false },
 ] as const;
 export function shellAssetPath(pathname: string, rsc = false, navigation = false) {
   return "/_shells/" + (pathname === "/" ? "home" : pathname.slice(1)) + (rsc ? navigation ? ".nav.rsc" : ".rsc" : ".html");

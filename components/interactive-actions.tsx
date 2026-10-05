@@ -9,6 +9,7 @@ import { optimizeImageForUpload } from "@/lib/image-upload";
 import { authActionTarget } from "@/lib/action-auth-return";
 import { ChatThread } from "@/components/chat-thread";
 import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
+import { postHref } from "@/lib/post-url";
 
 type IconName = "heart" | "bookmark" | "star" | "follow" | "check";
 const iconMap = { heart: Heart, bookmark: Bookmark, star: Star, follow: UserPlus, check: Check };
@@ -119,13 +120,29 @@ export function ShareActionButton({ title, url, iconOnly = false, className = ""
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [manualLink, setManualLink] = useState("");
+  const [shareError, setShareError] = useState("");
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
   const share = async () => {
     if (busy) return;
-    const postPath = targetType === "post" && targetId && /^[1-9]\d*$/.test(targetId) && Number.isSafeInteger(Number(targetId)) ? `/bai-viet/${targetId}` : undefined;
-    const link = new URL(postPath ?? url ?? window.location.href, window.location.origin).href;
     setBusy(true);
+    setShareError("");
+    let link: string;
+    try {
+      let path = url ?? window.location.href;
+      if (targetType === "post" && targetId && /^[1-9]\d*$/.test(targetId) && Number.isSafeInteger(Number(targetId))) {
+        const response = await fetch(`/api/news-feed?postId=${targetId}`, { cache: "no-store" });
+        const data = await response.json() as { posts?: { id: number; slug?: string | null }[] };
+        const post = data.posts?.find(post => post.id === Number(targetId));
+        if (!response.ok || !post?.slug) throw new Error("Post link unavailable");
+        path = postHref(post);
+      }
+      link = new URL(path, window.location.origin).href;
+    } catch {
+      setShareError("Chưa thể lấy liên kết bài viết. Vui lòng thử lại.");
+      setBusy(false);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(link);
     } catch {
@@ -151,6 +168,7 @@ export function ShareActionButton({ title, url, iconOnly = false, className = ""
       {copied ? <Check size={17} aria-hidden="true"/> : <Share2 size={17} aria-hidden="true"/>}
       <span className={iconOnly ? "sr-only" : undefined} aria-live="polite">{copied ? "Đã sao chép" : "Chia sẻ"}</span>
     </button>
+    {shareError && <span role="alert" className="text-xs text-rose-600">{shareError}</span>}
     <Dialog open={Boolean(manualLink)} onOpenChange={(open) => { if (!open) setManualLink(""); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>Chia sẻ: {title}</DialogTitle></DialogHeader>

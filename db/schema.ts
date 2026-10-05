@@ -23,6 +23,7 @@ export const posts = sqliteTable("posts", {
   authorName: text("author_name").notNull(),
   category: text("category").notNull(),
   title: text("title").notNull(),
+  slug: text("slug"),
   content: text("content").notNull(),
   specifications: text(POST_STORAGE_COLUMNS.specifications),
   audience: text("audience").notNull().default("Công khai"),
@@ -30,7 +31,7 @@ export const posts = sqliteTable("posts", {
   priceLabel: text(POST_STORAGE_COLUMNS.priceLabel),
   comments: integer("comments").notNull().default(0),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, table => [uniqueIndex("posts_slug_unique").on(table.slug)]);
 
 // Internal editorial decisions are never included in public post metadata.
 export const catalogQualityFlags = sqliteTable("catalog_quality_flags", {

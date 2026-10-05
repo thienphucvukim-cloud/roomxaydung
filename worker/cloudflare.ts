@@ -7,6 +7,7 @@ import { handleConfiguredImageOptimization, isImageOptimizationPath } from "vine
 import { canonicalUrl, isPublicSeoPage, isSitemapPath } from "../lib/seo";
 import { robotsResponse } from "../lib/seo-robots";
 import { replaceRscShellTemplate } from "../lib/rsc-shell-template";
+import { isPostSlug } from "../lib/post-url";
 export { ApiRuntime } from "./api-runtime";
 
 let shellVersion: { buildId: string; rscCompatibilityId: string } | undefined;
@@ -114,7 +115,7 @@ const worker = {
       headers.delete("cookie"); headers.delete("authorization");
       return env.API_RUNTIME.get(env.API_RUNTIME.idFromName("public-pages")).fetch(cloudflareRequest(new Request(request, { headers })));
     }
-    const template = STATIC_SHELL_TEMPLATES.find(template => pathname.startsWith(template.prefix) && /^[A-Za-z0-9_-]{1,180}$/.test(pathname.slice(template.prefix.length)));
+    const template = STATIC_SHELL_TEMPLATES.find(template => pathname.startsWith(template.prefix) && /^[A-Za-z0-9_-]{1,180}$/.test(pathname.slice(template.prefix.length)) && (template.prefix !== "/" || isPostSlug(pathname.slice(1))));
     const detailId = template ? pathname.slice(template.prefix.length) : undefined;
     if (template?.numeric && (!/^[1-9]\d*$/.test(detailId!) || !Number.isSafeInteger(Number(detailId)))) return new Response("Not found", { status: 404 });
     if (readOnly && env.ASSETS && (template || STATIC_SHELL_PATHS.some(path => path === pathname))) {
@@ -141,7 +142,7 @@ const worker = {
             headers.delete("etag");
             headers.delete("content-length");
             headers.delete("content-encoding");
-            headers.set("X-Vinext-Params", encodeURIComponent(JSON.stringify({ id: detailId })));
+            headers.set("X-Vinext-Params", encodeURIComponent(JSON.stringify({ [template.prefix === "/" ? "slug" : "id"]: detailId })));
             const payload = await response.text();
             const body = rsc ? replaceRscShellTemplate(payload, template.marker, detailId!) : payload.split(template.marker).join(detailId!);
             return new Response(request.method === "HEAD" ? null : body, { status: 200, headers });
@@ -168,8 +169,8 @@ const seoWorker = {
     const contentType = headers.get("content-type") || "";
     if (contentType.includes("text/html")) {
       if (!isPublicSeoPage(url.pathname) || [...url.searchParams.keys()].some(key => !["_rsc", "page"].includes(key))) headers.set("X-Robots-Tag", "noindex, follow");
-      if (isPublicSeoPage(url.pathname)) headers.set("Link", `<${canonicalUrl(url.pathname + url.search)}>; rel="canonical"`);
-    } else if (url.pathname.startsWith("/api/") && url.pathname !== "/api/files") headers.set("X-Robots-Tag", "noindex");
+      if (isPublicSeoPage(url.pathname) && !headers.has("Link")) headers.set("Link", `<${canonicalUrl(url.pathname + url.search)}>; rel="canonical"`);
+    } else if (url.pathname.startsWith("/api/") && url.pathname !== "/api/files" && !url.pathname.startsWith("/api/share-image/")) headers.set("X-Robots-Tag", "noindex");
     return new Response(response.body, { status: response.status, headers });
   },
 };

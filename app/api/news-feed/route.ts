@@ -4,12 +4,15 @@ import { getDb } from "@/db";
 import { memberProfiles, postAttachments, posts } from "@/db/schema";
 import { NEWS_PAGE_SIZE, NEWS_SOURCES, newsSourceLink } from "@/lib/news-feed";
 import { memberAvatarUrl } from "@/lib/member-avatar";
+import { isPostSlug } from "@/lib/post-url";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const page = Number(params.get("page") ?? 1);
   const category = params.get("category") || "";
   const postId = params.get("postId");
+  const slug = params.get("slug");
+  if (slug !== null && !isPostSlug(slug)) return Response.json({ error: "Đường dẫn không hợp lệ." }, { status: 400 });
   if (postId !== null && (!/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId)))) return Response.json({ error: "Bài đăng không hợp lệ." }, { status: 400 });
   const query = params.get("q")?.trim().slice(0, 120) || "";
   if (!Number.isSafeInteger(page) || page < 1 || page > 1000000) {
@@ -25,6 +28,7 @@ export async function GET(request: Request) {
       eq(posts.audience, "Công khai"),
       inArray(posts.category, NEWS_SOURCES.map(source => source.category)),
       postId ? eq(posts.id, Number(postId)) : undefined,
+      slug ? eq(posts.slug, slug) : undefined,
       category ? eq(posts.category, category) : undefined,
       query ? or(...[posts.title, posts.content, posts.authorName, posts.specifications, posts.listingType].map(column =>
         sql`instr(lower(coalesce(${column}, '')), lower(${query})) > 0`,
@@ -56,7 +60,7 @@ export async function GET(request: Request) {
     return Response.json({
       posts: rows.map(post => postWithLegacyMetadata({
         id: post.id, userId: post.userId, authorName: post.authorName, avatarUrl: avatars.get(post.userId) ?? null, category: post.category,
-        title: post.title, content: post.content, specifications: post.specifications, listingType: post.listingType,
+        title: post.title, slug: post.slug, content: post.content, specifications: post.specifications, listingType: post.listingType,
         priceLabel: post.priceLabel, createdAt: post.createdAt, comments: post.comments,
         ...newsSourceLink(post.category, post.id),
         images: imagesByPost.get(post.id) ?? [],

@@ -9,6 +9,7 @@ import { ClientNavigationLink } from "@/components/client-navigation-link";
 import { CurrentMemberAvatar, MemberAvatar } from "@/components/member-avatar";
 import { OwnerPostControls } from "@/components/site-editor";
 import { ShareActionButton, ToggleActionButton } from "@/components/interactive-actions";
+import { postHref } from "@/lib/post-url";
 import { NewsPhotoViewer } from "@/components/news-photo-viewer";
 import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
 import { optimizeImageForUpload } from "@/lib/image-upload";
@@ -138,7 +139,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
     <div className="min-w-0 flex-1">
       <ClientNavigationLink href={`/nguoi-dung/${encodeURIComponent(post.userId)}`} className="block w-fit max-w-full break-words text-[15px] font-semibold hover:underline">{post.authorName}</ClientNavigationLink>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[#65676b]">
-        <time dateTime={post.createdAt}><ClientNavigationLink href={`/bai-viet/${post.id}`}>{dateFormat.format(new Date(post.createdAt))}</ClientNavigationLink></time>
+        <time dateTime={post.createdAt}><ClientNavigationLink href={postHref(post)}>{dateFormat.format(new Date(post.createdAt))}</ClientNavigationLink></time>
         <span aria-hidden="true">·</span><Globe2 size={12} aria-label="Công khai" />
         <span aria-hidden="true">·</span>{onFilter && !gallery ? <button type="button" onClick={() => onFilter(post.category)} className="hover:text-[#168ac0] hover:underline">{post.sourceLabel}</button> : <span>{post.sourceLabel}</span>}
       </div>
@@ -147,7 +148,7 @@ export function NewsPostCard({ post, onFilter, detail = false }: { post: NewsPos
   </header>;
 
   const postContent = <div className="px-4 pb-3">
-    {post.category !== POST_CATEGORIES.news && <h3 className="break-words text-[15px] font-semibold leading-6"><ClientNavigationLink href={`/bai-viet/${post.id}`}>{title}</ClientNavigationLink></h3>}
+    {post.category !== POST_CATEGORIES.news && <h3 className="break-words text-[15px] font-semibold leading-6"><ClientNavigationLink href={postHref(post)}>{title}</ClientNavigationLink></h3>}
     {post.content && <>
       <p className={`mt-1 whitespace-pre-wrap break-words text-[15px] leading-6 ${canExpand && !expanded && !gallery ? "line-clamp-4" : ""}`}>{content}</p>
       {canExpand && !gallery && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)} className="mt-1 text-sm font-semibold hover:underline">{expanded ? "Thu gọn" : "Xem thêm"}</button>}

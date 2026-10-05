@@ -239,7 +239,8 @@ export async function POST(request: Request) {
       savedAttachments = inserted.filter((attachment) => attachment.accessType === "public").sort((a, b) => a.id - b.id).map(publicAttachment);
     }
 
-    return Response.json({ post: { ...postWithLegacyMetadata(post), attachments: savedAttachments } }, { status: 201 });
+    const [link] = await db.select({ slug: posts.slug }).from(posts).where(eq(posts.id, post.id)).limit(1);
+    return Response.json({ post: { ...postWithLegacyMetadata(post), slug: link.slug, attachments: savedAttachments } }, { status: 201 });
   } catch {
     return Response.json({ error: "Chưa thể đăng bài lúc này. Vui lòng thử lại." }, { status: 500 });
   }

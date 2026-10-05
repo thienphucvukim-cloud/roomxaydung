@@ -48,7 +48,7 @@ export async function dispatchApi(request: Request): Promise<Response> {
       await discardUnreadBody(scopedRequest);
       const responseHeaders = new Headers(response.headers);
       for (const cookie of getAndClearPendingCookies()) responseHeaders.append("Set-Cookie", cookie);
-      if (guestCookie) responseHeaders.append("Set-Cookie", guestCookie);
+      if (guestCookie && !pathname.startsWith("/api/share-image/")) responseHeaders.append("Set-Cookie", guestCookie);
       // API data may contain identity, wallet or private records. Never let a
       // shared cache turn the cheap dispatcher into an authentication bypass.
       if (!responseHeaders.has("Cache-Control")) responseHeaders.set("Cache-Control", "private, no-store");

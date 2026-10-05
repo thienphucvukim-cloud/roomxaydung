@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import jpeg from 'jpeg-js';
 const origin=process.env.TIPOOK_TEST_ORIGIN||'http://127.0.0.1:8790';
 assert.ok(['localhost','127.0.0.1'].includes(new URL(origin).hostname),'Fixtures must stay local');
 const call=async(path,body,cookie,method='POST',status=200)=>{
@@ -22,11 +23,22 @@ const checkShare=async(path,post,preview)=>{
  const head=page.html.slice(page.html.indexOf('<head'),page.html.indexOf('</head>'));
  assert.ok(head.includes(`property="og:title" content="${post.title} | NhàĐẹpChất"`),'Post title must be in the initial head for social crawlers: '+path);
  assert.ok(head.includes('property="og:type" content="article"'));
- assert.ok(head.includes(`property="og:url" content="https://nhadepchat.top/bai-viet/${post.id}"`));
- assert.ok(head.includes(`property="og:image" content="https://nhadepchat.top/api/files?key=${preview.key}"`),'Share image must be the public uploaded image: '+path);
- assert.ok(head.includes(`name="twitter:image" content="https://nhadepchat.top/api/files?key=${preview.key}"`));
- assert.ok(page.headers.get('link')?.includes(`https://nhadepchat.top/bai-viet/${post.id}`));
+ assert.ok(head.includes('property="og:image:type" content="image/jpeg"'));
+ assert.ok(head.includes('property="og:image:width" content="1200"'));
+ assert.ok(head.includes('property="og:image:height" content="630"'));
+ assert.ok(head.includes(`property="og:url" content="https://nhadepchat.top/${post.slug}"`));
+ assert.ok(head.includes(`property="og:image" content="https://nhadepchat.top/api/share-image/${post.id}.jpg?v=${preview.key}"`),'Share image must be the public uploaded image: '+path);
+ assert.ok(head.includes(`name="twitter:image" content="https://nhadepchat.top/api/share-image/${post.id}.jpg?v=${preview.key}"`));
+ assert.ok(page.headers.get('link')?.includes(`https://nhadepchat.top/${post.slug}`));
  assert.ok(page.html.includes(`id="post-${post.id}"`),'The shared link opens its exact post');
+ const imagePath=`/api/share-image/${post.id}.jpg?v=${preview.key}`;
+ const image=await fetch(origin+imagePath,{headers:{'user-agent':'facebookexternalhit/1.1'}});
+ assert.equal(image.status,200,imagePath);assert.equal(image.headers.get('content-type'),'image/jpeg');
+ const bytes=new Uint8Array(await image.arrayBuffer()),decoded=jpeg.decode(bytes,{useTArray:true});
+ assert.equal(decoded.width,1200);assert.equal(decoded.height,630);assert.ok(bytes.length<1024*1024);
+ const headImage=await fetch(origin+imagePath,{method:'HEAD'});assert.equal(headImage.status,200);assert.equal((await headImage.arrayBuffer()).byteLength,0);
+ assert.equal(Number(headImage.headers.get('content-length')),bytes.length);
+ assert.equal((await fetch(origin+`/api/share-image/${post.id}.jpg?v=00000000-0000-4000-8000-000000000000`)).status,404,'Stale or forged preview keys are rejected');
  return page;
 };
 for(const path of ['/','/gioi-thieu']){
@@ -51,7 +63,7 @@ await checkShare('/bai-viet/'+post.id,post,image);
 assert.equal(page.status,200);
 assert.ok(page.html.includes('id="post-'+post.id+'"'),'Public post is rendered before JavaScript');
 assert.ok(page.html.includes('SEO visible content'),'Content is in initial HTML');
-assert.ok(page.html.includes('rel="canonical" href="https://nhadepchat.top/bai-viet/'+post.id+'"'));
+assert.ok(page.html.includes('rel="canonical" href="https://nhadepchat.top/'+post.slug+'"'));
 const schema=schemaOf(page.html).find(item=>item['@type']==='SocialMediaPosting');
 assert.ok(schema);assert.equal(schema.text,text);assert.ok(schema.image.some(url=>url.includes(image.key)));
 assert.ok(!page.html.includes('<script>window.seoUnsafe=1</script>'),'User content cannot inject scripts');
@@ -72,12 +84,13 @@ const robots=await document('/robots.txt');assert.equal(robots.status,200);asser
 assert.equal((await document('/robots.txt',{method:'HEAD'})).html,'');
 const sitemapHead=await document('/sitemap.xml',{method:'HEAD'});
 assert.equal(sitemapHead.status,200);assert.equal(sitemapHead.html,'');
-let sitemap=await document('/sitemaps/posts-1.xml');assert.ok(sitemap.html.includes('/bai-viet/'+post.id+'<'));assert.ok(sitemap.html.includes(image.key));
+let sitemap=await document('/sitemaps/posts-1.xml');assert.ok(sitemap.html.includes('/'+post.slug+'<'));assert.ok(sitemap.html.includes(image.key));
 await call('/api/my-posts',{id:post.id,imageKeys:[]},cookie,'PATCH');
-sitemap=await document('/sitemaps/posts-1.xml');assert.ok(sitemap.html.includes('/bai-viet/'+post.id+'<'));assert.ok(!sitemap.html.includes(image.key),'Removed images disappear on the next sitemap read');
+assert.equal((await fetch(origin+`/api/share-image/${post.id}.jpg?v=${image.key}`)).status,404,'Removed images leave preview immediately');
+sitemap=await document('/sitemaps/posts-1.xml');assert.ok(sitemap.html.includes('/'+post.slug+'<'));assert.ok(!sitemap.html.includes(image.key),'Removed images disappear on the next sitemap read');
 await call('/api/my-posts',{id:post.id,action:'hide'},cookie,'PATCH');
 assert.equal((await document('/bai-viet/'+post.id)).status,404,'Hidden posts must not remain in SEO HTML');
-assert.ok(!(await document('/sitemaps/posts-1.xml')).html.includes('/bai-viet/'+post.id+'<'));
+assert.ok(!(await document('/sitemaps/posts-1.xml')).html.includes('/'+post.slug+'<'));
 await call('/api/my-posts',{id:post.id,action:'publish'},cookie,'PATCH');
 assert.equal((await document('/bai-viet/'+post.id)).status,200);
 await call('/api/my-posts',{id:post.id},cookie,'DELETE');
@@ -98,8 +111,11 @@ for(const [category,path] of [['Bộ sưu tập ảnh','/kho-mau-nha-dep-chat'],
  const shared=await checkShare('/bai-viet/'+catalogPost.id,catalogPost,catalogPreview);
  if(catalogFile) assert.ok(!shared.html.includes(catalogFile.key));
  await call('/api/my-posts',{id:catalogPost.id,action:'hide'},cookie,'PATCH');
+ assert.equal((await fetch(origin+`/api/share-image/${catalogPost.id}.jpg?v=${catalogPreview.key}`)).status,404,'Hidden previews stay inaccessible after JPEG was cached');
+ assert.equal((await document('/'+catalogPost.slug)).status,404);
  assert.equal((await document(path+'?postId='+catalogPost.id,{headers:{'user-agent':'facebookexternalhit/1.1',cookie}})).status,404,'Hidden posts never appear in previews, even for their owner');
  await call('/api/my-posts',{id:catalogPost.id},cookie,'DELETE');
+ assert.equal((await document('/'+catalogPost.slug)).status,404);
  assert.equal((await document(path+'?postId='+catalogPost.id)).status,404);
 }
 for(const base of ['/kho-mau-nha-dep-chat','/file-ban-ve-nha-dep-chat','/noi-that']) {
@@ -108,6 +124,6 @@ for(const base of ['/kho-mau-nha-dep-chat','/file-ban-ve-nha-dep-chat','/noi-tha
 page=await document('/bai-viet/'+listing.id);assert.ok(!page.html.includes(paidFile.key));
 sitemap=await document('/sitemaps/posts-1.xml');assert.ok(sitemap.html.includes(publicPreview.key));assert.ok(!sitemap.html.includes(paidFile.key));
 assert.equal((await fetch(origin+'/api/files?key='+paidFile.key)).status,403);
-assert.ok((await document('/')).html.includes('href="/bai-viet/'+listing.id+'"'),'Feed exposes ordinary crawlable post links');
+assert.ok((await document('/')).html.includes('href="/'+listing.slug+'"'),'Feed exposes ordinary crawlable post links');
 await call('/api/my-posts',{id:listing.id},cookie,'DELETE');
 console.log('PASS: raw public HTML; Facebook/Twitter post previews and matching canonical headers on new and legacy links in all catalogs; exact post content; 404 visibility; no session/private-file leakage; robots, pagination and hide/publish/delete.');

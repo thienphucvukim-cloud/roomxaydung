@@ -1,5 +1,6 @@
 import { isPublicSeoPage, isSitemapPath } from "../lib/seo";
 import { sitemapResponse } from "../lib/seo-sitemap";
+import { canonicalUrl } from "../lib/seo";
 
 // Render public content in the existing SQLite DO allowance, not the Free
 // Worker's 10ms allowance. Compiled renderer modules are reused by the isolate.
@@ -22,5 +23,9 @@ export async function publicPageResponse(request: Request, env: Cloudflare.Env, 
   // Re-check live visibility on every request; hidden/deleted/private posts
   // must never survive in an HTML cache. Do not cache personalized responses.
   resultHeaders.set("Cache-Control", "private, no-store");
+  const legacyId = /^\/bai-viet\/([1-9]\d*)$/.exec(url.pathname)?.[1] || (["/kho-mau-nha-dep-chat", "/file-ban-ve-nha-dep-chat", "/noi-that"].includes(url.pathname) ? url.searchParams.get("postId") : undefined);
+  const post = legacyId && /^[1-9]\d*$/.test(legacyId) && Number.isSafeInteger(Number(legacyId)) && env.DB
+    ? await env.DB.prepare("SELECT slug FROM posts WHERE id=? AND audience='Công khai'").bind(Number(legacyId)).first<{ slug: string }>() : undefined;
+  resultHeaders.set("Link", `<${canonicalUrl(post?.slug ? "/" + post.slug : url.pathname + url.search)}>; rel="canonical"`);
   return new Response(request.method === "HEAD" ? null : response.body, { status: response.status, headers: resultHeaders });
 }

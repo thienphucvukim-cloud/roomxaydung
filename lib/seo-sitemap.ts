@@ -41,12 +41,12 @@ async function generateSitemap(pathname: string) {
       const result = await env.DB.prepare(`SELECT mp.user_id FROM member_profiles mp WHERE ${genuineProfile} ORDER BY mp.user_id LIMIT ? OFFSET ?`).bind(...categories, PAGE_SIZE, offset).all<{ user_id: string }>();
       entries = result.results.map(profile => urlEntry(SITE_ORIGIN + "/nguoi-dung/" + encodeURIComponent(profile.user_id)));
     } else {
-      const result = await env.DB.prepare(`SELECT p.id FROM posts p WHERE ${visiblePosts} ORDER BY p.id LIMIT ? OFFSET ?`).bind(...categories, PAGE_SIZE, offset).all<{ id: number }>();
+      const result = await env.DB.prepare(`SELECT p.id,p.slug FROM posts p WHERE ${visiblePosts} ORDER BY p.id LIMIT ? OFFSET ?`).bind(...categories, PAGE_SIZE, offset).all<{ id: number; slug: string }>();
       const ids = result.results.map(post => post.id);
       const images = ids.length ? await env.DB.prepare(`SELECT pa.post_id, pa.object_key FROM post_attachments pa JOIN (SELECT p.id FROM posts p WHERE ${visiblePosts} ORDER BY p.id LIMIT ? OFFSET ?) eligible ON eligible.id = pa.post_id WHERE pa.access_type = 'public' AND pa.mime_type IN ('image/webp','image/jpeg','image/png','image/gif') ORDER BY pa.id`).bind(...categories, PAGE_SIZE, offset).all<{ post_id: number; object_key: string }>() : { results: [] };
       const byPost = new Map<number, { key: string; title: string }[]>();
       for (const image of images.results) { const current = byPost.get(image.post_id) ?? []; current.push({ key: image.object_key, title: "" }); byPost.set(image.post_id, current); }
-      entries = ids.map(id => urlEntry(SITE_ORIGIN + "/bai-viet/" + id, byPost.get(id)));
+      entries = result.results.map(post => urlEntry(SITE_ORIGIN + "/" + post.slug, byPost.get(post.id)));
     }
     if (!entries.length) return reply("Not found", 404);
   }
