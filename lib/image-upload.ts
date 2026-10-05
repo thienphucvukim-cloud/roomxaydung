@@ -3,7 +3,7 @@ import { drawImageWatermark, loadWatermarkLogo, shouldWatermarkPostImages } from
 
 const MAX_SOURCE_SIZE = 25 * 1024 * 1024;
 
-function encodeWebp(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+function encodeWebp(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob || blob.type !== "image/webp") {
@@ -11,7 +11,7 @@ function encodeWebp(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
         return;
       }
       resolve(blob);
-    }, "image/webp", quality);
+    }, "image/webp", 0.8);
   });
 }
 
@@ -49,17 +49,12 @@ export async function optimizeImageForUpload(file: File, kind: ImageUploadKind =
     };
     draw();
 
-    let result = await encodeWebp(canvas, 0.7);
-    for (const quality of [0.6, 0.5]) {
-      if (result.size <= maxBytes) break;
-      const smaller = await encodeWebp(canvas, quality);
-      if (smaller.size < result.size) result = smaller;
-    }
+    let result = await encodeWebp(canvas);
     while (result.size > maxBytes) {
       if (canvas.width === 1 && canvas.height === 1) throw new Error("Không thể giảm dung lượng ảnh. Vui lòng chọn ảnh khác.");
       scale *= 0.8;
       draw();
-      result = await encodeWebp(canvas, 0.5);
+      result = await encodeWebp(canvas);
     }
 
     return new File([result], webpFileName(file.name), { type: "image/webp", lastModified: file.lastModified });

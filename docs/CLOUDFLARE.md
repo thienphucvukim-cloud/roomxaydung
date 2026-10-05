@@ -119,8 +119,8 @@ tải trang không phải CPU time. Tài liệu: [Workers limits](https://develo
 
 ## Đăng nhập và thanh toán
 
-Ảnh tải mới được nén trên trình duyệt trước khi gửi R2: WebP chất lượng 70%,
-hạ dần đến 50% và giảm kích thước thêm nếu cần. Ảnh bài đăng/ảnh xem trước có
+Ảnh tải mới được nén trên trình duyệt trước khi gửi R2: WebP chất lượng 80%,
+giữ nguyên chất lượng và giảm kích thước thêm nếu cần. Ảnh bài đăng/ảnh xem trước có
 cạnh dài tối đa 1600 px, dung lượng 512 KB; bình luận 1280 px/256 KB;
 avatar 512 px/96 KB. GIF/WebP động được chuyển thành ảnh tĩnh; giữ nền trong suốt.
 Ảnh tải mới ở Mẫu nhà đẹp, Kho bản vẽ và Nội thất được đóng logo NhàĐẹpChất

@@ -156,9 +156,11 @@ try {
     }
     const encode = HTMLCanvasElement.prototype.toBlob;
     let attempts = 0, reduced;
+    const qualities = [];
     try {
       HTMLCanvasElement.prototype.toBlob = function (callback, type, quality) {
-        if (type === 'image/webp' && ++attempts <= 3) callback(new Blob([new Uint8Array(512 * 1024 + 1)], { type }));
+        if (type === 'image/webp') qualities.push(quality);
+        if (type === 'image/webp' && ++attempts === 1) callback(new Blob([new Uint8Array(512 * 1024 + 1)], { type }));
         else encode.call(this, callback, type, quality);
       };
       reduced = await inspectPixels(await window.optimizePostUploadFixture(source, 'Bộ sưu tập ảnh'));
@@ -171,7 +173,7 @@ try {
       let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
       samples.push({ name, base64: btoa(binary) });
     }
-    return { results, reduced, attempts, logoFailureRejected, samples };
+    return { results, reduced, attempts, qualities, logoFailureRejected, samples };
   })()`);
   assert.equal(watermark.logoFailureRejected, true, 'A missing logo must not silently upload an unmarked catalog photo');
   for (const result of [...watermark.results.slice(0, 3), watermark.reduced]) {
@@ -182,6 +184,7 @@ try {
     assert.equal(result.type, 'image/webp'); assert.ok(result.size <= 512 * 1024);
   }
   assert.equal(watermark.reduced.width, 960, 'Logo must survive size reduction after compression retries');
+  assert.deepEqual(watermark.qualities, [0.8, 0.8], 'Initial encoding and size reduction must both preserve 80% quality');
   assert.ok(watermark.results.slice(3).every(result => result.changed === 0), 'News photos, comments and avatars must remain unmarked');
   for (const sample of watermark.samples) writeFileSync(path.join(dir, sample.name), Buffer.from(sample.base64, 'base64'));
   console.log('PASS: all three catalog categories embed a small bottom-centered logo in WebP; compression retries retain it; logo load failures retry safely; unrelated images stay unmarked.');
