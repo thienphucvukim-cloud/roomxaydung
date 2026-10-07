@@ -1,15 +1,15 @@
 "use client";
 
 import { SITE_EVENTS } from "@/lib/site-events";
-import { useEffect, useId, useRef, useState } from "react";
-import { Bookmark, Check, CircleHelp, FileDown, Heart, LoaderCircle, MessageCircle, Send, Share2, Star, Upload, UserPlus, UserRound, X } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { Bookmark, Check, CircleHelp, FileDown, Heart, LoaderCircle, MessageCircle, Send, Star, Upload, UserPlus, UserRound, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { optimizeImageForUpload } from "@/lib/image-upload";
 import { authActionTarget } from "@/lib/action-auth-return";
 import { ChatThread } from "@/components/chat-thread";
 import { AutoResizeTextarea } from "@/components/auto-resize-textarea";
-import { postHref } from "@/lib/post-url";
+export { ShareActionButton } from "@/components/share-action-button";
 
 type IconName = "heart" | "bookmark" | "star" | "follow" | "check";
 const iconMap = { heart: Heart, bookmark: Bookmark, star: Star, follow: UserPlus, check: Check };
@@ -114,69 +114,6 @@ export function ToggleActionButton({
     {busy ? <LoaderCircle size={17} className="animate-spin"/> : <Icon size={17} className={active ? (icon === "heart" ? "fill-red-500 text-red-500" : "fill-current") : ""}/>}
     <span className={showCount ? "tabular-nums" : undefined}>{visibleLabel}</span>
   </button>;
-}
-
-export function ShareActionButton({ title, url, iconOnly = false, className = "", targetType, targetId, onShared }: { title: string; url?: string; iconOnly?: boolean; className?: string; targetType?: string; targetId?: string; onShared?: (created: boolean) => void }) {
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [manualLink, setManualLink] = useState("");
-  const [shareError, setShareError] = useState("");
-  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (resetTimer.current) clearTimeout(resetTimer.current); }, []);
-  const share = async () => {
-    if (busy) return;
-    setBusy(true);
-    setShareError("");
-    let link: string;
-    try {
-      let path = url ?? window.location.href;
-      if (targetType === "post" && targetId && /^[1-9]\d*$/.test(targetId) && Number.isSafeInteger(Number(targetId))) {
-        const response = await fetch(`/api/news-feed?postId=${targetId}`, { cache: "no-store" });
-        const data = await response.json() as { posts?: { id: number; slug?: string | null }[] };
-        const post = data.posts?.find(post => post.id === Number(targetId));
-        if (!response.ok || !post?.slug) throw new Error("Post link unavailable");
-        path = postHref(post);
-      }
-      link = new URL(path, window.location.origin).href;
-    } catch {
-      setShareError("Chưa thể lấy liên kết bài viết. Vui lòng thử lại.");
-      setBusy(false);
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(link);
-    } catch {
-      setManualLink(link);
-      setBusy(false);
-      return;
-    }
-    setCopied(true);
-    if (resetTimer.current) clearTimeout(resetTimer.current);
-    resetTimer.current = setTimeout(() => setCopied(false), 1800);
-    setBusy(false);
-    try {
-      if (targetType && targetId) {
-        const response = await fetch("/api/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actionType: "share", targetType, targetId }) });
-        const result = await response.json() as { created?: boolean };
-        if (response.ok) onShared?.(Boolean(result.created));
-      }
-    } catch { /* The link was copied even if recording the share fails. */ }
-  };
-  const label = copied ? "Đã sao chép liên kết" : "Sao chép liên kết chia sẻ";
-  return <>
-    <button type="button" data-requires-account {...authActionTarget(targetType, targetId)} onClick={() => void share()} disabled={busy} className={className} aria-label={label} title={label}>
-      {copied ? <Check size={17} aria-hidden="true"/> : <Share2 size={17} aria-hidden="true"/>}
-      <span className={iconOnly ? "sr-only" : undefined} aria-live="polite">{copied ? "Đã sao chép" : "Chia sẻ"}</span>
-    </button>
-    {shareError && <span role="alert" className="text-xs text-rose-600">{shareError}</span>}
-    <Dialog open={Boolean(manualLink)} onOpenChange={(open) => { if (!open) setManualLink(""); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Chia sẻ: {title}</DialogTitle></DialogHeader>
-        <p className="text-sm text-[#667085]">Không thể sao chép tự động. Bạn có thể sao chép liên kết bên dưới để chia sẻ.</p>
-        <input aria-label="Liên kết chia sẻ" readOnly value={manualLink} onFocus={(event) => event.currentTarget.select()} className="w-full rounded-lg border border-[#d0d5dd] px-3 py-2 text-sm"/>
-      </DialogContent>
-    </Dialog>
-  </>;
 }
 
 export function RequestActionButton({

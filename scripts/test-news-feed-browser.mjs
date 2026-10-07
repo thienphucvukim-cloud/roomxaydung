@@ -58,6 +58,8 @@ try {
     window.review = { comments: [{ id: 1, userId: 'review-reader', authorName: 'Người đọc', content: 'Bình luận có ảnh', imageUrl: '/community-house.png', createdAt: '2026-10-03T08:01:00.000Z' }], liked: false, uploads: [], failSend: false, failMore: true };
     window.review.feedRequests = [];
     window.review.copiedLinks = [];
+    window.review.shareRecords = [];
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async link => {
       if (window.review.clipboardFail) throw new Error('Clipboard unavailable');
       window.review.copiedLinks.push(link);
@@ -83,7 +85,7 @@ try {
         return json({ posts: !url.searchParams.get('postId') || url.searchParams.get('postId') === String(post.id) ? [target] : [], total: 1, seed: 4321, nextCursor: null, catalogOrder: ['post:' + post.id] });
       }
       if (url.pathname === '/api/wallet' && method === 'GET') return json({balance:200000});
-      if (url.pathname === '/api/actions') { if (method === 'POST' && JSON.parse(init.body).actionType === 'share') return json({ created: true }); if (method !== 'GET') window.review.liked = method === 'POST'; return json({ actions: window.review.liked ? [{}] : [], count: window.review.liked ? 1 : 0 }); }
+      if (url.pathname === '/api/actions') { if (method === 'POST' && JSON.parse(init.body).actionType === 'share') { window.review.shareRecords.push(JSON.parse(init.body)); return json({ created: true }); } if (method !== 'GET') window.review.liked = method === 'POST'; return json({ actions: window.review.liked ? [{}] : [], count: window.review.liked ? 1 : 0 }); }
       if (url.pathname === '/api/files' && method === 'POST') { const file = init.body.get('file'); window.review.uploads.push({ name: file.name, size: file.size, type: file.type }); return json({ attachment: { key: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', url: '/community-house.png', name: file.name } }, 201); }
       if (url.pathname === '/api/comments') {
         if (method === 'GET') return json({ comments: window.review.comments, total: window.review.comments.length, nextCursor: null });
@@ -261,7 +263,7 @@ try {
   await evaluate(`(() => { const input = document.querySelector('textarea'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(input, 'Bình luận nhiều dòng\\nGiá 250000đ'); input.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await evaluate(`document.querySelector('button[aria-label="Gửi bình luận"]').click()`);
   await waitFor(`window.review.comments.length === 3`, 'text comment sent');
-  assert.ok(await evaluate(`document.querySelector('article').innerText.includes('Giá 250.000đ')`));
+  await waitFor(`document.querySelector('article').innerText.includes('Giá 250.000đ')`, 'formatted comment renders after the response');
   await evaluate(`document.querySelector('button[aria-label="Xem ảnh bình luận của Người đọc"]').click()`);
   await waitFor(`document.querySelector('[role="dialog"] [role="status"]')?.textContent.includes('1 / 1')`, 'comment photo viewer');
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
@@ -318,18 +320,61 @@ try {
     await send('Page.navigate',{url:origin+legacy+'#post-'+fixtureId});
     await waitFor(`location.pathname===${JSON.stringify('/'+fixture.slug)} && location.search==='' && location.hash==='' && document.querySelector('textarea[aria-label="Nội dung bình luận"]')`,'old links finish on a clean readable URL');
   }
+  let shareLayoutReviewed = false;
   const checkShareButton = async () => {
-    await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share button ready');
-    await evaluate(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').scrollIntoView({block:'center',behavior:'instant'})`);
+    await waitFor(`document.querySelector('article button[aria-label="Chia sẻ"]')`, 'share button ready');
+    await evaluate(`document.querySelector('article button[aria-label="Chia sẻ"]').scrollIntoView({block:'center',behavior:'instant'})`);
     await pause(150);
-    const point = await evaluate(`(() => { const button = document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]'); const r = button.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    const point = await evaluate(`(() => { const button = document.querySelector('article button[aria-label="Chia sẻ"]'); const r = button.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
     await send('Input.dispatchMouseEvent', {type:'mousePressed',button:'left',clickCount:1,...point});
     await send('Input.dispatchMouseEvent', {type:'mouseReleased',button:'left',clickCount:1,...point});
+    await waitFor(`document.querySelector('input[aria-label="Liên kết chia sẻ"]')`, 'share dialog ready');
+    const shareLinks = await evaluate(`Array.from(document.querySelectorAll('[role="dialog"] a')).map(a => ({href:a.href,rel:a.rel,target:a.target}))`);
+    assert.equal(new URL(shareLinks[0].href).searchParams.get('u'), origin + '/' + fixture.slug);
+    assert.equal(new URL(shareLinks[1].href).searchParams.get('url'), origin + '/' + fixture.slug);
+    assert.equal(new URL(shareLinks[1].href).searchParams.get('text'), fixture.title);
+    assert.equal(new URL(shareLinks[2].href).searchParams.get('body'), fixture.title + '\n\n' + origin + '/' + fixture.slug);
+    assert.ok(shareLinks.slice(0,2).every(a => a.target === '_blank' && a.rel.includes('noopener')));
+    if (!shareLayoutReviewed) {
+      for (const width of [1440,390,320]) {
+        await send('Emulation.setDeviceMetricsOverride', {width,height:844,deviceScaleFactor:1,mobile:width<1024});
+        await pause(200);
+        assert.ok(await evaluate(`(() => {const d=document.querySelector('[role="dialog"]');const r=d.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth && d.scrollWidth<=d.clientWidth && Array.from(d.querySelectorAll('a')).every(a=>a.scrollWidth<=a.clientWidth);})()`), 'Share options must fit at width '+width);
+        writeFileSync(path.join(dir, `share-${width}.png`), Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+      }
+      await send('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
+      shareLayoutReviewed = true;
+    }
+    await evaluate(`Array.from(document.querySelectorAll('[role="dialog"] button')).find(button => button.textContent === 'Sao chép liên kết').click()`);
     await waitFor(`window.review.copiedLinks.length`, 'link copied by share button');
     assert.equal(await evaluate('window.review.copiedLinks.at(-1)'), origin + '/' + fixture.slug, 'Share buttons must use the dedicated post URL');
     await evaluate('window.review.copiedLinks=[]');
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await waitFor(`!document.querySelector('[role="dialog"]')`, 'share dialog closed');
+    assert.equal(await evaluate(`document.activeElement?.getAttribute('aria-label')`), 'Chia sẻ', 'Closing restores focus to the share button');
   };
   await checkShareButton();
+  // The device API must receive the correct URL directly from a click. Neither
+  // cancellation nor permission failures should copy a link or record a share.
+  await evaluate(`Object.defineProperty(navigator, 'canShare', {configurable:true,value:()=>true}); Object.defineProperty(navigator, 'share', {configurable:true,value:async data=>{window.review.nativeData=data;throw new DOMException('Canceled','AbortError');}});window.review.shareRecords=[]`);
+  const openNativeShare = async () => {
+    await evaluate(`document.querySelector('article button[aria-label="Chia sẻ"]').click()`);
+    await waitFor(`Array.from(document.querySelectorAll('[role="dialog"] button')).some(b=>b.textContent==='Chia sẻ qua ứng dụng')`, 'device sharing available');
+    await evaluate(`Array.from(document.querySelectorAll('[role="dialog"] button')).find(b=>b.textContent==='Chia sẻ qua ứng dụng').click()`);
+  };
+  await openNativeShare();
+  await waitFor(`document.querySelector('[role="dialog"] button:not([disabled])')`,'cancel restores dialog controls');
+  assert.deepEqual(await evaluate('window.review.nativeData'), {title:fixture.title,url:origin+'/'+fixture.slug});
+  assert.deepEqual(await evaluate('window.review.shareRecords'), []);
+  assert.deepEqual(await evaluate('window.review.copiedLinks'), []);
+  assert.ok(await evaluate(`document.querySelector('[role="dialog"]') && !document.querySelector('[role="dialog"]').innerText.includes('Đã sao chép')`));
+  await evaluate(`Object.defineProperty(navigator,'share',{configurable:true,value:async()=>{throw new DOMException('Denied','NotAllowedError');}});Array.from(document.querySelectorAll('[role="dialog"] button')).find(b=>b.textContent==='Chia sẻ qua ứng dụng').click()`);
+  await waitFor(`document.querySelector('[role="dialog"] [role="status"]').textContent.includes('Chưa thể mở ứng dụng chia sẻ')`,'native permission fallback');
+  assert.deepEqual(await evaluate('window.review.shareRecords'), []);
+  await evaluate(`Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.review.nativeData=data;}});Array.from(document.querySelectorAll('[role="dialog"] button')).find(b=>b.textContent==='Chia sẻ qua ứng dụng').click()`);
+  await waitFor(`!document.querySelector('[role="dialog"]') && window.review.shareRecords.length===1`,'successful native handoff closes dialog and records activity');
+  await evaluate(`Object.defineProperty(navigator,'share',{configurable:true,value:undefined})`);
   await send('Page.navigate', {url: origin});
   await waitFor(`document.querySelector('article time a')`, 'feed article link');
   await evaluate(`document.querySelector('article time a').click()`);
@@ -351,9 +396,11 @@ try {
     assert.ok(await evaluate(`document.getElementById('post-${fixtureId}').textContent.includes('Nhà phố 5 × 20m')`));
     await checkShareButton();
     if (category === 'Nội thất cộng đồng') {
-      await waitFor(`document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]')`, 'share reset');
-      await evaluate(`window.review.clipboardFail=true; document.querySelector('article button[aria-label="Sao chép liên kết chia sẻ"]').click()`);
+      await waitFor(`document.querySelector('article button[aria-label="Chia sẻ"]')`, 'share reset');
+      await evaluate(`window.review.clipboardFail=true; document.querySelector('article button[aria-label="Chia sẻ"]').click()`);
       await waitFor(`document.querySelector('input[aria-label="Liên kết chia sẻ"]')`, 'manual copy fallback');
+      await evaluate(`Array.from(document.querySelectorAll('[role="dialog"] button')).find(button => button.textContent === 'Sao chép liên kết').click()`);
+      await waitFor(`document.querySelector('[role="dialog"] [role="status"]')?.textContent.includes('Không thể sao chép tự động')`, 'manual copy instructions');
       assert.equal(await evaluate(`document.querySelector('input[aria-label="Liên kết chia sẻ"]').value`), origin + '/' + fixture.slug);
     }
   }
