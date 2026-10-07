@@ -1,4 +1,5 @@
 import { normalizePostMetadata, postWithLegacyMetadata } from "@/lib/post-metadata";
+import { CATALOG_PRICE_ERROR, isPricedCatalog, normalizeCatalogPrice } from "@/lib/catalog-price";
 import { and, asc, count, desc, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getDb } from "@/db";
@@ -51,7 +52,7 @@ async function mutate(request: Request, deleting: boolean) {
     if (!body || Array.isArray(body) || typeof body !== "object") throw new Error();
   } catch { return reply({ error: "Dữ liệu không hợp lệ." }, 400); }
   if (typeof body.id !== "number" || !Number.isSafeInteger(body.id) || body.id < 1) return reply({ error: "Mã bài không hợp lệ." }, 400);
-  const allowed = deleting ? ["id"] : ["id", "title", "content", "specifications", "listingType", "imageKeys", "action"];
+  const allowed = deleting ? ["id"] : ["id", "title", "content", "specifications", "listingType", "priceLabel", "imageKeys", "action"];
   if (Object.keys(body).some(key => !allowed.includes(key))) return reply({ error: "Bạn có thể quản lý nội dung và ảnh bài viết. File hồ sơ do quản trị viên quản lý." }, 400);
   const updates: Omit<Partial<typeof posts.$inferInsert>, "audience" | "content"> & { audience?: string | SQL; content?: string | SQL } = {};
   let states = AUTHOR_POST_STATES;
@@ -71,6 +72,16 @@ async function mutate(request: Request, deleting: boolean) {
     else if (body.action === "publish") { updates.audience = "Công khai"; states = [OWN_POST_HIDDEN]; }
     else return reply({ error: "Thao tác không hợp lệ." }, 400);
   } else {
+    if (body.priceLabel !== undefined) {
+      const price = normalizeCatalogPrice(body.priceLabel);
+      if (price === null) return reply({ error: CATALOG_PRICE_ERROR }, 400);
+      let owned: { category: string } | undefined;
+      try { [owned] = await getDb().select({ category: posts.category }).from(posts).where(and(eq(posts.id, body.id), eq(posts.userId, userId))).limit(1); }
+      catch { return reply({ error: "Chưa thể cập nhật giá bán." }, 500); }
+      if (!owned) return reply({ error: "Bài viết không thuộc bạn." }, 404);
+      if (!isPricedCatalog(owned.category)) return reply({ error: "Chỉ hồ sơ bản vẽ và nội thất có giá bán." }, 400);
+      updates.priceLabel = price;
+    }
     for (const [key, max] of [["title", 120], ["content", 1200], ["specifications", 240], ["listingType", 80]] as const) {
       if (body[key] === undefined) continue;
       if (typeof body[key] !== "string" || body[key].length > max || (key === "title" && !body[key].trim())) return reply({ error: "Nội dung hoặc độ dài không hợp lệ." }, 400);

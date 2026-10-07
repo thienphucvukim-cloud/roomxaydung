@@ -2,16 +2,20 @@
 
 import { SITE_EVENTS } from "@/lib/site-events";
 import { useState } from "react";
+import Link from "next/link";
 import { Download, LoaderCircle, ShieldCheck, ShoppingCart, WalletCards, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseVndPrice } from "@/lib/drawing-catalog";
 import { authActionTarget } from "@/lib/action-auth-return";
+import { useSiteEditor } from "@/components/site-editor";
 
 type PurchaseResult = { message?: string; downloadLinks?: { name: string; url: string }[]; error?: string; balance?: number; required?: number };
 
-export function PurchaseActionButton({ targetType, targetId, title, price, className = "", label }: { targetType: "drawing" | "post"; targetId: string; title: string; price: string; className?: string; label?: string }) {
-  const amount = parseVndPrice(price);
-  const displayPrice = amount ? `${amount.toLocaleString("vi-VN")}đ` : price;
+export function PurchaseActionButton({ targetType, targetId, title, price, priceContentKey, className = "", label }: { targetType: "drawing" | "post"; targetId: string; title: string; price: string; priceContentKey?: string; className?: string; label?: string }) {
+  const editor = useSiteEditor();
+  const currentPrice = priceContentKey ? editor.content[priceContentKey]?.value ?? price : price;
+  const amount = parseVndPrice(currentPrice);
+  const displayPrice = amount ? `${amount.toLocaleString("vi-VN")}đ` : "Miễn phí";
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -72,7 +76,7 @@ export function PurchaseActionButton({ targetType, targetId, title, price, class
             <div className="rounded-xl bg-[#f4f9fc] px-4 py-3"><span className="block text-xs font-semibold text-[#667085]">Số dư ví nạp</span><strong className="mt-1 block text-lg text-[#0b2e59]">{balance === null ? "Đang tải..." : `${balance.toLocaleString("vi-VN")}đ`}</strong></div>
           </div>
           <div className="mt-4 flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-800"><ShieldCheck size={20} className="mt-0.5 shrink-0"/><p>Tiền được trừ trực tiếp từ Ví NhàĐẹpChất. Giao dịch lưu lại tên hồ sơ và tác giả để admin đối soát.</p></div>
-          {error && <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"><p>{error}</p>{requiresTopup && <a href="/tai-khoan?wallet=topup#vi-nhadepchat" className="mt-2 inline-flex items-center gap-1.5 text-[#168ac0] hover:underline"><WalletCards size={16}/>Nạp tiền vào ví</a>}</div>}
+          {error && <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700"><p>{error}</p>{requiresTopup && <Link href="/tai-khoan?wallet=topup#vi-nhadepchat" className="mt-2 inline-flex items-center gap-1.5 text-[#168ac0] hover:underline"><WalletCards size={16}/>Nạp tiền vào ví</Link>}</div>}
           {result && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"><p className="font-semibold">{result.message}</p>{result.downloadLinks?.map((item) => <a key={item.url} href={item.url} className="mt-2 flex items-center gap-2 rounded-lg bg-white px-3 py-2 font-bold text-[#168ac0]"><Download size={17}/>{item.name}</a>)}</div>}
           {!result && <button type="button" onClick={checkout} disabled={busy} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#229ed9] font-extrabold text-white transition hover:bg-[#168ac0] disabled:opacity-60">{busy ? <LoaderCircle size={19} className="animate-spin"/> : <WalletCards size={19}/>}Xác nhận mua</button>}
         </div>

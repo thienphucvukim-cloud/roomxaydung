@@ -6,6 +6,7 @@ import { validOrigin } from "@/lib/website-auth";
 import { AUTHOR_DELETED_STATES } from "@/lib/post-ownership";
 import { requestStatuses } from "@/lib/admin-types";
 import { env } from "cloudflare:workers";
+import { CATALOG_PRICE_ERROR, isPricedCatalog, normalizeCatalogPrice } from "@/lib/catalog-price";
 
 type Context = { params: Promise<{ resource: string }> };
 export async function GET(request: Request, context: Context) {
@@ -27,7 +28,7 @@ export async function GET(request: Request, context: Context) {
       const audiences: Record<string, string> = { public: "Công khai", hidden: "Ẩn bởi quản trị", deleted: "Đã xóa bởi tác giả" };
       if (filter && !Object.hasOwn(audiences, filter)) return Response.json({ error: "Bộ lọc bài viết không hợp lệ." }, { status: 400 });
       const condition = and(filter ? filter === "deleted" ? inArray(posts.audience, AUTHOR_DELETED_STATES) : filter === "hidden" ? inArray(posts.audience, ["Ẩn bởi quản trị", "Chỉ mình tôi"]) : eq(posts.audience, audiences[filter]) : inArray(posts.audience, ["Công khai", "Ẩn bởi quản trị", "Chỉ mình tôi", ...AUTHOR_DELETED_STATES]), requestedId ? eq(posts.id, requestedId) : undefined, query ? or(sql`instr(lower(${posts.title}), lower(${query})) > 0`, sql`instr(lower(${posts.authorName}), lower(${query})) > 0`) : undefined);
-      [items, [total]] = await Promise.all([db.select({ id: posts.id, title: posts.title, content: posts.content, authorName: posts.authorName, category: posts.category, audience: posts.audience, createdAt: posts.createdAt }).from(posts).where(condition).orderBy(desc(posts.createdAt), desc(posts.id)).limit(size).offset((page - 1) * size), db.select({ value: count() }).from(posts).where(condition)]);
+      [items, [total]] = await Promise.all([db.select({ id: posts.id, title: posts.title, content: posts.content, authorName: posts.authorName, category: posts.category, priceLabel: posts.priceLabel, audience: posts.audience, createdAt: posts.createdAt }).from(posts).where(condition).orderBy(desc(posts.createdAt), desc(posts.id)).limit(size).offset((page - 1) * size), db.select({ value: count() }).from(posts).where(condition)]);
     } else if (resource === "requests") {
       const condition = and(eq(userRequests.recipientUserId, admin.userId!), ne(userRequests.requestType, "direct-message"), query ? or(sql`instr(lower(${userRequests.subject}), lower(${query})) > 0`, sql`instr(lower(${userRequests.authorName}), lower(${query})) > 0`) : undefined, filter ? eq(userRequests.status, filter) : undefined);
       [items, [total]] = await Promise.all([db.select({ id: userRequests.id, subject: userRequests.subject, content: userRequests.content, authorName: userRequests.authorName, contact: userRequests.contact, requestType: userRequests.requestType, status: userRequests.status, createdAt: userRequests.createdAt }).from(userRequests).where(condition).orderBy(desc(userRequests.createdAt), desc(userRequests.id)).limit(size).offset((page - 1) * size), db.select({ value: count() }).from(userRequests).where(condition)]);
@@ -58,12 +59,20 @@ export async function PATCH(request: Request, context: Context) {
   if (!validOrigin(request)) return Response.json({ error: "Nguồn yêu cầu không hợp lệ." }, { status: 403 });
   const { resource } = await context.params;
   try {
-    const body = await request.json() as { id?: unknown; audience?: unknown; status?: unknown; title?: unknown; content?: unknown; action?: unknown };
+    const body = await request.json() as { id?: unknown; audience?: unknown; status?: unknown; title?: unknown; content?: unknown; priceLabel?: unknown; action?: unknown };
     if (typeof body.id !== "number" || !Number.isSafeInteger(body.id) || body.id < 1) return Response.json({ error: "Mã dữ liệu không hợp lệ." }, { status: 400 });
     let rows;
     if (resource === "posts") {
       if (body.action !== undefined) return Response.json({ error: "Thao tác không hợp lệ." }, { status: 400 });
-      const updates: { title?: string; content?: string; audience?: string } = {};
+      const updates: { title?: string; content?: string; audience?: string; priceLabel?: string } = {};
+      if (body.priceLabel !== undefined) {
+        const price = normalizeCatalogPrice(body.priceLabel);
+        if (price === null) return Response.json({ error: CATALOG_PRICE_ERROR }, { status: 400 });
+        const [post] = await getDb().select({ category: posts.category }).from(posts).where(eq(posts.id, body.id)).limit(1);
+        if (!post) return Response.json({ error: "Không tìm thấy bài viết." }, { status: 404 });
+        if (!isPricedCatalog(post.category)) return Response.json({ error: "Chỉ hồ sơ bản vẽ và nội thất có giá bán." }, { status: 400 });
+        updates.priceLabel = price;
+      }
       if (body.audience !== undefined) {
         if (body.audience !== "Công khai" && body.audience !== "Ẩn bởi quản trị") return Response.json({ error: "Trạng thái bài viết không hợp lệ." }, { status: 400 });
         updates.audience = body.audience;

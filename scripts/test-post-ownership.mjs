@@ -55,6 +55,12 @@ async function load(specifier, referencing) {
 }
 const route = await load("@/app/api/my-posts/route");
 await route.link(load); await route.evaluate();
+const { normalizeCatalogPrice } = (await load("@/lib/catalog-price")).namespace;
+for (const value of ["", "  ", "0", "0đ", "0 ₫", "Miễn phí"]) assert.equal(normalizeCatalogPrice(value), "0đ", value);
+for (const value of ["150000", "150.000đ", "150,000 VND", " 150.000 ₫ "]) assert.equal(normalizeCatalogPrice(value), "150.000đ", value);
+assert.equal(normalizeCatalogPrice("2000"), "2.000đ");
+for (const value of [null, undefined, 150000, "-2000", "1đ", "1999", "1.500", "20.00", "2,500.5", "2e3", "abc2000", "2000abc", "9007199254740992", "2".repeat(241)]) assert.equal(normalizeCatalogPrice(value), null, String(value));
+const products = await load("@/lib/wallet-products"); await products.link(load); await products.evaluate();
 const feed = await load("@/app/api/news-feed/route");
 await feed.link(load); await feed.evaluate();
 const comments = await load("@/app/api/comments/route");
@@ -228,5 +234,29 @@ try {
   assert.equal((await read({ id: String(adminOwnPost) })).isAdmin, true);
   await change({ id: adminOwnPost }, 200, "DELETE");
   assert.equal(sqlite.prepare("SELECT id FROM posts WHERE id = ?").get(adminOwnPost), undefined);
+  userId = "author";
+  for (const category of ["Bản vẽ cộng đồng", "Nội thất cộng đồng"]) {
+    const catalogPost = add("author", "Công khai", category);
+    const otherCatalogPost = add("other", "Công khai", category);
+    await change({ id: otherCatalogPost, priceLabel: "50000" }, 404);
+    const priced = await change({ id: catalogPost, priceLabel: "150000" });
+    assert.equal(priced.post.priceLabel, "150.000đ");
+    assert.equal((await products.namespace.resolveWalletProduct("post", String(catalogPost))).amount, 150000);
+    for (const value of ["1đ", "-2000", "bad2000", 10000, null]) await change({ id: catalogPost, priceLabel: value }, 400);
+    assert.equal((await read({ id: String(catalogPost) })).posts[0].priceLabel, "150.000đ");
+    await change({ id: catalogPost, priceLabel: "75000" });
+    assert.equal((await products.namespace.resolveWalletProduct("post", String(catalogPost))).amount, 75000);
+    await change({ id: catalogPost, priceLabel: "" });
+    assert.equal((await products.namespace.resolveWalletProduct("post", String(catalogPost))).amount, 0);
+    const adminPrice = await admin.namespace.PATCH(adminRequest("PATCH", { id: otherCatalogPost, priceLabel: "99000" }), adminContext);
+    assert.equal(adminPrice.status, 200);
+    assert.equal((await products.namespace.resolveWalletProduct("post", String(otherCatalogPost))).amount, 99000);
+    const listed = await admin.namespace.GET(new Request(`http://localhost/api/admin/manage/posts?id=${otherCatalogPost}`), adminContext);
+    assert.equal((await listed.json()).items[0].priceLabel, "99.000đ");
+    assert.equal((await admin.namespace.PATCH(adminRequest("PATCH", { id: otherCatalogPost, priceLabel: "-99000" }), adminContext)).status, 400);
+    await change({ id: catalogPost }, 200, "DELETE");
+    await change({ id: catalogPost, priceLabel: "80000" }, 404);
+  }
+  console.log("PASS: catalog price editing enforces ownership, category, valid VND amounts and deleted states; checkout uses current author/admin prices.");
   console.log("PASS: author deletion retained only in admin, permanent admin deletion (including own profile), hide/show, cleanup, ownership/privacy, unchanged ledger and purchased downloads, atomic photo editing.");
 } finally { sqlite.close(); }

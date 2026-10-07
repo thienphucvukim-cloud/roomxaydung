@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const catalog = [
     ...resources,
     ...houseModels.flatMap((model, index) => demoPostVisible(content, houseModelContentKey(index)) ? [{ title: content[houseModelContentKey(index, "title")]?.value ?? model.title, copy: `${content[houseModelContentKey(index, "meta")]?.value ?? model.meta} · ${content[houseModelContentKey(index, "style")]?.value ?? model.style} · ${model.authorName}`, href: catalogPageHref("/kho-mau-nha-dep-chat", 1, model.title), type: "Mẫu nhà đẹp" }] : []),
-    ...drawings.flatMap((drawing, index) => demoPostVisible(content, `drawing.${index}`) ? [{ title: content[`drawing.${index}.title`]?.value ?? drawing.title, copy: `${content[`drawing.${index}.style`]?.value ?? drawing.category} · ${drawing.price} · ${drawing.authorName}`, href: catalogPageHref("/file-ban-ve-nha-dep-chat", 1, drawing.title), type: "Bản vẽ" }] : []),
+    ...drawings.flatMap((drawing, index) => demoPostVisible(content, `drawing.${index}`) ? [{ title: content[`drawing.${index}.title`]?.value ?? drawing.title, copy: `${content[`drawing.${index}.style`]?.value ?? drawing.category} · ${content[`drawing.${index}.price`]?.value ?? drawing.price} · ${drawing.authorName}`, href: catalogPageHref("/file-ban-ve-nha-dep-chat", 1, drawing.title), type: "Bản vẽ" }] : []),
   ].filter(item => `${item.title} ${item.copy}`.toLocaleLowerCase("vi").includes(normalized));
   try {
     const matchedPosts = await getDb().select().from(posts).where(and(

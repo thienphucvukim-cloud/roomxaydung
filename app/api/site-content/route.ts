@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { getSiteContent, type ContentValue } from "@/lib/site-content";
 import { requireAdmin } from "@/lib/admin-auth";
 import { validOrigin } from "@/lib/website-auth";
+import { CATALOG_PRICE_ERROR, normalizeCatalogPrice } from "@/lib/catalog-price";
 
 export async function GET() {
   return Response.json({ content: await getSiteContent() }, { headers: { "Cache-Control": "no-store" } });
@@ -23,6 +24,11 @@ export async function PUT(request: Request) {
       if (change.content === null) continue;
       const content = change.content;
       if (!content || !["text", "image", "color"].includes(content.kind) || typeof content.value !== "string" || content.value.length > 5000) return Response.json({ error: "Nội dung không hợp lệ hoặc quá dài." }, { status: 400 });
+      if (/^drawing\.\d+\.price$/.test(change.key)) {
+        const price = normalizeCatalogPrice(content.value);
+        if (content.kind !== "text" || price === null) return Response.json({ error: CATALOG_PRICE_ERROR }, { status: 400 });
+        change.content = { kind: "text", value: price };
+      }
       if (content.kind === "color" && !/^#[0-9a-f]{6}$/i.test(content.value)) return Response.json({ error: "Mã màu không hợp lệ." }, { status: 400 });
       if (content.kind === "image") {
         const url = new URL(content.value, request.url);

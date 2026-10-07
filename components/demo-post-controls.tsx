@@ -7,8 +7,9 @@ import { useSiteEditor } from "@/components/site-editor";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { demoPostState } from "@/lib/demo-posts";
 import type { ContentValue } from "@/lib/site-content";
+import { CATALOG_PRICE_ERROR, normalizeCatalogPrice } from "@/lib/catalog-price";
 
-export function DemoPostControls({ prefix, title, style, image, meta }: { prefix: string; title: string; style: string; image: string; meta?: string }) {
+export function DemoPostControls({ prefix, title, style, image, meta, price }: { prefix: string; title: string; style: string; image: string; meta?: string; price?: string }) {
   const editor = useSiteEditor();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,6 +41,11 @@ export function DemoPostControls({ prefix, title, style, image, meta }: { prefix
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const changes: Record<string, ContentValue> = {};
+    if (price !== undefined) {
+      const value = normalizeCatalogPrice(form.get("price"));
+      if (value === null) { setError(CATALOG_PRICE_ERROR); return; }
+      changes[`${prefix}.price`] = { kind: "text", value };
+    }
     for (const field of ["title", "style", "image", ...(meta === undefined ? [] : ["meta"])]) {
       changes[`${prefix}.${field}`] = { kind: field === "image" ? "image" : "text", value: String(form.get(field) ?? "").trim() };
     }
@@ -65,6 +71,7 @@ export function DemoPostControls({ prefix, title, style, image, meta }: { prefix
         <label>Tiêu đề<input name="title" defaultValue={currentTitle} required maxLength={120} disabled={busy}/></label>
         <label>Loại / phong cách<input name="style" defaultValue={editor.content[`${prefix}.style`]?.value ?? style} maxLength={200} disabled={busy}/></label>
         {meta !== undefined && <label>Thông tin mẫu<input name="meta" defaultValue={editor.content[`${prefix}.meta`]?.value ?? meta} maxLength={500} disabled={busy}/></label>}
+        {price !== undefined && <label>Giá bán (VNĐ)<input name="price" inputMode="numeric" defaultValue={editor.content[`${prefix}.price`]?.value ?? price} maxLength={240} disabled={busy}/><span className="text-xs font-normal text-[#667085]">Giá từ 2.000đ. Nhập 0 hoặc để trống nếu miễn phí.</span></label>}
         <label>Đường dẫn ảnh<input name="image" defaultValue={editor.content[`${prefix}.image`]?.value ?? image} required maxLength={1024} disabled={busy}/></label>
         {error && <p role="alert" className="owner-edit-error">{error}</p>}
         <div className="owner-edit-actions"><button type="button" className="owner-secondary" disabled={busy} onClick={() => setOpen(false)}>Hủy</button><button type="submit" className="owner-primary" disabled={busy}>{busy && <LoaderCircle size={15} className="animate-spin"/>}Lưu thay đổi</button></div>

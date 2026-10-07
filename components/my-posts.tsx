@@ -13,9 +13,10 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { AUTHOR_POST_STATES, OWN_POST_HIDDEN } from "@/lib/post-ownership";
 import { CoverImagePicker } from "@/components/cover-image-picker";
 import { optimizePostImageForUpload } from "@/lib/image-upload";
+import { isPricedCatalog } from "@/lib/catalog-price";
 
 type PostImage = { key: string; name: string; type: string; size: number; url: string };
-type Post = { id: number; title: string; content: string; specifications: string | null; listingType: string | null; audience: string; category: string; images: PostImage[] };
+type Post = { id: number; title: string; content: string; specifications: string | null; listingType: string | null; priceLabel: string | null; audience: string; category: string; images: PostImage[] };
 type PostResponse = { post: Post; posts: Post[]; totalPages: number; isAdmin?: boolean; error?: string };
 const buttonClass = "rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50";
 
@@ -76,10 +77,10 @@ export function MyPostControls({ postId, iconOnly = false }: { postId: number; i
   }
   return <><button type="button" className={iconOnly ? postManagementIconClass : "owner-post-control"} aria-label="Quản lý bài viết" title="Quản lý bài viết" onClick={() => { setPost(undefined); setError(""); setNotice(""); setConfirmDelete(false); setOpen(true); }}><Pencil size={14} aria-hidden="true"/>{!iconOnly && "Quản lý bài viết"}</button>
     <Dialog open={open} onOpenChange={value => { if (!locked) setOpen(value); }}><DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-      <DialogTitle>Quản lý bài viết của bạn</DialogTitle><DialogDescription>Bạn có thể sửa nội dung và ảnh, ẩn hoặc xóa bài viết. File hồ sơ tải xuống do quản trị viên quản lý.</DialogDescription>
+      <DialogTitle>Quản lý bài viết của bạn</DialogTitle><DialogDescription>Bạn có thể sửa nội dung, ảnh và giá bán hồ sơ, ẩn hoặc xóa bài viết. File hồ sơ tải xuống do quản trị viên quản lý.</DialogDescription>
       {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}{notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
       {!post && !error && <p role="status"><LoaderCircle className="inline animate-spin" size={18}/> Đang tải bài viết...</p>}
-      {post && <form onSubmit={event => { event.preventDefault(); if (locked) return; void update({ title: post.title, content: post.content, specifications: post.specifications || "", listingType: post.listingType || "", imageKeys: post.images.map(image => image.key) }); }} className="space-y-4">
+      {post && <form onSubmit={event => { event.preventDefault(); if (locked) return; void update({ title: post.title, content: post.content, specifications: post.specifications || "", listingType: post.listingType || "", ...(isPricedCatalog(post.category) ? { priceLabel: post.priceLabel || "" } : {}), imageKeys: post.images.map(image => image.key) }); }} className="space-y-4">
         <p className="text-sm text-[#667085]">Trạng thái: {post.audience}</p>
         <section aria-label="Ảnh bài viết">
           <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">Ảnh bài viết ({post.images.length}/10)</h3><label className={`cursor-pointer ${buttonClass} ${locked || post.images.length >= 10 ? "pointer-events-none opacity-50" : ""}`}>{uploading ? "Đang tải ảnh..." : "Thêm ảnh"}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled={locked || post.images.length >= 10} onChange={event => void chooseImages(event)} className="sr-only"/></label></div>
@@ -95,6 +96,7 @@ export function MyPostControls({ postId, iconOnly = false }: { postId: number; i
         <label className="block text-sm font-semibold">Nội dung<textarea rows={5} maxLength={1200} disabled={locked} value={post.content} onChange={event => setPost({ ...post, content: event.target.value })} className="mt-1 w-full rounded-lg border p-2"/></label>
         <label className="block text-sm font-semibold">Thông tin kích thước / định dạng<input maxLength={240} disabled={locked} value={post.specifications || ""} onChange={event => setPost({ ...post, specifications: event.target.value })} className="mt-1 w-full rounded-lg border p-2"/></label>
         <label className="block text-sm font-semibold">Phong cách / loại hồ sơ<input maxLength={80} disabled={locked} value={post.listingType || ""} onChange={event => setPost({ ...post, listingType: event.target.value })} className="mt-1 w-full rounded-lg border p-2"/></label>
+        {isPricedCatalog(post.category) && <label className="block text-sm font-semibold">Giá bán (VNĐ)<input inputMode="numeric" maxLength={240} disabled={locked} value={post.priceLabel || ""} onChange={event => setPost({ ...post, priceLabel: event.target.value })} placeholder="Ví dụ: 150.000đ" className="mt-1 w-full rounded-lg border p-2"/><span className="mt-1 block text-xs font-normal text-[#667085]">Giá từ 2.000đ. Nhập 0 hoặc để trống nếu miễn phí.</span></label>}
         <div className="flex flex-wrap gap-2"><button disabled={locked} className={`${buttonClass} bg-[#229ed9] text-white`}>{busy ? "Đang xử lý..." : "Lưu thay đổi"}</button>
           {AUTHOR_POST_STATES.includes(post.audience) && <button type="button" disabled={locked} className={buttonClass} onClick={() => void update({ action: post.audience === OWN_POST_HIDDEN ? "publish" : "hide" })}>{post.audience === OWN_POST_HIDDEN ? "Hiện bài viết" : "Ẩn bài viết"}</button>}
           <button type="button" disabled={locked} className={`${buttonClass} text-rose-700`} onClick={() => setConfirmDelete(true)}>Xóa bài viết</button></div>

@@ -48,6 +48,8 @@ const helpers = await load("@/lib/demo-posts");
 await helpers.link(load); await helpers.evaluate();
 const search = await load("@/app/api/search/route");
 await search.link(load); await search.evaluate();
+const products = await load("@/lib/wallet-products"); await products.link(load); await products.evaluate();
+const { drawings } = (await load("@/lib/drawing-catalog")).namespace;
 const { demoPostVisible, demoPostState } = helpers.namespace;
 const read = async () => (await (await route.namespace.GET()).json()).content;
 const results = async () => (await (await search.namespace.GET(new Request("https://example.test/api/search?q=" + encodeURIComponent("Nhà phố 3 tầng xanh mát")))).json()).results;
@@ -59,6 +61,19 @@ async function write(changes, expected = 200, origin = "https://example.test") {
 }
 const state = value => [{ key: "facade.0.visibility", content: { kind: "text", value } }];
 try {
+  const priceChange = value => [{ key: "drawing.0.price", content: { kind: "text", value } }];
+  const product = () => products.namespace.resolveWalletProduct("drawing", drawings[0].title);
+  assert.equal((await product()).amount, 150000);
+  await write(priceChange("99000"));
+  assert.equal((await read())["drawing.0.price"].value, "99.000đ");
+  assert.equal((await product()).amount, 99000, "Checkout reads the persisted price override");
+  for (const value of ["-2000", "1đ", "abc2000", "9007199254740992"]) await write(priceChange(value), 400);
+  assert.equal((await product()).amount, 99000);
+  await write([{ key: "drawing.0.price", content: { kind: "image", value: "/2000.png" } }], 400);
+  await write(priceChange("0")); assert.equal((await product()).amount, 0);
+  await write(priceChange("85000"), 403, "https://other.test");
+  isAdmin = false; await write(priceChange("85000"), 401); isAdmin = true;
+  await write([{ key: "drawing.0.price", content: null }]); assert.equal((await product()).amount, 150000);
   assert.equal(demoPostVisible(await read(), "facade.0"), true);
   assert.equal((await results()).length, 1);
   await write(state("hidden"));

@@ -8,10 +8,11 @@ import { recordCatalogView } from "@/components/catalog-engagement";
 import type { CatalogTarget } from "@/lib/catalog-engagement";
 import { DemoPostBadge } from "@/components/demo-post-badge";
 
-type Model = { title: string; meta: string; style: string; image: string; photos?: string[]; editableKey?: string; isDemo?: boolean };
+type Model = { title: string; meta: string; price?: string; style: string; image: string; photos?: string[]; editableKey?: string; isDemo?: boolean };
 
 export function ProjectGallery({ model, trigger = "text", engagementTarget }: { model: Model; trigger?: "text" | "overlay"; engagementTarget?: CatalogTarget }) {
   const editor = useSiteEditor();
+  const meta = model.price === undefined ? model.meta : `${model.editableKey ? editor.content[`${model.editableKey}.price`]?.value ?? model.price : model.price} · ${model.meta}`;
   const originals = model.photos?.length ? model.photos : [model.image, "/community-house.png", "/mau-nha-pho-xanh.png", "/mat-bang-5x20.png", model.image];
   const photos = originals.map((photo, index) => model.editableKey ? editor.content[`${model.editableKey}.${index === 0 ? "image" : `photo.${index}`}`]?.value ?? photo : photo);
   const [open, setOpen] = useState(false);
@@ -121,7 +122,7 @@ export function ProjectGallery({ model, trigger = "text", engagementTarget }: { 
             <h2 className="bg-[#0b2e59] px-3 py-2 text-center text-xs font-extrabold uppercase tracking-[.1em] text-[#bde7f8] sm:px-5 sm:py-4 sm:text-sm">Thông tin công trình</h2>
             <div className="grid grid-cols-3 divide-x divide-[#e3eaf2] text-xs sm:text-base">
               <div className="min-w-0 p-2 break-words sm:p-4"><p className="text-[10px] font-bold text-[#3f5064] sm:text-xs">Loại công trình</p><p className="mt-1 font-extrabold">{model.style}</p></div>
-              <div className="min-w-0 p-2 break-words sm:p-4"><p className="text-[10px] font-bold text-[#3f5064] sm:text-xs">Quy mô</p><p className="mt-1 font-extrabold">{model.meta}</p></div>
+              <div className="min-w-0 p-2 break-words sm:p-4"><p className="text-[10px] font-bold text-[#3f5064] sm:text-xs">Quy mô</p><p className="mt-1 font-extrabold">{meta}</p></div>
               <div className="min-w-0 p-2 break-words sm:p-4"><p className="flex items-center gap-1 text-[10px] font-bold text-[#3f5064] sm:text-xs"><MapPin size={13} className="shrink-0"/>Khu vực tham khảo</p><p className="mt-1 font-extrabold">Việt Nam</p></div>
             </div>
           </section>

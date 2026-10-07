@@ -20,8 +20,8 @@ let edited = await send("/api/my-posts", "PATCH", { id: post.id, location: "6 ×
 assert.equal(edited.post.specifications, "6 × 18m"); assert.equal(edited.post.listingType, "Nhà phố");
 edited = await send("/api/my-posts", "PATCH", { id: post.id, specifications: "7 × 16m", listingType: "Nhà vườn", feeling: "Cũ" }, 200);
 assert.equal(edited.post.listingType, "Nhà vườn"); assert.equal(edited.post.feeling, "Nhà vườn");
-await send("/api/my-posts", "PATCH", { id: post.id, priceLabel: "1đ" }, 400); // author cannot change managed prices
-await send("/api/my-posts", "PATCH", { id: post.id, pollQuestion: "1đ" }, 400); // old alias cannot bypass that policy
+await send("/api/my-posts", "PATCH", { id: post.id, priceLabel: "1đ" }, 400); // house model posts do not have editable sale prices
+await send("/api/my-posts", "PATCH", { id: post.id, pollQuestion: "1đ" }, 400); // legacy alias follows the same catalog restriction
 for (const route of ["/api/posts?category=" + encodeURIComponent("Bộ sưu tập ảnh") + "&postId=" + post.id, "/api/my-posts?id=" + post.id, "/api/news-feed?q=" + encodeURIComponent(title)]) {
   const listed = await send(route, "GET", null, 200);
   const found = listed.posts.find(item => item.id === post.id); assert.ok(found, route);
